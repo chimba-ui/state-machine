@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "allowJs": false,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noImplicitReturns": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@render-experiment/behavior-core": ["./packages/behavior/core/src"],
+      "@render-experiment/behavior-react": ["./packages/behavior/react/src"],
+      "@render-experiment/style-react": ["./packages/style/react/src"],
+      "@render-experiment/tooltip-core": ["./packages/components/core/tooltip/src"],
+      "@render-experiment/tooltip-react": ["./packages/components/react/tooltip/src"]
+    },
+    "types": ["@types/node", "vite/client", "vitest/globals"]
+  },
+  "include": ["./packages", "./sandbox", "./scripts", "./*.ts"],
+  "exclude": ["**/node_modules", "**/dist"]
+}
