@@ -3,3 +3,6 @@ dist
 .DS_Store
 *.log
 .vite
+.expo
+.expo-shared
+sandbox/native/dist

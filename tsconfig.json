@@ -16,14 +16,24 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "@render-experiment/behavior-core": ["./packages/core/behavior/src"],
-      "@render-experiment/behavior-react": ["./packages/react/behavior/src"],
-      "@render-experiment/style-react": ["./packages/react/style/src"],
+      "@render-experiment/machine-core": ["./packages/core/machine/src"],
+      "@render-experiment/machine-react": ["./packages/react/machine/src"],
+      "@render-experiment/machine-native": ["./packages/native/machine/src"],
+      "@render-experiment/style-engine-react": ["./packages/react/style-engine/src"],
+      "@render-experiment/style-engine-native": ["./packages/native/style-engine/src"],
       "@render-experiment/tooltip-core": ["./packages/core/components/tooltip/src"],
-      "@render-experiment/tooltip-react": ["./packages/react/components/tooltip/src"]
+      "@render-experiment/tooltip-react": ["./packages/react/components/tooltip/src"],
+      "@render-experiment/tooltip-native": ["./packages/native/components/tooltip/src"]
     },
     "types": ["@types/node", "vite/client", "vitest/globals"]
   },
-  "include": ["./packages", "./sandbox", "./scripts", "./*.ts"],
-  "exclude": ["**/node_modules", "**/dist"]
+  "include": ["./packages", "./sandbox/react", "./scripts", "./*.ts"],
+  "exclude": [
+    "**/node_modules",
+    "**/dist",
+    "./packages/native/machine",
+    "./packages/native/style-engine",
+    "./packages/native/components",
+    "./sandbox/native"
+  ]
 }
