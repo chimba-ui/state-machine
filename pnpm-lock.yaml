@@ -48,6 +48,12 @@ importers:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@22.19.19)(vite@8.0.14(@types/node@22.19.19)(esbuild@0.28.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
 
+  packages/core/components/dropdown-menu:
+    dependencies:
+      '@render-experiment/machine-core':
+        specifier: workspace:*
+        version: link:../../machine
+
   packages/core/components/tooltip:
     dependencies:
       '@render-experiment/machine-core':
@@ -55,6 +61,24 @@ importers:
         version: link:../../machine
 
   packages/core/machine: {}
+
+  packages/native/components/dropdown-menu:
+    dependencies:
+      '@render-experiment/dropdown-menu-core':
+        specifier: workspace:*
+        version: link:../../../core/components/dropdown-menu
+      '@render-experiment/machine-native':
+        specifier: workspace:*
+        version: link:../../machine
+      '@render-experiment/style-engine-native':
+        specifier: workspace:*
+        version: link:../../style-engine
+      react:
+        specifier: '*'
+        version: 19.2.6
+      react-native:
+        specifier: '*'
+        version: 0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@19.2.6)
 
   packages/native/components/tooltip:
     dependencies:
@@ -91,6 +115,21 @@ importers:
       react-native:
         specifier: '*'
         version: 0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@19.2.6)
+
+  packages/react/components/dropdown-menu:
+    dependencies:
+      '@render-experiment/dropdown-menu-core':
+        specifier: workspace:*
+        version: link:../../../core/components/dropdown-menu
+      '@render-experiment/machine-react':
+        specifier: workspace:*
+        version: link:../../machine
+      '@render-experiment/style-engine-react':
+        specifier: workspace:*
+        version: link:../../style-engine
+      react:
+        specifier: '*'
+        version: 19.2.6
 
   packages/react/components/tooltip:
     dependencies:
@@ -130,6 +169,12 @@ importers:
       '@expo/metro-runtime':
         specifier: ~3.2.3
         version: 3.2.3(react-native@0.74.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.2.79)(react@18.2.0))
+      '@render-experiment/dropdown-menu-core':
+        specifier: workspace:*
+        version: link:../../packages/core/components/dropdown-menu
+      '@render-experiment/dropdown-menu-native':
+        specifier: workspace:*
+        version: link:../../packages/native/components/dropdown-menu
       '@render-experiment/machine-core':
         specifier: workspace:*
         version: link:../../packages/core/machine
@@ -176,6 +221,12 @@ importers:
       '@json-render/react':
         specifier: ^0.19.0
         version: 0.19.0(react@19.2.6)(zod@4.4.3)
+      '@render-experiment/dropdown-menu-core':
+        specifier: workspace:*
+        version: link:../../packages/core/components/dropdown-menu
+      '@render-experiment/dropdown-menu-react':
+        specifier: workspace:*
+        version: link:../../packages/react/components/dropdown-menu
       '@render-experiment/machine-core':
         specifier: workspace:*
         version: link:../../packages/core/machine

@@ -23,7 +23,10 @@
       "@render-experiment/style-engine-native": ["./packages/native/style-engine/src"],
       "@render-experiment/tooltip-core": ["./packages/core/components/tooltip/src"],
       "@render-experiment/tooltip-react": ["./packages/react/components/tooltip/src"],
-      "@render-experiment/tooltip-native": ["./packages/native/components/tooltip/src"]
+      "@render-experiment/tooltip-native": ["./packages/native/components/tooltip/src"],
+      "@render-experiment/dropdown-menu-core": ["./packages/core/components/dropdown-menu/src"],
+      "@render-experiment/dropdown-menu-react": ["./packages/react/components/dropdown-menu/src"],
+      "@render-experiment/dropdown-menu-native": ["./packages/native/components/dropdown-menu/src"]
     },
     "types": ["@types/node", "vite/client", "vitest/globals"]
   },
