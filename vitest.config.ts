@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      "@render-experiment/shared": resolve(__dirname, "./packages/shared/src"),
       "@render-experiment/store": resolve(__dirname, "./packages/core/store/src"),
       "@render-experiment/store-react": resolve(
         __dirname,
