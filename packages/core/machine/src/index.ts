@@ -31,4 +31,5 @@ export type {
   KeyboardPayload,
   PointerPayload,
 } from "./bindings";
+export type { Part } from "./part";
 export type { Style, StyleSpec, StyleValue } from "./style-spec";
