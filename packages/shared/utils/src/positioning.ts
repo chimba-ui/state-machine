@@ -48,3 +48,52 @@ const sideMap: Record<Placement, Side> = {
 export function placementToSide(p: Placement): Side {
   return sideMap[p];
 }
+
+/**
+ * Collision flip — pick the effective side given the preferred side, the
+ * trigger's rect, the (possibly null) content rect, the viewport, and the
+ * main-axis offset. Vertical/horizontal sides flip within their own axis
+ * (top↔bottom, left↔right); we don't rotate 90°. Returns the preferred
+ * side if no flip is needed or the content hasn't been measured yet.
+ */
+export interface ViewportSize {
+  width: number;
+  height: number;
+}
+export function pickSide(
+  preferred: Side,
+  triggerRect: { top: number; bottom: number; left: number; right: number },
+  contentRect: { width: number; height: number } | null,
+  viewport: ViewportSize,
+  offset: number,
+): Side {
+  if (!contentRect) return preferred;
+  const ch = contentRect.height;
+  const cw = contentRect.width;
+  switch (preferred) {
+    case "bottom": {
+      const fitsBottom = triggerRect.bottom + offset + ch <= viewport.height;
+      if (fitsBottom) return "bottom";
+      const fitsTop = triggerRect.top - offset - ch >= 0;
+      return fitsTop ? "top" : "bottom";
+    }
+    case "top": {
+      const fitsTop = triggerRect.top - offset - ch >= 0;
+      if (fitsTop) return "top";
+      const fitsBottom = triggerRect.bottom + offset + ch <= viewport.height;
+      return fitsBottom ? "bottom" : "top";
+    }
+    case "right": {
+      const fitsRight = triggerRect.right + offset + cw <= viewport.width;
+      if (fitsRight) return "right";
+      const fitsLeft = triggerRect.left - offset - cw >= 0;
+      return fitsLeft ? "left" : "right";
+    }
+    case "left": {
+      const fitsLeft = triggerRect.left - offset - cw >= 0;
+      if (fitsLeft) return "left";
+      const fitsRight = triggerRect.right + offset + cw <= viewport.width;
+      return fitsRight ? "right" : "left";
+    }
+  }
+}

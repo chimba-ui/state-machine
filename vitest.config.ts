@@ -35,6 +35,14 @@ export default defineConfig({
         __dirname,
         "./packages/react/components/tooltip/src",
       ),
+      "@render-experiment/dropdown-menu-core": resolve(
+        __dirname,
+        "./packages/core/components/dropdown-menu/src",
+      ),
+      "@render-experiment/dropdown-menu-react": resolve(
+        __dirname,
+        "./packages/react/components/dropdown-menu/src",
+      ),
     },
   },
   test: {

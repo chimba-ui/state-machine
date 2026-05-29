@@ -24,6 +24,14 @@
 export interface PointerPayload {
   /** True when an upstream handler called preventDefault / equivalent. */
   defaultPrevented?: boolean;
+  /**
+   * Cancels the substrate's default action for the event (e.g. on web,
+   * stops a synthetic click on Space-keyup, suppresses form submission on
+   * Enter, prevents the page from scrolling on Arrow keys). Adapters
+   * wire this to the native event's preventDefault when available;
+   * substrates that have no concept of default action provide a no-op.
+   */
+  preventDefault?: () => void;
   /** Pointer button number. 0 is primary on every substrate. */
   button?: number;
   /** Input modality. Canvas/RN can supply "touch" or "mouse"; web supplies all three. */
@@ -32,6 +40,8 @@ export interface PointerPayload {
 
 export interface KeyboardPayload {
   defaultPrevented?: boolean;
+  /** See PointerPayload.preventDefault. */
+  preventDefault?: () => void;
   /** Logical key name. Matches `KeyboardEvent.key` on web. */
   key?: string;
 }
@@ -84,4 +94,13 @@ export interface AttrBindings {
 
   /** ARIA role on web; equivalent semantic tag on other substrates. */
   role?: string;
+
+  /**
+   * Open slot for substrate-specific attributes the named keys don't
+   * cover. Common case: `data-*` and `aria-*` attrs the React adapter
+   * passes through verbatim; native + pixi adapters drop unknown keys.
+   * Keep values primitive (string / number / boolean) so adapters can
+   * serialize them.
+   */
+  [key: string]: string | number | boolean | undefined;
 }
