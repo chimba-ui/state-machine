@@ -17,6 +17,8 @@
     "baseUrl": ".",
     "paths": {
       "@render-experiment/shared": ["./packages/shared/src"],
+      "@render-experiment/tooltip-shared": ["./packages/shared/components/tooltip/src"],
+      "@render-experiment/dropdown-menu-shared": ["./packages/shared/components/dropdown-menu/src"],
       "@render-experiment/store": ["./packages/core/store/src"],
       "@render-experiment/store-react": ["./packages/react/store/src"],
       "@render-experiment/machine-core": ["./packages/core/machine/src"],

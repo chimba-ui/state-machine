@@ -59,6 +59,9 @@ importers:
 
   packages/core/components/dropdown-menu:
     dependencies:
+      '@render-experiment/dropdown-menu-shared':
+        specifier: workspace:*
+        version: link:../../../shared/components/dropdown-menu
       '@render-experiment/machine-core':
         specifier: workspace:*
         version: link:../../machine
@@ -68,6 +71,9 @@ importers:
       '@render-experiment/machine-core':
         specifier: workspace:*
         version: link:../../machine
+      '@render-experiment/tooltip-shared':
+        specifier: workspace:*
+        version: link:../../../shared/components/tooltip
 
   packages/core/machine:
     dependencies:
@@ -241,6 +247,20 @@ importers:
       react:
         specifier: '*'
         version: 19.2.6
+
+  packages/shared: {}
+
+  packages/shared/components/dropdown-menu:
+    dependencies:
+      '@render-experiment/machine-core':
+        specifier: workspace:*
+        version: link:../../../core/machine
+
+  packages/shared/components/tooltip:
+    dependencies:
+      '@render-experiment/machine-core':
+        specifier: workspace:*
+        version: link:../../../core/machine
 
   sandbox/native:
     dependencies:

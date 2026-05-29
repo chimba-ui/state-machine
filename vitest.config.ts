@@ -7,6 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@render-experiment/shared": resolve(__dirname, "./packages/shared/src"),
+      "@render-experiment/tooltip-shared": resolve(__dirname, "./packages/shared/components/tooltip/src"),
+      "@render-experiment/dropdown-menu-shared": resolve(__dirname, "./packages/shared/components/dropdown-menu/src"),
       "@render-experiment/store": resolve(__dirname, "./packages/core/store/src"),
       "@render-experiment/store-react": resolve(
         __dirname,
