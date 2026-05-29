@@ -1,11 +1,20 @@
 export { createMachine } from "./machine";
-export { createStore } from "./store";
-export type { Store } from "./store";
+// Re-export the standalone store package for backwards-compat consumers
+// who imported these from machine-core. New code should import directly
+// from @render-experiment/store.
+export { createStore, shallowEqual } from "@render-experiment/store";
+export type {
+  Listener,
+  SetStateAction,
+  Store,
+} from "@render-experiment/store";
 export { withAdapter } from "./adapter";
 export type { Adapter } from "./adapter";
 export { mergeProps } from "./utils";
 export { connector } from "./connector";
 export type { Connect, MachineSnapshot, Send } from "./connector";
+export { placementToSide } from "./positioning";
+export type { Placement, PositioningOptions } from "./positioning";
 export type {
   Action,
   Machine,
