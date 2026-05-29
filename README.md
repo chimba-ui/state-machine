@@ -80,3 +80,26 @@ across web (React DOM), mobile (React Native), and future targets.
 > renderer's native props.
 
 Everything else is plumbing around that claim.
+
+## Workflow
+
+| Command                | What it does                                                     |
+|------------------------|------------------------------------------------------------------|
+| `pnpm codegen`         | One-shot: regenerate `elements.ts` + `api.ts` in each adapter.   |
+| `pnpm codegen:watch`   | Watcher: regenerates per component on changes under `core/`.     |
+| `pnpm dev:react`       | Watcher + Vite dev server for the React sandbox.                 |
+| `pnpm dev:native`      | Watcher + Expo for the React Native sandbox.                     |
+| `pnpm dev:pixi`        | Watcher + Vite for the Pixi sandbox.                             |
+| `pnpm typecheck`       | `tsc --noEmit` across the workspace.                             |
+| `pnpm test`            | `vitest`.                                                        |
+| `pnpm build`           | Codegen + production build of the React sandbox.                 |
+
+Codegen reads each component's `core/components/<comp>/src/elements/` and
+`index.ts`. Editing styles or behavior triggers regeneration via the
+watcher; Vite / Metro pick up the regenerated files and HMR.
+
+## Going deeper
+
+- [`AGENT.md`](./AGENT.md) — rules for modifying code in this repo.
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the layered model and where things live.
+- Each component has a `SPEC.md` describing its behavior, styles, and accessibility.
