@@ -1,6 +1,6 @@
 # agnostic-render
 
-Research project: one definition of how a component *behaves*, reused
+Research project: one definition of how a component _behaves_, reused
 across web (React DOM), mobile (React Native), and future targets.
 
 ## Mental model
@@ -64,14 +64,14 @@ across web (React DOM), mobile (React Native), and future targets.
 
 ## Glossary
 
-| Term         | Lives in              | What it does                                              |
-|--------------|-----------------------|-----------------------------------------------------------|
-| **host**     | `packages/core/`      | Defines the contract — state graph, bindings, style spec. |
-| **machine**  | `core/machine`        | The state-machine engine + `createMachine`.               |
-| **bindings** | `core/machine`        | Substrate-agnostic event/attr vocabulary (`onPress`, …).  |
-| **adapter**  | `packages/<target>/`  | Supplies substrate-specific effect impls + translators.   |
-| **target**   | `react`, `native`, …  | A render environment with its own adapter.                |
-| **codegen**  | `scripts/build.ts`    | Emits `elements.ts` + `api.ts` per (target × component).  |
+| Term         | Lives in             | What it does                                              |
+| ------------ | -------------------- | --------------------------------------------------------- |
+| **host**     | `packages/core/`     | Defines the contract — state graph, bindings, style spec. |
+| **machine**  | `core/machine`       | The state-machine engine + `createMachine`.               |
+| **bindings** | `core/machine`       | Substrate-agnostic event/attr vocabulary (`onPress`, …).  |
+| **adapter**  | `packages/<target>/` | Supplies substrate-specific effect impls + translators.   |
+| **target**   | `react`, `native`, … | A render environment with its own adapter.                |
+| **codegen**  | `scripts/build.ts`   | Emits `elements.ts` + `api.ts` per (target × component).  |
 
 ## The one-sentence claim
 
@@ -83,16 +83,16 @@ Everything else is plumbing around that claim.
 
 ## Workflow
 
-| Command                | What it does                                                     |
-|------------------------|------------------------------------------------------------------|
-| `pnpm codegen`         | One-shot: regenerate `elements.ts` + `api.ts` in each adapter.   |
-| `pnpm codegen:watch`   | Watcher: regenerates per component on changes under `core/`.     |
-| `pnpm dev:react`       | Watcher + Vite dev server for the React sandbox.                 |
-| `pnpm dev:native`      | Watcher + Expo for the React Native sandbox.                     |
-| `pnpm dev:pixi`        | Watcher + Vite for the Pixi sandbox.                             |
-| `pnpm typecheck`       | `tsc --noEmit` across the workspace.                             |
-| `pnpm test`            | `vitest`.                                                        |
-| `pnpm build`           | Codegen + production build of the React sandbox.                 |
+| Command              | What it does                                                   |
+| -------------------- | -------------------------------------------------------------- |
+| `pnpm codegen`       | One-shot: regenerate `elements.ts` + `api.ts` in each adapter. |
+| `pnpm codegen:watch` | Watcher: regenerates per component on changes under `core/`.   |
+| `pnpm dev:react`     | Watcher + Vite dev server for the React sandbox.               |
+| `pnpm dev:native`    | Watcher + Expo for the React Native sandbox.                   |
+| `pnpm dev:pixi`      | Watcher + Vite for the Pixi sandbox.                           |
+| `pnpm typecheck`     | `tsc --noEmit` across the workspace.                           |
+| `pnpm test`          | `vitest`.                                                      |
+| `pnpm build`         | Codegen + production build of the React sandbox.               |
 
 Codegen reads each component's `core/components/<comp>/src/elements/` and
 `index.ts`. Editing styles or behavior triggers regeneration via the

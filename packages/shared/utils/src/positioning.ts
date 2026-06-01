@@ -8,45 +8,45 @@
  */
 
 export type Placement =
-  | "top"
-  | "top-start"
-  | "top-end"
-  | "bottom"
-  | "bottom-start"
-  | "bottom-end"
-  | "left"
-  | "left-start"
-  | "left-end"
-  | "right"
-  | "right-start"
-  | "right-end";
+  | 'top'
+  | 'top-start'
+  | 'top-end'
+  | 'bottom'
+  | 'bottom-start'
+  | 'bottom-end'
+  | 'left'
+  | 'left-start'
+  | 'left-end'
+  | 'right'
+  | 'right-start'
+  | 'right-end'
 
 /** The base side a placement resolves to (drops the -start/-end suffix). */
-export type Side = "top" | "bottom" | "left" | "right";
+export type Side = 'top' | 'bottom' | 'left' | 'right'
 
 export interface PositioningOptions {
-  placement: Placement;
-  offset: { main: number; cross: number };
+  placement: Placement
+  offset: { main: number; cross: number }
 }
 
 const sideMap: Record<Placement, Side> = {
-  top: "top",
-  "top-start": "top",
-  "top-end": "top",
-  bottom: "bottom",
-  "bottom-start": "bottom",
-  "bottom-end": "bottom",
-  left: "left",
-  "left-start": "left",
-  "left-end": "left",
-  right: "right",
-  "right-start": "right",
-  "right-end": "right",
-};
+  top: 'top',
+  'top-start': 'top',
+  'top-end': 'top',
+  bottom: 'bottom',
+  'bottom-start': 'bottom',
+  'bottom-end': 'bottom',
+  left: 'left',
+  'left-start': 'left',
+  'left-end': 'left',
+  right: 'right',
+  'right-start': 'right',
+  'right-end': 'right',
+}
 
 /** Convert a logical placement to its base side (the `side` variant key). */
 export function placementToSide(p: Placement): Side {
-  return sideMap[p];
+  return sideMap[p]
 }
 
 /**
@@ -57,8 +57,8 @@ export function placementToSide(p: Placement): Side {
  * side if no flip is needed or the content hasn't been measured yet.
  */
 export interface ViewportSize {
-  width: number;
-  height: number;
+  width: number
+  height: number
 }
 export function pickSide(
   preferred: Side,
@@ -67,33 +67,33 @@ export function pickSide(
   viewport: ViewportSize,
   offset: number,
 ): Side {
-  if (!contentRect) return preferred;
-  const ch = contentRect.height;
-  const cw = contentRect.width;
+  if (!contentRect) return preferred
+  const ch = contentRect.height
+  const cw = contentRect.width
   switch (preferred) {
-    case "bottom": {
-      const fitsBottom = triggerRect.bottom + offset + ch <= viewport.height;
-      if (fitsBottom) return "bottom";
-      const fitsTop = triggerRect.top - offset - ch >= 0;
-      return fitsTop ? "top" : "bottom";
+    case 'bottom': {
+      const fitsBottom = triggerRect.bottom + offset + ch <= viewport.height
+      if (fitsBottom) return 'bottom'
+      const fitsTop = triggerRect.top - offset - ch >= 0
+      return fitsTop ? 'top' : 'bottom'
     }
-    case "top": {
-      const fitsTop = triggerRect.top - offset - ch >= 0;
-      if (fitsTop) return "top";
-      const fitsBottom = triggerRect.bottom + offset + ch <= viewport.height;
-      return fitsBottom ? "bottom" : "top";
+    case 'top': {
+      const fitsTop = triggerRect.top - offset - ch >= 0
+      if (fitsTop) return 'top'
+      const fitsBottom = triggerRect.bottom + offset + ch <= viewport.height
+      return fitsBottom ? 'bottom' : 'top'
     }
-    case "right": {
-      const fitsRight = triggerRect.right + offset + cw <= viewport.width;
-      if (fitsRight) return "right";
-      const fitsLeft = triggerRect.left - offset - cw >= 0;
-      return fitsLeft ? "left" : "right";
+    case 'right': {
+      const fitsRight = triggerRect.right + offset + cw <= viewport.width
+      if (fitsRight) return 'right'
+      const fitsLeft = triggerRect.left - offset - cw >= 0
+      return fitsLeft ? 'left' : 'right'
     }
-    case "left": {
-      const fitsLeft = triggerRect.left - offset - cw >= 0;
-      if (fitsLeft) return "left";
-      const fitsRight = triggerRect.right + offset + cw <= viewport.width;
-      return fitsRight ? "right" : "left";
+    case 'left': {
+      const fitsLeft = triggerRect.left - offset - cw >= 0
+      if (fitsLeft) return 'left'
+      const fitsRight = triggerRect.right + offset + cw <= viewport.width
+      return fitsRight ? 'right' : 'left'
     }
   }
 }

@@ -25,15 +25,15 @@
  *   connect({ state, context, props, send })(items);
  */
 
-import type { EventObject } from "./types";
+import type { EventObject } from './types'
 
-export type Send = (event: EventObject) => void;
+export type Send = (event: EventObject) => void
 
 export interface MachineSnapshot<TState, TContext, TProps> {
-  state: TState;
-  context: TContext;
-  props: TProps;
-  send: Send;
+  state: TState
+  context: TContext
+  props: TProps
+  send: Send
 }
 
 /**
@@ -42,9 +42,7 @@ export interface MachineSnapshot<TState, TContext, TProps> {
  * (often empty, or a single `items` arg) at the call site of `connector`.
  */
 export interface Connect<TState, TContext, TProps, TApi, TExtras extends unknown[]> {
-  (snapshot: MachineSnapshot<TState, TContext, TProps>): (
-    ...extras: TExtras
-  ) => TApi;
+  (snapshot: MachineSnapshot<TState, TContext, TProps>): (...extras: TExtras) => TApi
 }
 
 /**
@@ -53,13 +51,9 @@ export interface Connect<TState, TContext, TProps, TApi, TExtras extends unknown
  */
 export function connector<TState, TContext, TProps, TApi>() {
   return <TExtras extends unknown[]>(
-    build: (
-      snapshot: MachineSnapshot<TState, TContext, TProps>,
-      ...extras: TExtras
-    ) => TApi,
-  ): Connect<TState, TContext, TProps, TApi, TExtras> => {
-    return (snapshot) =>
-      (...extras: TExtras) =>
-        build(snapshot, ...extras);
-  };
+    build: (snapshot: MachineSnapshot<TState, TContext, TProps>, ...extras: TExtras) => TApi,
+  ): Connect<TState, TContext, TProps, TApi, TExtras> =>
+    snapshot =>
+    (...extras: TExtras) =>
+      build(snapshot, ...extras)
 }

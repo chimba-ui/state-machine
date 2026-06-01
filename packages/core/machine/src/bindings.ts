@@ -23,7 +23,7 @@
 
 export interface PointerPayload {
   /** True when an upstream handler called preventDefault / equivalent. */
-  defaultPrevented?: boolean;
+  defaultPrevented?: boolean
   /**
    * Cancels the substrate's default action for the event (e.g. on web,
    * stops a synthetic click on Space-keyup, suppresses form submission on
@@ -31,19 +31,19 @@ export interface PointerPayload {
    * wire this to the native event's preventDefault when available;
    * substrates that have no concept of default action provide a no-op.
    */
-  preventDefault?: () => void;
+  preventDefault?: () => void
   /** Pointer button number. 0 is primary on every substrate. */
-  button?: number;
+  button?: number
   /** Input modality. Canvas/RN can supply "touch" or "mouse"; web supplies all three. */
-  pointerType?: "mouse" | "touch" | "pen";
+  pointerType?: 'mouse' | 'touch' | 'pen'
 }
 
 export interface KeyboardPayload {
-  defaultPrevented?: boolean;
+  defaultPrevented?: boolean
   /** See PointerPayload.preventDefault. */
-  preventDefault?: () => void;
+  preventDefault?: () => void
   /** Logical key name. Matches `KeyboardEvent.key` on web. */
-  key?: string;
+  key?: string
 }
 
 // -----------------------------------------------------------------------------
@@ -52,20 +52,20 @@ export interface KeyboardPayload {
 
 export interface EventBindings {
   /** "user clicked / tapped / activated this thing." */
-  onPress?: (event?: PointerPayload) => void;
+  onPress?: (event?: PointerPayload) => void
 
-  onPointerEnter?: (event?: PointerPayload) => void;
-  onPointerLeave?: (event?: PointerPayload) => void;
-  onPointerMove?: (event?: PointerPayload) => void;
-  onPointerDown?: (event?: PointerPayload) => void;
-  onPointerUp?: (event?: PointerPayload) => void;
-  onPointerCancel?: (event?: PointerPayload) => void;
+  onPointerEnter?: (event?: PointerPayload) => void
+  onPointerLeave?: (event?: PointerPayload) => void
+  onPointerMove?: (event?: PointerPayload) => void
+  onPointerDown?: (event?: PointerPayload) => void
+  onPointerUp?: (event?: PointerPayload) => void
+  onPointerCancel?: (event?: PointerPayload) => void
 
-  onFocus?: () => void;
-  onBlur?: () => void;
+  onFocus?: () => void
+  onBlur?: () => void
 
-  onKeyDown?: (event?: KeyboardPayload) => void;
-  onKeyUp?: (event?: KeyboardPayload) => void;
+  onKeyDown?: (event?: KeyboardPayload) => void
+  onKeyUp?: (event?: KeyboardPayload) => void
 }
 
 // -----------------------------------------------------------------------------
@@ -73,27 +73,27 @@ export interface EventBindings {
 // -----------------------------------------------------------------------------
 
 export interface AttrBindings {
-  id?: string;
+  id?: string
 
   /** "this element's description is over there" (ARIA describedby). */
-  describedBy?: string;
+  describedBy?: string
   /** "this element's label is over there" (ARIA labelledby). */
-  labelledBy?: string;
+  labelledBy?: string
 
   /** Boolean state (open/closed disclosure regions). */
-  expanded?: boolean;
-  selected?: boolean;
-  disabled?: boolean;
-  hidden?: boolean;
+  expanded?: boolean
+  selected?: boolean
+  disabled?: boolean
+  hidden?: boolean
 
   /**
    * Whether the element participates in keyboard focus.
    * Adapters map to `tabIndex` (web) / `accessible` (RN) / etc.
    */
-  focusable?: boolean;
+  focusable?: boolean
 
   /** ARIA role on web; equivalent semantic tag on other substrates. */
-  role?: string;
+  role?: string
 
   /**
    * Open slot for substrate-specific attributes the named keys don't
@@ -102,5 +102,5 @@ export interface AttrBindings {
    * Keep values primitive (string / number / boolean) so adapters can
    * serialize them.
    */
-  [key: string]: string | number | boolean | undefined;
+  [key: string]: string | number | boolean | undefined
 }

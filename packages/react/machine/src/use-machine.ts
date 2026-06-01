@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import { createMachine, type Machine, type MachineConfig } from "@render-experiment/machine-core";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { createMachine, type Machine, type MachineConfig } from '@render-experiment/machine-core'
 
 /**
  * React reactivity bridge for a machine instance.
@@ -17,27 +17,27 @@ export function useMachine<TContext extends object, TProps extends object>(
   config: MachineConfig<TContext, TProps>,
   props: TProps,
 ): Machine<TContext, TProps> {
-  const configRef = useRef(config);
+  const configRef = useRef(config)
   const machine = useMemo(
     () => createMachine(configRef.current, props),
     // Machine is created once; subsequent config or props updates flow
     // through setProps below — recreating would lose state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
-  );
+  )
 
-  machine.setProps(props);
+  machine.setProps(props)
 
   useEffect(() => {
-    machine.start();
-    return () => machine.stop();
-  }, [machine]);
+    machine.start()
+    return () => machine.stop()
+  }, [machine])
 
   useSyncExternalStore(
-    (notify) => machine.subscribe(notify),
+    notify => machine.subscribe(notify),
     () => machine.getVersion(),
     () => machine.getVersion(),
-  );
+  )
 
-  return machine;
+  return machine
 }

@@ -6,53 +6,51 @@
  * Target adapters translate that logical surface to a specific renderer.
  */
 
-import type { AttrBindings, EventBindings } from "./bindings";
+import type { AttrBindings, EventBindings } from './bindings'
 
-export type EventObject = { type: string; [key: string]: unknown };
+export type EventObject = { type: string; [key: string]: unknown }
 
 export interface Params<TContext, TProps> {
-  context: TContext;
-  setContext: (patch: Partial<TContext>) => void;
-  props: TProps;
-  event: EventObject;
-  send: (event: EventObject) => void;
+  context: TContext
+  setContext: (patch: Partial<TContext>) => void
+  props: TProps
+  event: EventObject
+  send: (event: EventObject) => void
 }
 
-export type Action<TContext, TProps> = (
-  params: Params<TContext, TProps>,
-) => void;
+export type Action<TContext, TProps> = (params: Params<TContext, TProps>) => void
 
 export type Guard<TContext, TProps> = (
-  params: Omit<Params<TContext, TProps>, "send" | "setContext">,
-) => boolean;
+  params: Omit<Params<TContext, TProps>, 'send' | 'setContext'>,
+) => boolean
 
 export type Effect<TContext, TProps> = (
-  params: Omit<Params<TContext, TProps>, "event">,
-) => VoidFunction | void;
+  params: Omit<Params<TContext, TProps>, 'event'>,
+) => VoidFunction | void
 
 export interface Transition {
-  target?: string;
-  guard?: string;
-  actions?: string[];
+  target?: string
+  guard?: string
+  actions?: string[]
 }
 
 export interface StateNode {
-  entry?: string[];
-  exit?: string[];
-  effects?: string[];
-  on?: Record<string, Transition | Transition[]>;
+  entry?: string[]
+  exit?: string[]
+  effects?: string[]
+  on?: Record<string, Transition | Transition[]>
 }
 
 export interface MachineConfig<TContext, TProps = Record<string, unknown>> {
-  initial: string | ((props: TProps) => string);
-  context: TContext | ((props: TProps) => TContext);
-  states: Record<string, StateNode>;
-  on?: Record<string, Transition | Transition[]>;
+  initial: string | ((props: TProps) => string)
+  context: TContext | ((props: TProps) => TContext)
+  states: Record<string, StateNode>
+  on?: Record<string, Transition | Transition[]>
   implementations?: {
-    actions?: Record<string, Action<TContext, TProps>>;
-    guards?: Record<string, Guard<TContext, TProps>>;
-    effects?: Record<string, Effect<TContext, TProps>>;
-  };
+    actions?: Record<string, Action<TContext, TProps>>
+    guards?: Record<string, Guard<TContext, TProps>>
+    effects?: Record<string, Effect<TContext, TProps>>
+  }
 }
 
 /**
@@ -76,28 +74,25 @@ export interface MachineConfig<TContext, TProps = Record<string, unknown>> {
  * Authors who don't need variants still benefit from the typing: a
  * Separator's part is just `Part` (no variants, no extras).
  */
-export type Part<
-  TVariants extends object = never,
-  TExtras extends object = never,
-> = {
-  handlers: EventBindings;
-  attrs: AttrBindings;
+export type Part<TVariants extends object = never, TExtras extends object = never> = {
+  handlers: EventBindings
+  attrs: AttrBindings
 } & ([TVariants] extends [never] ? unknown : { variants: TVariants }) &
-  ([TExtras] extends [never] ? unknown : TExtras);
+  ([TExtras] extends [never] ? unknown : TExtras)
 
 export interface Machine<TContext, TProps = Record<string, unknown>> {
-  getState: () => string;
-  getContext: () => TContext;
-  getProps: () => TProps;
+  getState: () => string
+  getContext: () => TContext
+  getProps: () => TProps
   /**
    * Monotonic counter that bumps on every state transition or context
    * change. Designed as a cheap "did anything change?" snapshot for
    * subscribers like React's useSyncExternalStore.
    */
-  getVersion: () => number;
-  setProps: (next: TProps) => void;
-  send: (event: EventObject) => void;
-  subscribe: (listener: () => void) => () => void;
-  start: () => void;
-  stop: () => void;
+  getVersion: () => number
+  setProps: (next: TProps) => void
+  send: (event: EventObject) => void
+  subscribe: (listener: () => void) => () => void
+  start: () => void
+  stop: () => void
 }

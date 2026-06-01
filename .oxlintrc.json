@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "eslint",
+    "import",
+    "node",
+    "oxc",
+    "promise",
+    "react",
+    "typescript",
+    "unicorn",
+    "vitest"
+  ],
+  "rules": {
+    "eslint/arrow-body-style": ["error", "as-needed"],
+    "import/newline-after-import": "error",
+    "unicorn/filename-case": [
+      "error",
+      {
+        "case": "kebabCase"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["packages/**/src/**/*.ts", "packages/**/src/**/*.tsx"],
+      "rules": {
+        "import/no-default-export": "error"
+      }
+    }
+  ],
+  "categories": {},
+  "settings": {
+    "vitest": {
+      "typecheck": false
+    }
+  },
+  "globals": {},
+  "ignorePatterns": [
+    "packages/**/src/generated/**",
+    "sandbox/native/ios/**",
+    "sandbox/native/android/**",
+    "**/dist/**"
+  ]
+}

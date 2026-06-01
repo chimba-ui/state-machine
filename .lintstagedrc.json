@@ -1,0 +1,3 @@
+{
+  "*.{ts,tsx}": ["oxlint --fix", "oxfmt"]
+}

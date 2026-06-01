@@ -17,10 +17,10 @@
  * functional stays in core. The merge boundary doesn't exist yet.
  */
 
-export type StyleValue = string | number | boolean;
+export type StyleValue = string | number | boolean
 
 export interface Style {
-  [prop: string]: StyleValue | StyleValue[];
+  [prop: string]: StyleValue | StyleValue[]
 }
 
 // Flat spec — base style props live at the top level. Variants/etc. live
@@ -28,12 +28,12 @@ export interface Style {
 // the translator inspects each key and decides whether it's a style prop
 // or a structural key, so a strict union here would over-constrain authors.
 export type StyleSpec<TVariants extends Record<string, Record<string, Style>>> = {
-  variants: TVariants;
+  variants: TVariants
   compoundVariants?: Array<
     {
-      [K in keyof TVariants]?: keyof TVariants[K];
+      [K in keyof TVariants]?: keyof TVariants[K]
     } & { css: Style }
-  >;
-  defaultVariants?: { [K in keyof TVariants]?: keyof TVariants[K] };
-  [prop: string]: unknown;
-};
+  >
+  defaultVariants?: { [K in keyof TVariants]?: keyof TVariants[K] }
+  [prop: string]: unknown
+}

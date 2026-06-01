@@ -28,58 +28,54 @@
  * conflicts. Handlers compose.
  */
 
-type AnyProps = Record<string, unknown>;
+type AnyProps = Record<string, unknown>
 
 const isEventHandlerKey = (key: string): boolean =>
-  key.length > 2 && key.startsWith("on") && key[2] === key[2]!.toUpperCase();
+  key.length > 2 && key.startsWith('on') && key[2] === key[2]!.toUpperCase()
 
-const isFn = (v: unknown): v is (...args: unknown[]) => unknown =>
-  typeof v === "function";
+const isFn = (v: unknown): v is (...args: unknown[]) => unknown => typeof v === 'function'
 
 function composeHandlers(
   consumer: (...args: unknown[]) => unknown,
   library: (...args: unknown[]) => unknown,
 ): (...args: unknown[]) => unknown {
   return (...args) => {
-    consumer(...args);
+    consumer(...args)
     // Respect consumer's defaultPrevented — if the first arg looks like
     // an event whose default was prevented, the library handler is
     // skipped. This matches Radix/Ark conventions.
-    const event = args[0] as { defaultPrevented?: boolean } | undefined;
-    if (event && typeof event === "object" && event.defaultPrevented) return;
-    return library(...args);
-  };
+    const event = args[0] as { defaultPrevented?: boolean } | undefined
+    if (event && typeof event === 'object' && event.defaultPrevented) return
+    return library(...args)
+  }
 }
 
-export function mergeProps(
-  consumer: AnyProps | undefined,
-  library: AnyProps,
-): AnyProps {
-  if (!consumer) return library;
-  const out: AnyProps = { ...consumer };
+export function mergeProps(consumer: AnyProps | undefined, library: AnyProps): AnyProps {
+  if (!consumer) return library
+  const out: AnyProps = { ...consumer }
 
   for (const [key, libValue] of Object.entries(library)) {
-    const consumerValue = consumer[key];
+    const consumerValue = consumer[key]
 
     if (isEventHandlerKey(key) && isFn(consumerValue) && isFn(libValue)) {
-      out[key] = composeHandlers(consumerValue, libValue);
-      continue;
+      out[key] = composeHandlers(consumerValue, libValue)
+      continue
     }
 
-    if (key === "style" && consumerValue != null) {
+    if (key === 'style' && consumerValue != null) {
       // React accepts array-of-styles for the style prop; RN accepts it too.
-      out[key] = [consumerValue, libValue];
-      continue;
+      out[key] = [consumerValue, libValue]
+      continue
     }
 
-    if (key === "className" && typeof consumerValue === "string" && typeof libValue === "string") {
-      out[key] = `${consumerValue} ${libValue}`.trim();
-      continue;
+    if (key === 'className' && typeof consumerValue === 'string' && typeof libValue === 'string') {
+      out[key] = `${consumerValue} ${libValue}`.trim()
+      continue
     }
 
     // Default: library wins.
-    out[key] = libValue;
+    out[key] = libValue
   }
 
-  return out;
+  return out
 }

@@ -16,12 +16,9 @@
  * platform.
  */
 
-import type { Effect, MachineConfig } from "./types";
+import type { Effect, MachineConfig } from './types'
 
-export type Adapter<TContext, TProps> = Record<
-  string,
-  Effect<TContext, TProps>
->;
+export type Adapter<TContext, TProps> = Record<string, Effect<TContext, TProps>>
 
 /**
  * Return a copy of `config` with the adapter's effect implementations
@@ -35,15 +32,13 @@ export function withAdapter<TContext, TProps>(
   config: MachineConfig<TContext, TProps>,
   adapter: Adapter<TContext, TProps>,
 ): MachineConfig<TContext, TProps> {
-  const existing = config.implementations?.effects ?? {};
-  const merged: Record<string, Effect<TContext, TProps>> = { ...existing };
+  const existing = config.implementations?.effects ?? {}
+  const merged: Record<string, Effect<TContext, TProps>> = { ...existing }
   for (const [name, fn] of Object.entries(adapter)) {
     if (!(name in existing)) {
-      console.warn(
-        `[machine] adapter effect "${name}" not declared in host; using it anyway`,
-      );
+      console.warn(`[machine] adapter effect "${name}" not declared in host; using it anyway`)
     }
-    merged[name] = fn;
+    merged[name] = fn
   }
   return {
     ...config,
@@ -51,5 +46,5 @@ export function withAdapter<TContext, TProps>(
       ...config.implementations,
       effects: merged,
     },
-  };
+  }
 }

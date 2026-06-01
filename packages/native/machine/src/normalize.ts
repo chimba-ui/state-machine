@@ -23,79 +23,74 @@
  */
 
 const HANDLER_MAP: Record<string, string> = {
-  onPress: "onPress",
-  onPointerDown: "onPressIn",
-  onPointerUp: "onPressOut",
-  onFocus: "onFocus",
-  onBlur: "onBlur",
-};
+  onPress: 'onPress',
+  onPointerDown: 'onPressIn',
+  onPointerUp: 'onPressOut',
+  onFocus: 'onFocus',
+  onBlur: 'onBlur',
+}
 
 // Handlers that have no RN analog. We strip them rather than crash.
 const HANDLER_DROP = new Set([
-  "onPointerEnter",
-  "onPointerLeave",
-  "onPointerMove",
-  "onPointerCancel",
-  "onKeyDown",
-  "onKeyUp",
-]);
+  'onPointerEnter',
+  'onPointerLeave',
+  'onPointerMove',
+  'onPointerCancel',
+  'onKeyDown',
+  'onKeyUp',
+])
 
 const ATTR_MAP: Record<string, string> = {
-  describedBy: "accessibilityLabelledBy",
-  labelledBy: "accessibilityLabelledBy",
-  role: "accessibilityRole",
-  id: "nativeID",
-};
+  describedBy: 'accessibilityLabelledBy',
+  labelledBy: 'accessibilityLabelledBy',
+  role: 'accessibilityRole',
+  id: 'nativeID',
+}
 
 // Attrs that fold into accessibilityState.
-const A11Y_STATE_KEYS = new Set([
-  "disabled",
-  "expanded",
-  "selected",
-  "hidden",
-]);
+const A11Y_STATE_KEYS = new Set(['disabled', 'expanded', 'selected', 'hidden'])
 
-export type Bindings = Record<string, unknown>;
+export type Bindings = Record<string, unknown>
 
 export function normalize(logical: Bindings): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  const a11yState: Record<string, unknown> = {};
-  let hasA11yState = false;
+  const out: Record<string, unknown> = {}
+  const a11yState: Record<string, unknown> = {}
+  let hasA11yState = false
 
   for (const [key, value] of Object.entries(logical)) {
-    if (value === undefined) continue;
+    if (value === undefined) continue
 
-    if (HANDLER_DROP.has(key)) continue;
+    if (HANDLER_DROP.has(key)) continue
 
-    const handler = HANDLER_MAP[key];
+    const handler = HANDLER_MAP[key]
     if (handler) {
-      out[handler] = value;
-      continue;
+      out[handler] = value
+      continue
     }
 
     if (A11Y_STATE_KEYS.has(key)) {
-      a11yState[key] = value;
-      hasA11yState = true;
-      continue;
+      a11yState[key] = value
+      hasA11yState = true
+      continue
     }
 
-    if (key === "focusable") {
-      out.focusable = !!value;
-      continue;
+    if (key === 'focusable') {
+      out.focusable = !!value
+      continue
     }
 
-    const attr = ATTR_MAP[key];
+    const attr = ATTR_MAP[key]
     if (attr) {
-      out[attr] = value;
-      continue;
+      out[attr] = value
+      continue
     }
 
-    out[key] = value;
+    out[key] = value
   }
 
   if (hasA11yState) {
-    out.accessibilityState = a11yState;
+    out.accessibilityState = a11yState
   }
 
-  return out;
+  return out
 }

@@ -8,10 +8,10 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "peerDependencies": {
-    "react": "*"
-  },
   "dependencies": {
     "@render-experiment/machine-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "*"
   }
 }

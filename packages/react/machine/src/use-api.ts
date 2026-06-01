@@ -14,36 +14,28 @@
  * transitions or its context changes — exactly when subscribers care.
  */
 
-import { useMemo, useRef } from "react";
-import {
-  type Connect,
-  type MachineConfig,
-} from "@render-experiment/machine-core";
-import { useMachine } from "./use-machine";
+import { useMemo, useRef } from 'react'
+import { type Connect, type MachineConfig } from '@render-experiment/machine-core'
+import { useMachine } from './use-machine'
 
-export function useApi<
-  TContext extends object,
-  TProps extends object,
-  TState,
-  TApi,
->(
+export function useApi<TContext extends object, TProps extends object, TState, TApi>(
   config: MachineConfig<TContext, TProps>,
   props: TProps,
   connect: Connect<TState, TContext, TProps, TApi, []>,
 ): TApi {
-  const machine = useMachine<TContext, TProps>(config, props);
+  const machine = useMachine<TContext, TProps>(config, props)
 
   // Cache by (machine instance, version). A new machine instance can
   // appear after hot-reload or via key-driven remount; in either case
   // the previous cache is dead by definition.
   const cacheRef = useRef<{
-    machineToken: object;
-    version: number;
-    api: TApi;
-  } | null>(null);
+    machineToken: object
+    version: number
+    api: TApi
+  } | null>(null)
 
-  const machineToken = useMemo(() => ({}), [machine]);
-  const version = machine.getVersion();
+  const machineToken = useMemo(() => ({}), [machine])
+  const version = machine.getVersion()
 
   if (
     !cacheRef.current ||
@@ -59,8 +51,8 @@ export function useApi<
         props: machine.getProps(),
         send: machine.send,
       })(),
-    };
+    }
   }
 
-  return cacheRef.current.api;
+  return cacheRef.current.api
 }
