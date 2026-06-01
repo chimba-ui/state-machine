@@ -21,9 +21,9 @@ import type { ChooseBranch, ChosenActions, EventObject, Guard } from './types'
  * Short-circuit AND. Returns true iff every supplied guard passes. With
  * zero arguments returns true (vacuously true — the empty intersection).
  */
-export function and<TContext, TProps, TEvent extends EventObject = EventObject>(
-  ...guards: Array<Guard<TContext, TProps, TEvent>>
-): Guard<TContext, TProps, TEvent> {
+export function and<Context, Props, Event extends EventObject = EventObject>(
+  ...guards: Array<Guard<Context, Props, Event>>
+): Guard<Context, Props, Event> {
   return params => guards.every(g => g(params))
 }
 
@@ -31,16 +31,16 @@ export function and<TContext, TProps, TEvent extends EventObject = EventObject>(
  * Short-circuit OR. Returns true iff any supplied guard passes. With zero
  * arguments returns false (vacuously false — the empty union).
  */
-export function or<TContext, TProps, TEvent extends EventObject = EventObject>(
-  ...guards: Array<Guard<TContext, TProps, TEvent>>
-): Guard<TContext, TProps, TEvent> {
+export function or<Context, Props, Event extends EventObject = EventObject>(
+  ...guards: Array<Guard<Context, Props, Event>>
+): Guard<Context, Props, Event> {
   return params => guards.some(g => g(params))
 }
 
 /** Logical negation. */
-export function not<TContext, TProps, TEvent extends EventObject = EventObject>(
-  guard: Guard<TContext, TProps, TEvent>,
-): Guard<TContext, TProps, TEvent> {
+export function not<Context, Props, Event extends EventObject = EventObject>(
+  guard: Guard<Context, Props, Event>,
+): Guard<Context, Props, Event> {
   return params => !guard(params)
 }
 

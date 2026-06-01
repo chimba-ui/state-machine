@@ -10,23 +10,23 @@ import { type Connect, type EventObject, type MachineConfig } from '@render-expe
 import { useMachine } from './use-machine'
 
 export function useApi<
-  TContext extends object,
-  TProps extends object,
-  TState,
-  TApi,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
+  Context extends object,
+  Props extends object,
+  State,
+  Api,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
 >(
-  config: MachineConfig<TContext, TProps, TEvent, TComputed>,
-  props: TProps,
-  connect: Connect<TState, TContext, TProps, TApi, [], TEvent, TComputed>,
-): TApi {
-  const machine = useMachine<TContext, TProps, TEvent, TComputed>(config, props)
+  config: MachineConfig<Context, Props, Event, Computed>,
+  props: Props,
+  connect: Connect<State, Context, Props, Api, [], Event, Computed>,
+): Api {
+  const machine = useMachine<Context, Props, Event, Computed>(config, props)
 
   const cacheRef = useRef<{
     machineToken: object
     version: number
-    api: TApi
+    api: Api
   } | null>(null)
 
   const machineToken = useMemo(() => ({}), [machine])
@@ -41,7 +41,7 @@ export function useApi<
       machineToken,
       version,
       api: connect({
-        state: machine.getState() as TState,
+        state: machine.getState() as State,
         context: machine.getContext(),
         props: machine.getProps(),
         send: machine.send,

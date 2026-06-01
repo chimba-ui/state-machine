@@ -20,14 +20,14 @@ import {
  * Today it's a clean copy.
  */
 export function useMachine<
-  TContext extends object,
-  TProps extends object,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
+  Context extends object,
+  Props extends object,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
 >(
-  config: MachineConfig<TContext, TProps, TEvent, TComputed>,
-  props: TProps,
-): Machine<TContext, TProps, TEvent, TComputed> {
+  config: MachineConfig<Context, Props, Event, Computed>,
+  props: Props,
+): Machine<Context, Props, Event, Computed> {
   const configRef = useRef(config)
   const machine = useMemo(
     () => createMachine(configRef.current, props),

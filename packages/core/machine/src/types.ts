@@ -10,7 +10,7 @@ import type { AttrBindings, EventBindings } from './bindings'
 
 /**
  * Base event shape. Components declare their own discriminated-union
- * `TEvent` extending this — `{ type: 'item.click'; value: string; ... }`
+ * `Event` extending this — `{ type: 'item.click'; value: string; ... }`
  * etc — and pass it as the third generic to `MachineConfig` / `Machine`.
  *
  * Action / guard bodies then get a fully-typed `event` parameter, and
@@ -20,22 +20,22 @@ import type { AttrBindings, EventBindings } from './bindings'
 export type EventObject = { type: string }
 
 export interface Params<
-  TContext,
-  TProps,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
+  Context,
+  Props,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
 > {
-  context: TContext
-  setContext: (patch: Partial<TContext>) => void
-  props: TProps
-  event: TEvent
-  send: (event: TEvent) => void
+  context: Context
+  setContext: (patch: Partial<Context>) => void
+  props: Props
+  event: Event
+  send: (event: Event) => void
   /**
    * Derived values declared via `computed: { ... }` on the machine config.
    * Recomputed lazily when the machine's version bumps; cached otherwise.
    * Empty object `{}` when no computed declared.
    */
-  computed: TComputed
+  computed: Computed
   /**
    * Dispatch any guard argument — a name from `implementations.guards`
    * or an inline `Guard` function — against the live params. Returns
@@ -44,22 +44,22 @@ export interface Params<
    * uses; available to user-written guards / actions / effects that
    * need to consult another named guard.
    */
-  guard: (g: string | Guard<TContext, TProps, TEvent, TComputed>) => boolean
+  guard: (g: string | Guard<Context, Props, Event, Computed>) => boolean
 }
 
 export type Action<
-  TContext,
-  TProps,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
-> = (params: Params<TContext, TProps, TEvent, TComputed>) => void
+  Context,
+  Props,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
+> = (params: Params<Context, Props, Event, Computed>) => void
 
 export type Guard<
-  TContext,
-  TProps,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
-> = (params: Omit<Params<TContext, TProps, TEvent, TComputed>, 'send' | 'setContext'>) => boolean
+  Context,
+  Props,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
+> = (params: Omit<Params<Context, Props, Event, Computed>, 'send' | 'setContext'>) => boolean
 
 /**
  * What a transition's `guard` field accepts: a name (resolved against
@@ -67,29 +67,29 @@ export type Guard<
  * not) — itself just a Guard function. Same shape composes arbitrarily.
  */
 export type GuardArg<
-  TContext = unknown,
-  TProps = unknown,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
-> = string | Guard<TContext, TProps, TEvent, TComputed>
+  Context = unknown,
+  Props = unknown,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
+> = string | Guard<Context, Props, Event, Computed>
 
 export type Effect<
-  TContext,
-  TProps,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
-> = (params: Omit<Params<TContext, TProps, TEvent, TComputed>, 'event'>) => VoidFunction | void
+  Context,
+  Props,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
+> = (params: Omit<Params<Context, Props, Event, Computed>, 'event'>) => VoidFunction | void
 
 /**
  * One computed value's definition: a function over the snapshot that
  * returns the derived value. The runtime evaluates it lazily and caches
  * by machine version.
  */
-export type ComputedFn<TContext, TProps, TValue> = (params: {
+export type ComputedFn<Context, Props, Value> = (params: {
   state: string
-  context: TContext
-  props: TProps
-}) => TValue
+  context: Context
+  props: Props
+}) => Value
 
 /**
  * One branch of a `choose([...])` block: optional guard, an action list
@@ -134,13 +134,13 @@ export interface StateNode {
 }
 
 export interface MachineConfig<
-  TContext,
-  TProps = Record<string, unknown>,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
+  Context,
+  Props = Record<string, unknown>,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
 > {
-  initial: string | ((props: TProps) => string)
-  context: TContext | ((props: TProps) => TContext)
+  initial: string | ((props: Props) => string)
+  context: Context | ((props: Props) => Context)
   states: Record<string, StateNode>
   on?: Record<string, Transition | Transition[]>
   /**
@@ -149,12 +149,12 @@ export interface MachineConfig<
    * guards, effects, and the connect via `params.computed`.
    */
   computed?: {
-    [K in keyof TComputed]: ComputedFn<TContext, TProps, TComputed[K]>
+    [K in keyof Computed]: ComputedFn<Context, Props, Computed[K]>
   }
   implementations?: {
-    actions?: Record<string, Action<TContext, TProps, TEvent, TComputed>>
-    guards?: Record<string, Guard<TContext, TProps, TEvent, TComputed>>
-    effects?: Record<string, Effect<TContext, TProps, TEvent, TComputed>>
+    actions?: Record<string, Action<Context, Props, Event, Computed>>
+    guards?: Record<string, Guard<Context, Props, Event, Computed>>
+    effects?: Record<string, Effect<Context, Props, Event, Computed>>
   }
 }
 
@@ -179,31 +179,31 @@ export interface MachineConfig<
  * Authors who don't need variants still benefit from the typing: a
  * Separator's part is just `Part` (no variants, no extras).
  */
-export type Part<TVariants extends object = never, TExtras extends object = never> = {
+export type Part<Variants extends object = never, Extras extends object = never> = {
   handlers: EventBindings
   attrs: AttrBindings
-} & ([TVariants] extends [never] ? unknown : { variants: TVariants }) &
-  ([TExtras] extends [never] ? unknown : TExtras)
+} & ([Variants] extends [never] ? unknown : { variants: Variants }) &
+  ([Extras] extends [never] ? unknown : Extras)
 
 export interface Machine<
-  TContext,
-  TProps = Record<string, unknown>,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
+  Context,
+  Props = Record<string, unknown>,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
 > {
   getState: () => string
-  getContext: () => TContext
-  getProps: () => TProps
+  getContext: () => Context
+  getProps: () => Props
   /** Latest computed values; cached by version, recomputed on first read after a bump. */
-  getComputed: () => TComputed
+  getComputed: () => Computed
   /**
    * Monotonic counter that bumps on every state transition or context
    * change. Designed as a cheap "did anything change?" snapshot for
    * subscribers like React's useSyncExternalStore.
    */
   getVersion: () => number
-  setProps: (next: TProps) => void
-  send: (event: TEvent) => void
+  setProps: (next: Props) => void
+  send: (event: Event) => void
   subscribe: (listener: () => void) => () => void
   start: () => void
   stop: () => void

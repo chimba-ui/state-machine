@@ -27,20 +27,20 @@
 
 import type { EventObject } from './types'
 
-export type Send<TEvent extends EventObject = EventObject> = (event: TEvent) => void
+export type Send<Event extends EventObject = EventObject> = (event: Event) => void
 
 export interface MachineSnapshot<
-  TState,
-  TContext,
-  TProps,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
+  State,
+  Context,
+  Props,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
 > {
-  state: TState
-  context: TContext
-  props: TProps
-  send: Send<TEvent>
-  computed: TComputed
+  state: State
+  context: Context
+  props: Props
+  send: Send<Event>
+  computed: Computed
 }
 
 /**
@@ -49,17 +49,15 @@ export interface MachineSnapshot<
  * (often empty, or a single `items` arg) at the call site of `connector`.
  */
 export interface Connect<
-  TState,
-  TContext,
-  TProps,
-  TApi,
-  TExtras extends unknown[],
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
+  State,
+  Context,
+  Props,
+  Api,
+  Extras extends unknown[],
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
 > {
-  (
-    snapshot: MachineSnapshot<TState, TContext, TProps, TEvent, TComputed>,
-  ): (...extras: TExtras) => TApi
+  (snapshot: MachineSnapshot<State, Context, Props, Event, Computed>): (...extras: Extras) => Api
 }
 
 /**
@@ -67,20 +65,20 @@ export interface Connect<
  * so callers can write `connect(snapshot)(extras)` at the use site.
  */
 export function connector<
-  TState,
-  TContext,
-  TProps,
-  TApi,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
+  State,
+  Context,
+  Props,
+  Api,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
 >() {
-  return <TExtras extends unknown[]>(
+  return <Extras extends unknown[]>(
     build: (
-      snapshot: MachineSnapshot<TState, TContext, TProps, TEvent, TComputed>,
-      ...extras: TExtras
-    ) => TApi,
-  ): Connect<TState, TContext, TProps, TApi, TExtras, TEvent, TComputed> =>
+      snapshot: MachineSnapshot<State, Context, Props, Event, Computed>,
+      ...extras: Extras
+    ) => Api,
+  ): Connect<State, Context, Props, Api, Extras, Event, Computed> =>
     snapshot =>
-    (...extras: TExtras) =>
+    (...extras: Extras) =>
       build(snapshot, ...extras)
 }

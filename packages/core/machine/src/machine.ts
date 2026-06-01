@@ -1,24 +1,24 @@
 import type { ChosenActions, EventObject, MachineConfig, Machine, Transition } from './types'
 
 export function createMachine<
-  TContext extends object,
-  TProps extends object,
-  TEvent extends EventObject = EventObject,
-  TComputed = Record<string, never>,
+  Context extends object,
+  Props extends object,
+  Event extends EventObject = EventObject,
+  Computed = Record<string, never>,
 >(
-  config: MachineConfig<TContext, TProps, TEvent, TComputed>,
-  initialProps: TProps,
-): Machine<TContext, TProps, TEvent, TComputed> {
+  config: MachineConfig<Context, Props, Event, Computed>,
+  initialProps: Props,
+): Machine<Context, Props, Event, Computed> {
   let props = initialProps
 
   const initial =
     typeof config.initial === 'function'
-      ? (config.initial as (p: TProps) => string)(props)
+      ? (config.initial as (p: Props) => string)(props)
       : config.initial
 
   const initialContext =
     typeof config.context === 'function'
-      ? (config.context as (p: TProps) => TContext)(props)
+      ? (config.context as (p: Props) => Context)(props)
       : { ...config.context }
 
   let state = initial
@@ -31,9 +31,9 @@ export function createMachine<
   // Computed cache. Recomputed lazily when `cachedComputedVersion` falls
   // behind the live `version`. Empty object when the config has no
   // `computed` block — keeps the param shape consistent for callers.
-  let cachedComputed: TComputed = {} as TComputed
+  let cachedComputed: Computed = {} as Computed
   let cachedComputedVersion = -1
-  const computeAll = (): TComputed => {
+  const computeAll = (): Computed => {
     if (cachedComputedVersion === version) return cachedComputed
     const out = {} as Record<string, unknown>
     if (config.computed) {
@@ -42,7 +42,7 @@ export function createMachine<
         out[key] = (fn as (p: typeof snap) => unknown)(snap)
       }
     }
-    cachedComputed = out as TComputed
+    cachedComputed = out as Computed
     cachedComputedVersion = version
     return cachedComputed
   }
@@ -52,7 +52,7 @@ export function createMachine<
     listeners.forEach(l => l())
   }
 
-  const setContext = (patch: Partial<TContext>) => {
+  const setContext = (patch: Partial<Context>) => {
     let changed = false
     for (const key in patch) {
       if (!Object.is(context[key], patch[key])) {
@@ -82,7 +82,7 @@ export function createMachine<
     return (fn as (p: unknown) => boolean)(params)
   }
 
-  const baseParams = (event: TEvent) => {
+  const baseParams = (event: Event) => {
     const params = {
       context,
       setContext,
@@ -98,7 +98,7 @@ export function createMachine<
   const isChosen = (v: unknown): v is ChosenActions =>
     typeof v === 'object' && v !== null && (v as { __choose?: boolean }).__choose === true
 
-  const runActions = (actions: string[] | ChosenActions | undefined, event: TEvent) => {
+  const runActions = (actions: string[] | ChosenActions | undefined, event: Event) => {
     if (!actions) return
     // Expand a choose() sentinel by picking the first matching branch.
     // Guards inside choose use the same checker the runtime uses for
@@ -116,7 +116,7 @@ export function createMachine<
     }
   }
 
-  const checkGuard = (guard: Transition['guard'], event: TEvent): boolean => {
+  const checkGuard = (guard: Transition['guard'], event: Event): boolean => {
     if (!guard) return true
     // Same params shape user-written guards see — including a `guard()`
     // method that dispatches names or functions through the runtime's
@@ -158,14 +158,14 @@ export function createMachine<
 
   const resolveTransition = (
     transitions: Transition | Transition[] | undefined,
-    event: TEvent,
+    event: Event,
   ): Transition | undefined => {
     if (!transitions) return undefined
     const list = Array.isArray(transitions) ? transitions : [transitions]
     return list.find(t => checkGuard(t.guard, event))
   }
 
-  const send = (event: TEvent) => {
+  const send = (event: Event) => {
     if (!started) return
     const node = config.states[state]
     const transitions = node?.on?.[event.type] ?? config.on?.[event.type]
@@ -206,8 +206,8 @@ export function createMachine<
       if (started) return
       started = true
       // Synthetic boot event for entry actions. Cast because the user's
-      // TEvent union doesn't include it — it's machine-internal.
-      runActions(config.states[state]?.entry, { type: '@@start' } as TEvent)
+      // Event union doesn't include it — it's machine-internal.
+      runActions(config.states[state]?.entry, { type: '@@start' } as Event)
       runEffects(state)
     },
     stop() {

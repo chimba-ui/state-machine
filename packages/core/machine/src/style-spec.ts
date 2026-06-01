@@ -27,13 +27,13 @@ export interface Style {
 // alongside them under reserved keys. Loose index signature on purpose:
 // the translator inspects each key and decides whether it's a style prop
 // or a structural key, so a strict union here would over-constrain authors.
-export type StyleSpec<TVariants extends Record<string, Record<string, Style>>> = {
-  variants: TVariants
+export type StyleSpec<Variants extends Record<string, Record<string, Style>>> = {
+  variants: Variants
   compoundVariants?: Array<
     {
-      [K in keyof TVariants]?: keyof TVariants[K]
+      [K in keyof Variants]?: keyof Variants[K]
     } & { css: Style }
   >
-  defaultVariants?: { [K in keyof TVariants]?: keyof TVariants[K] }
+  defaultVariants?: { [K in keyof Variants]?: keyof Variants[K] }
   [prop: string]: unknown
 }
