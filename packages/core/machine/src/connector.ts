@@ -34,11 +34,13 @@ export interface MachineSnapshot<
   TContext,
   TProps,
   TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
 > {
   state: TState
   context: TContext
   props: TProps
   send: Send<TEvent>
+  computed: TComputed
 }
 
 /**
@@ -53,8 +55,11 @@ export interface Connect<
   TApi,
   TExtras extends unknown[],
   TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
 > {
-  (snapshot: MachineSnapshot<TState, TContext, TProps, TEvent>): (...extras: TExtras) => TApi
+  (
+    snapshot: MachineSnapshot<TState, TContext, TProps, TEvent, TComputed>,
+  ): (...extras: TExtras) => TApi
 }
 
 /**
@@ -67,13 +72,14 @@ export function connector<
   TProps,
   TApi,
   TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
 >() {
   return <TExtras extends unknown[]>(
     build: (
-      snapshot: MachineSnapshot<TState, TContext, TProps, TEvent>,
+      snapshot: MachineSnapshot<TState, TContext, TProps, TEvent, TComputed>,
       ...extras: TExtras
     ) => TApi,
-  ): Connect<TState, TContext, TProps, TApi, TExtras, TEvent> =>
+  ): Connect<TState, TContext, TProps, TApi, TExtras, TEvent, TComputed> =>
     snapshot =>
     (...extras: TExtras) =>
       build(snapshot, ...extras)

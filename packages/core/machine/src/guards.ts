@@ -15,7 +15,7 @@
  * Compose arbitrarily deep.
  */
 
-import type { EventObject, Guard } from './types'
+import type { ChooseBranch, ChosenActions, EventObject, Guard } from './types'
 
 /**
  * Short-circuit AND. Returns true iff every supplied guard passes. With
@@ -42,4 +42,27 @@ export function not<TContext, TProps, TEvent extends EventObject = EventObject>(
   guard: Guard<TContext, TProps, TEvent>,
 ): Guard<TContext, TProps, TEvent> {
   return params => !guard(params)
+}
+
+/**
+ * Pick one action list out of several at runtime. Each branch declares an
+ * optional `guard` and a list of action names; the first branch whose
+ * guard returns true (or the first guardless branch) wins. Use inside a
+ * transition's `actions` field:
+ *
+ *   on: {
+ *     escape: {
+ *       actions: choose([
+ *         { guard: 'isFocusTrap', actions: ['flashWarning'] },
+ *         { actions: ['invokeOnClose'] },
+ *       ]),
+ *       target: 'closed',
+ *     },
+ *   }
+ *
+ * Returns a sentinel object the runtime detects and expands. Combinators
+ * (`and / or / not`) work as the `guard` field, same as on transitions.
+ */
+export function choose(branches: ChooseBranch[]): ChosenActions {
+  return { __choose: true, branches }
 }

@@ -19,21 +19,47 @@ import type { AttrBindings, EventBindings } from './bindings'
  */
 export type EventObject = { type: string }
 
-export interface Params<TContext, TProps, TEvent extends EventObject = EventObject> {
+export interface Params<
+  TContext,
+  TProps,
+  TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
+> {
   context: TContext
   setContext: (patch: Partial<TContext>) => void
   props: TProps
   event: TEvent
   send: (event: TEvent) => void
+  /**
+   * Derived values declared via `computed: { ... }` on the machine config.
+   * Recomputed lazily when the machine's version bumps; cached otherwise.
+   * Empty object `{}` when no computed declared.
+   */
+  computed: TComputed
+  /**
+   * Dispatch any guard argument — a name from `implementations.guards`
+   * or an inline `Guard` function — against the live params. Returns
+   * the boolean the guard yields. Used by `setup<>().guards.and/or/not`
+   * to resolve composed guards against the same registry the runtime
+   * uses; available to user-written guards / actions / effects that
+   * need to consult another named guard.
+   */
+  guard: (g: string | Guard<TContext, TProps, TEvent, TComputed>) => boolean
 }
 
-export type Action<TContext, TProps, TEvent extends EventObject = EventObject> = (
-  params: Params<TContext, TProps, TEvent>,
-) => void
+export type Action<
+  TContext,
+  TProps,
+  TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
+> = (params: Params<TContext, TProps, TEvent, TComputed>) => void
 
-export type Guard<TContext, TProps, TEvent extends EventObject = EventObject> = (
-  params: Omit<Params<TContext, TProps, TEvent>, 'send' | 'setContext'>,
-) => boolean
+export type Guard<
+  TContext,
+  TProps,
+  TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
+> = (params: Omit<Params<TContext, TProps, TEvent, TComputed>, 'send' | 'setContext'>) => boolean
 
 /**
  * What a transition's `guard` field accepts: a name (resolved against
@@ -44,11 +70,47 @@ export type GuardArg<
   TContext = unknown,
   TProps = unknown,
   TEvent extends EventObject = EventObject,
-> = string | Guard<TContext, TProps, TEvent>
+  TComputed = Record<string, never>,
+> = string | Guard<TContext, TProps, TEvent, TComputed>
 
-export type Effect<TContext, TProps, TEvent extends EventObject = EventObject> = (
-  params: Omit<Params<TContext, TProps, TEvent>, 'event'>,
-) => VoidFunction | void
+export type Effect<
+  TContext,
+  TProps,
+  TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
+> = (params: Omit<Params<TContext, TProps, TEvent, TComputed>, 'event'>) => VoidFunction | void
+
+/**
+ * One computed value's definition: a function over the snapshot that
+ * returns the derived value. The runtime evaluates it lazily and caches
+ * by machine version.
+ */
+export type ComputedFn<TContext, TProps, TValue> = (params: {
+  state: string
+  context: TContext
+  props: TProps
+}) => TValue
+
+/**
+ * One branch of a `choose([...])` block: optional guard, an action list
+ * to run when the guard matches (or it's the catch-all). First branch
+ * whose guard returns true wins; later branches are skipped.
+ */
+export interface ChooseBranch {
+  guard?: GuardArg
+  actions: string[]
+}
+
+/**
+ * A `choose(...)` sentinel — a tagged object the runtime detects in
+ * `transition.actions` and expands by picking the first matching branch.
+ * Authored via the `choose()` helper exported from this package; users
+ * never construct it by hand.
+ */
+export interface ChosenActions {
+  readonly __choose: true
+  readonly branches: ChooseBranch[]
+}
 
 export interface Transition {
   target?: string
@@ -57,7 +119,11 @@ export interface Transition {
    * inline function. Compose with `and / or / not`.
    */
   guard?: GuardArg
-  actions?: string[]
+  /**
+   * Either a list of named actions to run unconditionally, or a
+   * `choose([...])` sentinel that picks one branch at runtime.
+   */
+  actions?: string[] | ChosenActions
 }
 
 export interface StateNode {
@@ -71,15 +137,24 @@ export interface MachineConfig<
   TContext,
   TProps = Record<string, unknown>,
   TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
 > {
   initial: string | ((props: TProps) => string)
   context: TContext | ((props: TProps) => TContext)
   states: Record<string, StateNode>
   on?: Record<string, Transition | Transition[]>
+  /**
+   * Derived values, evaluated lazily and memoized by machine version.
+   * Each key maps to a function over the snapshot. Available to actions,
+   * guards, effects, and the connect via `params.computed`.
+   */
+  computed?: {
+    [K in keyof TComputed]: ComputedFn<TContext, TProps, TComputed[K]>
+  }
   implementations?: {
-    actions?: Record<string, Action<TContext, TProps, TEvent>>
-    guards?: Record<string, Guard<TContext, TProps, TEvent>>
-    effects?: Record<string, Effect<TContext, TProps, TEvent>>
+    actions?: Record<string, Action<TContext, TProps, TEvent, TComputed>>
+    guards?: Record<string, Guard<TContext, TProps, TEvent, TComputed>>
+    effects?: Record<string, Effect<TContext, TProps, TEvent, TComputed>>
   }
 }
 
@@ -114,10 +189,13 @@ export interface Machine<
   TContext,
   TProps = Record<string, unknown>,
   TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
 > {
   getState: () => string
   getContext: () => TContext
   getProps: () => TProps
+  /** Latest computed values; cached by version, recomputed on first read after a bump. */
+  getComputed: () => TComputed
   /**
    * Monotonic counter that bumps on every state transition or context
    * change. Designed as a cheap "did anything change?" snapshot for

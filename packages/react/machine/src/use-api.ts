@@ -24,12 +24,13 @@ export function useApi<
   TState,
   TApi,
   TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
 >(
-  config: MachineConfig<TContext, TProps, TEvent>,
+  config: MachineConfig<TContext, TProps, TEvent, TComputed>,
   props: TProps,
-  connect: Connect<TState, TContext, TProps, TApi, [], TEvent>,
+  connect: Connect<TState, TContext, TProps, TApi, [], TEvent, TComputed>,
 ): TApi {
-  const machine = useMachine<TContext, TProps, TEvent>(config, props)
+  const machine = useMachine<TContext, TProps, TEvent, TComputed>(config, props)
 
   // Cache by (machine instance, version). A new machine instance can
   // appear after hot-reload or via key-driven remount; in either case
@@ -56,6 +57,7 @@ export function useApi<
         context: machine.getContext(),
         props: machine.getProps(),
         send: machine.send,
+        computed: machine.getComputed(),
       })(),
     }
   }

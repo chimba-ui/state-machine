@@ -23,10 +23,11 @@ export function useMachine<
   TContext extends object,
   TProps extends object,
   TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
 >(
-  config: MachineConfig<TContext, TProps, TEvent>,
+  config: MachineConfig<TContext, TProps, TEvent, TComputed>,
   props: TProps,
-): Machine<TContext, TProps, TEvent> {
+): Machine<TContext, TProps, TEvent, TComputed> {
   const configRef = useRef(config)
   const machine = useMemo(
     () => createMachine(configRef.current, props),

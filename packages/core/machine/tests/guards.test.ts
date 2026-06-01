@@ -79,6 +79,8 @@ describe('composition', () => {
       context: { x: 1 },
       props: {},
       event: { type: '_' as const },
+      computed: {} as Record<string, never>,
+      guard: () => false,
     }
     and(spy, not(spy))(params)
     expect(seen).toEqual([{ x: 1 }, { x: 1 }])

@@ -9,11 +9,14 @@ export type { Adapter } from './adapter'
 export { mergeProps } from './utils'
 export { connector } from './connector'
 export type { Connect, MachineSnapshot, Send } from './connector'
-export { and, or, not } from './guards'
+export { and, or, not, choose } from './guards'
 export { setup } from './setup'
 export type { MachineSchema, TypedMachineConfig } from './setup'
 export type {
   Action,
+  ChooseBranch,
+  ChosenActions,
+  ComputedFn,
   Effect,
   EventObject,
   Guard,

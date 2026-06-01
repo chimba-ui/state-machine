@@ -1,13 +1,14 @@
-import type { EventObject, MachineConfig, Machine, Transition } from './types'
+import type { ChosenActions, EventObject, MachineConfig, Machine, Transition } from './types'
 
 export function createMachine<
   TContext extends object,
   TProps extends object,
   TEvent extends EventObject = EventObject,
+  TComputed = Record<string, never>,
 >(
-  config: MachineConfig<TContext, TProps, TEvent>,
+  config: MachineConfig<TContext, TProps, TEvent, TComputed>,
   initialProps: TProps,
-): Machine<TContext, TProps, TEvent> {
+): Machine<TContext, TProps, TEvent, TComputed> {
   let props = initialProps
 
   const initial =
@@ -27,6 +28,25 @@ export function createMachine<
   const effectCleanups = new Map<string, VoidFunction[]>()
   let started = false
 
+  // Computed cache. Recomputed lazily when `cachedComputedVersion` falls
+  // behind the live `version`. Empty object when the config has no
+  // `computed` block — keeps the param shape consistent for callers.
+  let cachedComputed: TComputed = {} as TComputed
+  let cachedComputedVersion = -1
+  const computeAll = (): TComputed => {
+    if (cachedComputedVersion === version) return cachedComputed
+    const out = {} as Record<string, unknown>
+    if (config.computed) {
+      const snap = { state, context, props }
+      for (const [key, fn] of Object.entries(config.computed)) {
+        out[key] = (fn as (p: typeof snap) => unknown)(snap)
+      }
+    }
+    cachedComputed = out as TComputed
+    cachedComputedVersion = version
+    return cachedComputed
+  }
+
   const notify = () => {
     version++
     listeners.forEach(l => l())
@@ -45,36 +65,65 @@ export function createMachine<
     notify()
   }
 
-  const baseParams = (event: TEvent) => ({
-    context,
-    setContext,
-    props,
-    event,
-    send,
-  })
+  /**
+   * Dispatch any guard argument — a name or an inline function — against
+   * live params. Used by `params.guard()` and by `checkGuard`. Resolving
+   * via this single channel means schema-bound combinators
+   * (`setup<>().guards.and/or/not`) hit the same registry the runtime
+   * does, without leaking it through Params on a private field.
+   */
+  const resolveGuard = (g: string | ((p: unknown) => boolean), params: unknown): boolean => {
+    if (typeof g === 'function') return g(params)
+    const fn = config.implementations?.guards?.[g]
+    if (!fn) {
+      console.warn(`[machine] no guard "${g}"`)
+      return false
+    }
+    return (fn as (p: unknown) => boolean)(params)
+  }
 
-  const runActions = (names: string[] | undefined, event: TEvent) => {
-    if (!names) return
+  const baseParams = (event: TEvent) => {
+    const params = {
+      context,
+      setContext,
+      props,
+      event,
+      send,
+      computed: computeAll(),
+    } as Record<string, unknown>
+    params.guard = (g: string | ((p: unknown) => boolean)) => resolveGuard(g, params)
+    return params
+  }
+
+  const isChosen = (v: unknown): v is ChosenActions =>
+    typeof v === 'object' && v !== null && (v as { __choose?: boolean }).__choose === true
+
+  const runActions = (actions: string[] | ChosenActions | undefined, event: TEvent) => {
+    if (!actions) return
+    // Expand a choose() sentinel by picking the first matching branch.
+    // Guards inside choose use the same checker the runtime uses for
+    // transition guards — combinators and inline functions all work.
+    const names: string[] = isChosen(actions)
+      ? (actions.branches.find(b => checkGuard(b.guard, event))?.actions ?? [])
+      : actions
     for (const name of names) {
       const fn = config.implementations?.actions?.[name]
       if (!fn) {
         console.warn(`[machine] no action "${name}"`)
         continue
       }
-      fn(baseParams(event))
+      fn(baseParams(event) as unknown as Parameters<typeof fn>[0])
     }
   }
 
   const checkGuard = (guard: Transition['guard'], event: TEvent): boolean => {
     if (!guard) return true
-    const params = { context, props, event }
-    if (typeof guard === 'function') return guard(params)
-    const fn = config.implementations?.guards?.[guard]
-    if (!fn) {
-      console.warn(`[machine] no guard "${guard}"`)
-      return false
-    }
-    return fn(params)
+    // Same params shape user-written guards see — including a `guard()`
+    // method that dispatches names or functions through the runtime's
+    // single resolution path. Schema-bound combinators
+    // (`setup<>().guards.and/or/not`) call `params.guard(x)` and never
+    // touch the implementations map directly.
+    return resolveGuard(guard as string | ((p: unknown) => boolean), baseParams(event))
   }
 
   const runEffects = (stateName: string) => {
@@ -87,7 +136,15 @@ export function createMachine<
         console.warn(`[machine] no effect "${name}"`)
         continue
       }
-      const cleanup = fn({ context, setContext, props, send })
+      const eParams = {
+        context,
+        setContext,
+        props,
+        send,
+        computed: computeAll(),
+      } as Record<string, unknown>
+      eParams.guard = (g: string | ((p: unknown) => boolean)) => resolveGuard(g, eParams)
+      const cleanup = fn(eParams as unknown as Parameters<typeof fn>[0])
       if (cleanup) cleanups.push(cleanup)
     }
     if (cleanups.length) effectCleanups.set(stateName, cleanups)
@@ -135,6 +192,7 @@ export function createMachine<
     getState: () => state,
     getContext: () => context,
     getProps: () => props,
+    getComputed: () => computeAll(),
     getVersion: () => version,
     setProps(next) {
       props = next
