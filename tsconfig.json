@@ -40,11 +40,8 @@
   "exclude": [
     "**/node_modules",
     "**/dist",
-    // Jest tests (jest globals) are type-checked by tsconfig.native-tests.json,
-    // not here — this project provides vitest globals, which collide with jest's.
-    // (TS exclude globs don't support {ts,tsx} brace alternation — list both.)
-    "**/*.native.test.ts",
-    "**/*.native.test.tsx",
-    "./jest.native.ts"
+    // Native Jest tests are type-checked by tsconfig.jest.json
+    "./packages/native/**/tests/*.test.ts",
+    "./packages/native/**/tests/*.test.tsx",
   ],
 }

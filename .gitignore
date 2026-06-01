@@ -6,3 +6,5 @@ dist
 .expo
 .expo-shared
 sandbox/native/dist
+sandbox/native/ios
+sandbox/native/android

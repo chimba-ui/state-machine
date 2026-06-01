@@ -14,9 +14,9 @@
     "dev:pixi:vite": "pnpm --filter sandbox-pixi dev",
     "build": "pnpm codegen && pnpm --filter sandbox-react build",
     "test": "vitest",
-    "test:native": "TS_NODE_PROJECT=tsconfig.jest.json jest --config jest.native.ts",
+    "test:native": "jest --config jest.native.js",
     "test:all": "pnpm test && pnpm test:native",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.native-tests.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.jest.json"
   },
   "devDependencies": {
     "@react-native/babel-preset": "^0.85.3",
@@ -37,7 +37,6 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-test-renderer": "19.2.6",
-    "ts-node": "^10.9.2",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "vite": "^8.0.14",

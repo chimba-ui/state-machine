@@ -10,6 +10,9 @@ export default defineConfig({
   test: {
     globals: false,
     environment: "node",
-    exclude: ["**/node_modules/**", "**/*.native.test.{ts,tsx}"],
+    // Native component tests (.tsx — render RN components via RNTL) run
+    // under Jest via `pnpm test:native`. Pure-logic .ts tests in
+    // packages/native/ stay here.
+    exclude: ["**/node_modules/**", "packages/native/**/tests/**/*.test.tsx"],
   },
 });
