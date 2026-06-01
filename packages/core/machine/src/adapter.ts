@@ -16,9 +16,12 @@
  * platform.
  */
 
-import type { Effect, MachineConfig } from './types'
+import type { Effect, EventObject, MachineConfig } from './types'
 
-export type Adapter<TContext, TProps> = Record<string, Effect<TContext, TProps>>
+export type Adapter<TContext, TProps, TEvent extends EventObject = EventObject> = Record<
+  string,
+  Effect<TContext, TProps, TEvent>
+>
 
 /**
  * Return a copy of `config` with the adapter's effect implementations
@@ -28,12 +31,12 @@ export type Adapter<TContext, TProps> = Record<string, Effect<TContext, TProps>>
  * Unknown effect names in the adapter map trigger a warning — likely a
  * rename in core that the adapter file hasn't caught up with.
  */
-export function withAdapter<TContext, TProps>(
-  config: MachineConfig<TContext, TProps>,
-  adapter: Adapter<TContext, TProps>,
-): MachineConfig<TContext, TProps> {
+export function withAdapter<TContext, TProps, TEvent extends EventObject = EventObject>(
+  config: MachineConfig<TContext, TProps, TEvent>,
+  adapter: Adapter<TContext, TProps, TEvent>,
+): MachineConfig<TContext, TProps, TEvent> {
   const existing = config.implementations?.effects ?? {}
-  const merged: Record<string, Effect<TContext, TProps>> = { ...existing }
+  const merged: Record<string, Effect<TContext, TProps, TEvent>> = { ...existing }
   for (const [name, fn] of Object.entries(adapter)) {
     if (!(name in existing)) {
       console.warn(`[machine] adapter effect "${name}" not declared in host; using it anyway`)

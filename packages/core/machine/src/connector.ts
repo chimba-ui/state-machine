@@ -27,13 +27,18 @@
 
 import type { EventObject } from './types'
 
-export type Send = (event: EventObject) => void
+export type Send<TEvent extends EventObject = EventObject> = (event: TEvent) => void
 
-export interface MachineSnapshot<TState, TContext, TProps> {
+export interface MachineSnapshot<
+  TState,
+  TContext,
+  TProps,
+  TEvent extends EventObject = EventObject,
+> {
   state: TState
   context: TContext
   props: TProps
-  send: Send
+  send: Send<TEvent>
 }
 
 /**
@@ -41,18 +46,34 @@ export interface MachineSnapshot<TState, TContext, TProps> {
  * accepts component-specific extras. Components type the extras tuple
  * (often empty, or a single `items` arg) at the call site of `connector`.
  */
-export interface Connect<TState, TContext, TProps, TApi, TExtras extends unknown[]> {
-  (snapshot: MachineSnapshot<TState, TContext, TProps>): (...extras: TExtras) => TApi
+export interface Connect<
+  TState,
+  TContext,
+  TProps,
+  TApi,
+  TExtras extends unknown[],
+  TEvent extends EventObject = EventObject,
+> {
+  (snapshot: MachineSnapshot<TState, TContext, TProps, TEvent>): (...extras: TExtras) => TApi
 }
 
 /**
  * Build a component's connect function. Returns a function with two calls
  * so callers can write `connect(snapshot)(extras)` at the use site.
  */
-export function connector<TState, TContext, TProps, TApi>() {
+export function connector<
+  TState,
+  TContext,
+  TProps,
+  TApi,
+  TEvent extends EventObject = EventObject,
+>() {
   return <TExtras extends unknown[]>(
-    build: (snapshot: MachineSnapshot<TState, TContext, TProps>, ...extras: TExtras) => TApi,
-  ): Connect<TState, TContext, TProps, TApi, TExtras> =>
+    build: (
+      snapshot: MachineSnapshot<TState, TContext, TProps, TEvent>,
+      ...extras: TExtras
+    ) => TApi,
+  ): Connect<TState, TContext, TProps, TApi, TExtras, TEvent> =>
     snapshot =>
     (...extras: TExtras) =>
       build(snapshot, ...extras)

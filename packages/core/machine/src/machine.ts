@@ -1,9 +1,13 @@
 import type { EventObject, MachineConfig, Machine, Transition } from './types'
 
-export function createMachine<TContext extends object, TProps extends object>(
-  config: MachineConfig<TContext, TProps>,
+export function createMachine<
+  TContext extends object,
+  TProps extends object,
+  TEvent extends EventObject = EventObject,
+>(
+  config: MachineConfig<TContext, TProps, TEvent>,
   initialProps: TProps,
-): Machine<TContext, TProps> {
+): Machine<TContext, TProps, TEvent> {
   let props = initialProps
 
   const initial =
@@ -41,7 +45,7 @@ export function createMachine<TContext extends object, TProps extends object>(
     notify()
   }
 
-  const baseParams = (event: EventObject) => ({
+  const baseParams = (event: TEvent) => ({
     context,
     setContext,
     props,
@@ -49,7 +53,7 @@ export function createMachine<TContext extends object, TProps extends object>(
     send,
   })
 
-  const runActions = (names: string[] | undefined, event: EventObject) => {
+  const runActions = (names: string[] | undefined, event: TEvent) => {
     if (!names) return
     for (const name of names) {
       const fn = config.implementations?.actions?.[name]
@@ -61,7 +65,7 @@ export function createMachine<TContext extends object, TProps extends object>(
     }
   }
 
-  const checkGuard = (name: string | undefined, event: EventObject): boolean => {
+  const checkGuard = (name: string | undefined, event: TEvent): boolean => {
     if (!name) return true
     const fn = config.implementations?.guards?.[name]
     if (!fn) {
@@ -95,14 +99,14 @@ export function createMachine<TContext extends object, TProps extends object>(
 
   const resolveTransition = (
     transitions: Transition | Transition[] | undefined,
-    event: EventObject,
+    event: TEvent,
   ): Transition | undefined => {
     if (!transitions) return undefined
     const list = Array.isArray(transitions) ? transitions : [transitions]
     return list.find(t => checkGuard(t.guard, event))
   }
 
-  const send = (event: EventObject) => {
+  const send = (event: TEvent) => {
     if (!started) return
     const node = config.states[state]
     const transitions = node?.on?.[event.type] ?? config.on?.[event.type]
@@ -141,7 +145,9 @@ export function createMachine<TContext extends object, TProps extends object>(
     start() {
       if (started) return
       started = true
-      runActions(config.states[state]?.entry, { type: '@@start' })
+      // Synthetic boot event for entry actions. Cast because the user's
+      // TEvent union doesn't include it — it's machine-internal.
+      runActions(config.states[state]?.entry, { type: '@@start' } as TEvent)
       runEffects(state)
     },
     stop() {

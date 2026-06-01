@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
-import { createMachine, type Machine, type MachineConfig } from '@render-experiment/machine-core'
+import {
+  createMachine,
+  type EventObject,
+  type Machine,
+  type MachineConfig,
+} from '@render-experiment/machine-core'
 
 /**
  * React reactivity bridge for a machine instance.
@@ -13,10 +18,14 @@ import { createMachine, type Machine, type MachineConfig } from '@render-experim
  * callbacks (`onOpenChange`), and timing knobs (`openDelay`) stay fresh
  * inside actions/guards/effects.
  */
-export function useMachine<TContext extends object, TProps extends object>(
-  config: MachineConfig<TContext, TProps>,
+export function useMachine<
+  TContext extends object,
+  TProps extends object,
+  TEvent extends EventObject = EventObject,
+>(
+  config: MachineConfig<TContext, TProps, TEvent>,
   props: TProps,
-): Machine<TContext, TProps> {
+): Machine<TContext, TProps, TEvent> {
   const configRef = useRef(config)
   const machine = useMemo(
     () => createMachine(configRef.current, props),

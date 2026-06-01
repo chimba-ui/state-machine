@@ -8,24 +8,35 @@
 
 import type { AttrBindings, EventBindings } from './bindings'
 
-export type EventObject = { type: string; [key: string]: unknown }
+/**
+ * Base event shape. Components declare their own discriminated-union
+ * `TEvent` extending this — `{ type: 'item.click'; value: string; ... }`
+ * etc — and pass it as the third generic to `MachineConfig` / `Machine`.
+ *
+ * Action / guard bodies then get a fully-typed `event` parameter, and
+ * `send()` call sites are type-checked. The default keeps non-opted-in
+ * callers working with a payload-free event.
+ */
+export type EventObject = { type: string }
 
-export interface Params<TContext, TProps> {
+export interface Params<TContext, TProps, TEvent extends EventObject = EventObject> {
   context: TContext
   setContext: (patch: Partial<TContext>) => void
   props: TProps
-  event: EventObject
-  send: (event: EventObject) => void
+  event: TEvent
+  send: (event: TEvent) => void
 }
 
-export type Action<TContext, TProps> = (params: Params<TContext, TProps>) => void
+export type Action<TContext, TProps, TEvent extends EventObject = EventObject> = (
+  params: Params<TContext, TProps, TEvent>,
+) => void
 
-export type Guard<TContext, TProps> = (
-  params: Omit<Params<TContext, TProps>, 'send' | 'setContext'>,
+export type Guard<TContext, TProps, TEvent extends EventObject = EventObject> = (
+  params: Omit<Params<TContext, TProps, TEvent>, 'send' | 'setContext'>,
 ) => boolean
 
-export type Effect<TContext, TProps> = (
-  params: Omit<Params<TContext, TProps>, 'event'>,
+export type Effect<TContext, TProps, TEvent extends EventObject = EventObject> = (
+  params: Omit<Params<TContext, TProps, TEvent>, 'event'>,
 ) => VoidFunction | void
 
 export interface Transition {
@@ -41,15 +52,19 @@ export interface StateNode {
   on?: Record<string, Transition | Transition[]>
 }
 
-export interface MachineConfig<TContext, TProps = Record<string, unknown>> {
+export interface MachineConfig<
+  TContext,
+  TProps = Record<string, unknown>,
+  TEvent extends EventObject = EventObject,
+> {
   initial: string | ((props: TProps) => string)
   context: TContext | ((props: TProps) => TContext)
   states: Record<string, StateNode>
   on?: Record<string, Transition | Transition[]>
   implementations?: {
-    actions?: Record<string, Action<TContext, TProps>>
-    guards?: Record<string, Guard<TContext, TProps>>
-    effects?: Record<string, Effect<TContext, TProps>>
+    actions?: Record<string, Action<TContext, TProps, TEvent>>
+    guards?: Record<string, Guard<TContext, TProps, TEvent>>
+    effects?: Record<string, Effect<TContext, TProps, TEvent>>
   }
 }
 
@@ -80,7 +95,11 @@ export type Part<TVariants extends object = never, TExtras extends object = neve
 } & ([TVariants] extends [never] ? unknown : { variants: TVariants }) &
   ([TExtras] extends [never] ? unknown : TExtras)
 
-export interface Machine<TContext, TProps = Record<string, unknown>> {
+export interface Machine<
+  TContext,
+  TProps = Record<string, unknown>,
+  TEvent extends EventObject = EventObject,
+> {
   getState: () => string
   getContext: () => TContext
   getProps: () => TProps
@@ -91,7 +110,7 @@ export interface Machine<TContext, TProps = Record<string, unknown>> {
    */
   getVersion: () => number
   setProps: (next: TProps) => void
-  send: (event: EventObject) => void
+  send: (event: TEvent) => void
   subscribe: (listener: () => void) => () => void
   start: () => void
   stop: () => void

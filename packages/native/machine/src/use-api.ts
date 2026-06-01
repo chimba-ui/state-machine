@@ -6,15 +6,21 @@
  */
 
 import { useMemo, useRef } from 'react'
-import { type Connect, type MachineConfig } from '@render-experiment/machine-core'
+import { type Connect, type EventObject, type MachineConfig } from '@render-experiment/machine-core'
 import { useMachine } from './use-machine'
 
-export function useApi<TContext extends object, TProps extends object, TState, TApi>(
-  config: MachineConfig<TContext, TProps>,
+export function useApi<
+  TContext extends object,
+  TProps extends object,
+  TState,
+  TApi,
+  TEvent extends EventObject = EventObject,
+>(
+  config: MachineConfig<TContext, TProps, TEvent>,
   props: TProps,
-  connect: Connect<TState, TContext, TProps, TApi, []>,
+  connect: Connect<TState, TContext, TProps, TApi, [], TEvent>,
 ): TApi {
-  const machine = useMachine<TContext, TProps>(config, props)
+  const machine = useMachine<TContext, TProps, TEvent>(config, props)
 
   const cacheRef = useRef<{
     machineToken: object
