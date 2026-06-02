@@ -154,11 +154,38 @@ export function createState<T extends string>(initial: T, nodes: Record<T, State
 // minimally here and formalized in Round 4 (guards) and Round 5 (actions).
 // This round owns the transition mechanics + the queue, not those registries.
 
+// -----------------------------------------------------------------------------
+// Round 4a: guards — params shape + inline guards (DECIDED)
+// -----------------------------------------------------------------------------
+//
+// A guard is a predicate gating a transition. It receives the FINAL params
+// shape now — { context, event, computed } — even though `computed` is wired
+// in Round 7; until then it's an empty object. Locking the shape here means no
+// guard signature churns later. Named guards (4b) and combinators (4c) build
+// on this same Guard type.
+
+/** Everything a guard can read. `computed` is `{}` until Round 7 wires it. */
+export interface GuardParams<Context, Event, Computed = Record<string, never>> {
+  context: Context
+  event: Event
+  computed: Computed
+}
+
+/** An inline guard: a predicate over the params. */
+export type Guard<Context, Event, Computed = Record<string, never>> = (
+  params: GuardParams<Context, Event, Computed>,
+) => boolean
+
 /** A single transition: optional target, optional guard, optional actions. */
-export interface Transition<State extends string, Context, Event> {
+export interface Transition<
+  State extends string,
+  Context,
+  Event,
+  Computed = Record<string, never>,
+> {
   target?: State
-  /** Inline predicate for now; named guards + combinators are Round 4. */
-  guard?: (params: { context: Context; event: Event }) => boolean
+  /** Inline predicate. Named guards + combinators (4b/4c) extend this. */
+  guard?: Guard<Context, Event, Computed>
   /** Inline action list for now; named actions + choose are Round 5. */
   actions?: Array<(params: TransitionActionParams<Context, Event>) => void>
 }
@@ -171,16 +198,24 @@ export interface TransitionActionParams<Context, Event> {
   send: (event: Event) => void
 }
 
-type TransitionEntry<State extends string, Context, Event> =
-  | Transition<State, Context, Event>
-  | Array<Transition<State, Context, Event>>
+type TransitionEntry<State extends string, Context, Event, Computed> =
+  | Transition<State, Context, Event, Computed>
+  | Array<Transition<State, Context, Event, Computed>>
 
-export interface TransitionConfig<State extends string, Context, Event extends { type: string }> {
+export interface TransitionConfig<
+  State extends string,
+  Context,
+  Event extends { type: string },
+  Computed = Record<string, never>,
+> {
   initial: State
   context: Context
-  states: Record<State, StateNode & { on?: Record<string, TransitionEntry<State, Context, Event>> }>
+  states: Record<
+    State,
+    StateNode & { on?: Record<string, TransitionEntry<State, Context, Event, Computed>> }
+  >
   /** Any-state events. Per-state `on` takes precedence over this. */
-  on?: Record<string, TransitionEntry<State, Context, Event>>
+  on?: Record<string, TransitionEntry<State, Context, Event, Computed>>
 }
 
 export interface TransitionLayer<State extends string, Context, Event extends { type: string }> {
@@ -202,16 +237,27 @@ export function createTransitions<
   State extends string,
   Context extends object,
   Event extends { type: string },
->(config: TransitionConfig<State, Context, Event>): TransitionLayer<State, Context, Event> {
+  Computed = Record<string, never>,
+>(
+  config: TransitionConfig<State, Context, Event, Computed>,
+): TransitionLayer<State, Context, Event> {
   const st = createState<State>(config.initial, config.states)
   const { context, setContext } = createContext<Context>(config.context)
 
+  // `computed` is wired in Round 7; until then it's an empty object so the
+  // guard params shape is already final.
+  const computed = {} as Computed
+
   // 3c: resolve an entry (single or array) to the first transition whose
-  // guard passes. No guard = always passes.
-  const resolve = (entry: TransitionEntry<State, Context, Event> | undefined, event: Event) => {
+  // guard passes. No guard = always passes. Guards get { context, event,
+  // computed } (4a).
+  const resolve = (
+    entry: TransitionEntry<State, Context, Event, Computed> | undefined,
+    event: Event,
+  ) => {
     if (!entry) return undefined
     const list = Array.isArray(entry) ? entry : [entry]
-    return list.find(t => (t.guard ? t.guard({ context, event }) : true))
+    return list.find(t => (t.guard ? t.guard({ context, event, computed }) : true))
   }
 
   // 3d: the queue. send() enqueues; the first send drains the queue, so a
