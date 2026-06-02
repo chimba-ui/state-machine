@@ -70,10 +70,74 @@ export function createContext<C extends object>(
 }
 
 // -----------------------------------------------------------------------------
+// Round 2: state representation (DECIDED)
+// -----------------------------------------------------------------------------
+//
+// Flat tagged states (the "G" decision: flat per machine, composition for
+// hierarchy/parallelism later). One active state, a plain string. States
+// declare `tags` co-located on the node. Read surface:
+//   - `state`            tracked current state string
+//   - `hasTag(tag)`      tracked — is the current state tagged `tag`?
+//   - `matches(name)`    tracked — is the current state exactly `name`?
+// All three are tracked signal reads (reading inside an effect/computed
+// subscribes the reader), matching Round 1's context model.
+//
+// This layer owns ONLY representation + reads. Moving between states
+// (transitions) is Round 3.
+
+/** Per-state node. `tags` groups states so consumers query a tag, not names. */
+export interface StateNode {
+  tags?: string[]
+}
+
+export interface StateLayer<S extends string> {
+  /** Tracked current state. */
+  readonly state: S
+  /** Tracked: is the current state tagged `tag`? */
+  hasTag: (tag: string) => boolean
+  /** Tracked: is the current state exactly `name`? (sugar for state === name) */
+  matches: (name: S) => boolean
+  /**
+   * Move to a new state. INTERNAL to the engine: the transition layer
+   * (Round 3) calls this; the assembled machine does NOT forward it to
+   * consumers (who move state only via `send`). Privacy is structural — the
+   * public machine simply won't expose `set` — not by naming convention.
+   */
+  set: (next: S) => void
+}
+
+export function createState<S extends string>(
+  initial: S,
+  nodes: Record<S, StateNode>,
+): StateLayer<S> {
+  const stateSig = signal<S>(initial)
+
+  // Precompute each state's tag set once (lookup is per-read, must be cheap).
+  const tagsOf = {} as Record<S, ReadonlySet<string>>
+  for (const name in nodes) {
+    tagsOf[name as S] = new Set(nodes[name as S].tags ?? [])
+  }
+
+  return {
+    get state() {
+      return stateSig.value // tracked read
+    },
+    hasTag(tag: string) {
+      return tagsOf[stateSig.value].has(tag) // reads stateSig → tracked
+    },
+    matches(name: S) {
+      return stateSig.value === name // reads stateSig → tracked
+    },
+    set(next: S) {
+      stateSig.value = next // Object.is dedup is built into the signal
+    },
+  }
+}
+
+// -----------------------------------------------------------------------------
 // STUBS — to be designed in later rounds. Not wired, not final.
 // -----------------------------------------------------------------------------
 //
-// Round 2: state representation
 // Round 3: transitions
 // Round 4: guards (and/or/not — kept concept)
 // Round 5: actions (+ choose — kept concept)
