@@ -176,6 +176,23 @@ export type Guard<Context, Event, Computed = Record<string, never>> = (
   params: GuardParams<Context, Event, Computed>,
 ) => boolean
 
+// -----------------------------------------------------------------------------
+// Round 4b: named guards (DECIDED)
+// -----------------------------------------------------------------------------
+//
+// A transition's `guard` can be an inline function (4a) OR a NAME resolved
+// against `implementations.guards`. Names enable reuse + schema exhaustiveness.
+// A missing name throws in dev (catches typos immediately) and warns + treats
+// as false in prod (non-crashing). Resolution is one channel so the
+// combinators (4c) reuse it.
+
+/** A guard arg in a transition: an inline predicate or a registered name. */
+export type GuardArg<Context, Event, Computed = Record<string, never>> =
+  | Guard<Context, Event, Computed>
+  | string
+
+const isDev = process.env.NODE_ENV !== 'production'
+
 /** A single transition: optional target, optional guard, optional actions. */
 export interface Transition<
   State extends string,
@@ -184,8 +201,8 @@ export interface Transition<
   Computed = Record<string, never>,
 > {
   target?: State
-  /** Inline predicate. Named guards + combinators (4b/4c) extend this. */
-  guard?: Guard<Context, Event, Computed>
+  /** Inline predicate (4a) or a registered guard name (4b). */
+  guard?: GuardArg<Context, Event, Computed>
   /** Inline action list for now; named actions + choose are Round 5. */
   actions?: Array<(params: TransitionActionParams<Context, Event>) => void>
 }
@@ -216,6 +233,11 @@ export interface TransitionConfig<
   >
   /** Any-state events. Per-state `on` takes precedence over this. */
   on?: Record<string, TransitionEntry<State, Context, Event, Computed>>
+  /** Named implementations referenced by string in transitions. */
+  implementations?: {
+    /** Reusable named guards (4b). Referenced by name in a transition `guard`. */
+    guards?: Record<string, Guard<Context, Event, Computed>>
+  }
 }
 
 export interface TransitionLayer<State extends string, Context, Event extends { type: string }> {
@@ -248,16 +270,35 @@ export function createTransitions<
   // guard params shape is already final.
   const computed = {} as Computed
 
+  // 4b: resolve a guard arg (inline fn OR registered name) against params.
+  // Single channel so combinators (4c) reuse it. Missing name → throw in dev,
+  // warn + false in prod.
+  const guardRegistry = config.implementations?.guards
+  const resolveGuard = (
+    guard: GuardArg<Context, Event, Computed>,
+    params: GuardParams<Context, Event, Computed>,
+  ): boolean => {
+    if (typeof guard === 'function') return guard(params)
+    const fn = guardRegistry?.[guard]
+    if (!fn) {
+      const msg = `[machine] no guard "${guard}"`
+      if (isDev) throw new Error(msg)
+      console.warn(msg)
+      return false
+    }
+    return fn(params)
+  }
+
   // 3c: resolve an entry (single or array) to the first transition whose
   // guard passes. No guard = always passes. Guards get { context, event,
-  // computed } (4a).
+  // computed } (4a); a guard may be an inline fn or a registered name (4b).
   const resolve = (
     entry: TransitionEntry<State, Context, Event, Computed> | undefined,
     event: Event,
   ) => {
     if (!entry) return undefined
     const list = Array.isArray(entry) ? entry : [entry]
-    return list.find(t => (t.guard ? t.guard({ context, event, computed }) : true))
+    return list.find(t => (t.guard ? resolveGuard(t.guard, { context, event, computed }) : true))
   }
 
   // 3d: the queue. send() enqueues; the first send drains the queue, so a
