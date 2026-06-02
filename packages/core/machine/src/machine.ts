@@ -466,11 +466,18 @@ export function withAdapter<
   }
 }
 
-export interface TransitionLayer<State extends string, Context, Event extends { type: string }> {
+export interface TransitionLayer<
+  State extends string,
+  Context,
+  Event extends { type: string },
+  Computed = Record<string, never>,
+> {
   readonly state: State
   hasTag: (tag: string) => boolean
   matches: (name: State) => boolean
   readonly context: Context
+  /** 7c: derived state. Reading a field is a tracked computed-signal read. */
+  readonly computed: Computed
   send: (event: Event) => void
 }
 
@@ -488,7 +495,7 @@ export function createTransitions<
   Computed = Record<string, never>,
 >(
   config: TransitionConfig<State, Context, Event, Computed>,
-): TransitionLayer<State, Context, Event> {
+): TransitionLayer<State, Context, Event, Computed> {
   const st = createState<State>(config.initial, config.states)
   const { context, setContext } = createContext<Context>(config.context)
 
@@ -676,6 +683,12 @@ export function createTransitions<
     matches: st.matches,
     get context() {
       return context
+    },
+    // 7c: surface the computed bag (decision 3=A). Reading m.computed.x is a
+    // tracked read of the underlying preact computed signal — same model as
+    // context/state — so the render loop / connect can derive O(changed).
+    get computed() {
+      return computed
     },
     send,
   }
