@@ -472,6 +472,32 @@ export function withAdapter<
   }
 }
 
+// -----------------------------------------------------------------------------
+// Round 8: subscription surface (DECIDED)
+// -----------------------------------------------------------------------------
+//
+// Two pieces: coarse `subscribe(listener)` (8a — wake on any change) and a
+// `select` builder (8b/8c) that narrows to a slice. `select(fn)` is the
+// function form (derived/composite); `select.context/.computed/.state(...)`
+// are typed named-scope forms (8c). All return a Selection — a wrapped preact
+// computed: read `.value` (tracked, like signal.value) or `.subscribe(listener,
+// equals?)` to fire only when the SELECTED value changes (value-deduped,
+// Object.is default + optional equals). The selection machinery exists only
+// when select() is called — unobserved machines pay nothing.
+
+/** Compare two selected values; return true if equal (no fire). */
+export type EqualityFn<Value> = (a: Value, b: Value) => boolean
+
+/** A narrowed, value-deduped view of the machine. Wraps a preact computed. */
+export interface Selection<Value> {
+  /** Current value. A tracked read (like signal.value): auto-subscribes inside
+   * a reactive scope, a plain read outside one. */
+  readonly value: Value
+  /** Fire `listener(value)` only when the selected value changes (Object.is by
+   * default, or `equals`). Does not fire on subscribe. Bare unsubscribe. */
+  subscribe: (listener: (value: Value) => void, equals?: EqualityFn<Value>) => () => void
+}
+
 export interface TransitionLayer<
   State extends string,
   Context,
@@ -488,6 +514,9 @@ export interface TransitionLayer<
   /** 8a: coarse subscription — listener fires on ANY subsequent change (state
    * or context). Does not fire on subscribe. Returns a bare unsubscribe. */
   subscribe: (listener: () => void) => () => void
+  /** 8b: narrow to a derived/composite slice. Returns a value-deduped Selection.
+   * Named-scope forms (select.context/.computed/.state) are added in 8c. */
+  select: <Value>(selector: () => Value) => Selection<Value>
 }
 
 /**
@@ -702,6 +731,36 @@ export function createTransitions<
     })
   }
 
+  // 8b: build a Selection from a preact computed signal. `value` is a tracked
+  // read of the signal. `subscribe` runs an effect reading the signal, compares
+  // to the previous selected value (Object.is default / `equals`), and fires
+  // only on a real change — skipping the priming run (no fire-on-subscribe).
+  const makeSelection = <Value>(sig: { value: Value }): Selection<Value> => ({
+    get value() {
+      return sig.value
+    },
+    subscribe(listener, equals = Object.is) {
+      let prev: Value
+      let primed = false
+      return preactEffect(() => {
+        const next = sig.value // tracks exactly what the selector read
+        if (!primed) {
+          prev = next
+          primed = true
+          return
+        }
+        if (equals(prev, next)) return // selected value unchanged → no fire
+        prev = next
+        listener(next)
+      })
+    },
+  })
+
+  // 8b: function-form selector. Wrap in a lazy/memoized preact computed so it
+  // auto-tracks exactly the cells/computeds it reads — selecting from anything.
+  const select = <Value>(selector: () => Value): Selection<Value> =>
+    makeSelection(preactComputed(selector))
+
   return {
     get state() {
       return st.state
@@ -719,6 +778,7 @@ export function createTransitions<
     },
     send,
     subscribe,
+    select,
   }
 }
 
