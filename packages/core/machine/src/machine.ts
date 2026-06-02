@@ -17,7 +17,13 @@
  * rounds. The build is intentionally incomplete until then.
  */
 
-import { batch, computed as preactComputed, signal, type Signal } from '@preact/signals-core'
+import {
+  batch,
+  computed as preactComputed,
+  effect as preactEffect,
+  signal,
+  type Signal,
+} from '@preact/signals-core'
 
 // -----------------------------------------------------------------------------
 // Round 1: context layer
@@ -479,6 +485,9 @@ export interface TransitionLayer<
   /** 7c: derived state. Reading a field is a tracked computed-signal read. */
   readonly computed: Computed
   send: (event: Event) => void
+  /** 8a: coarse subscription — listener fires on ANY subsequent change (state
+   * or context). Does not fire on subscribe. Returns a bare unsubscribe. */
+  subscribe: (listener: () => void) => () => void
 }
 
 /**
@@ -675,6 +684,24 @@ export function createTransitions<
   // "started fresh" from "entered via transition". Cleanup runs on first exit.
   startEffects(config.initial, { type: MACHINE_INIT } as Event)
 
+  // 8a: coarse subscribe — wake on ANY change. One preact effect reads the
+  // state + every context cell, so any state transition or context write
+  // re-runs it (computed changes are downstream of context, so we needn't read
+  // computeds — and reading them here would force the lazy ones, which we avoid
+  // to keep unobserved computeds free). The effect body runs once on creation
+  // to register deps; `primed` skips that first run so the listener fires only
+  // on SUBSEQUENT changes (decision 3=A: no fire-on-subscribe). Returns a bare
+  // unsubscribe (Zag-style). Costs nothing unless called.
+  const subscribe = (listener: () => void): (() => void) => {
+    let primed = false
+    return preactEffect(() => {
+      void st.state
+      for (const key in context) void context[key as keyof Context]
+      if (primed) listener()
+      else primed = true
+    })
+  }
+
   return {
     get state() {
       return st.state
@@ -691,6 +718,7 @@ export function createTransitions<
       return computed
     },
     send,
+    subscribe,
   }
 }
 
