@@ -240,8 +240,8 @@ export interface Transition<
   target?: State
   /** Inline predicate (4a) or a registered guard name (4b). */
   guard?: GuardArg<Context, Event, Computed>
-  /** Inline action(s) for now; named actions + oneOf are Round 5b/5c. */
-  actions?: Array<Action<Context, Event, Computed>>
+  /** Actions to run: inline fns (5a) or registered names (5b), in order. */
+  actions?: Array<ActionArg<Context, Event, Computed>>
 }
 
 // -----------------------------------------------------------------------------
@@ -270,6 +270,15 @@ export type Action<Context, Event, Computed = Record<string, never>> = (
   params: ActionParams<Context, Event, Computed>,
 ) => void
 
+/**
+ * An action arg in an `actions` list (5b): an inline action OR a registered
+ * name resolved against `implementations.actions`. Missing name → throw in
+ * dev, warn in prod (same policy as named guards). A list runs in order.
+ */
+export type ActionArg<Context, Event, Computed = Record<string, never>> =
+  | Action<Context, Event, Computed>
+  | string
+
 type TransitionEntry<State extends string, Context, Event, Computed> =
   | Transition<State, Context, Event, Computed>
   | Array<Transition<State, Context, Event, Computed>>
@@ -292,6 +301,8 @@ export interface TransitionConfig<
   implementations?: {
     /** Reusable named guards (4b). Referenced by name in a transition `guard`. */
     guards?: Record<string, Guard<Context, Event, Computed>>
+    /** Reusable named actions (5b). Referenced by name in an `actions` list. */
+    actions?: Record<string, Action<Context, Event, Computed>>
   }
 }
 
@@ -375,12 +386,27 @@ export function createTransitions<
   const queue: Event[] = []
   let draining = false
 
+  // 5b: resolve an action arg (inline fn OR registered name) and run it.
+  // Missing name → throw in dev, warn in prod (same policy as guards).
+  const actionRegistry = config.implementations?.actions
+  const runAction = (action: ActionArg<Context, Event, Computed>, event: Event) => {
+    const fn = typeof action === 'function' ? action : actionRegistry?.[action]
+    if (!fn) {
+      const msg = `[machine] no action "${action as string}"`
+      if (isDev) throw new Error(msg)
+      console.warn(msg)
+      return
+    }
+    fn({ context, setContext, event, send, computed })
+  }
+
+  // A list of actions runs in order (5a/5b).
   const runActions = (
-    actions: Array<Action<Context, Event, Computed>> | undefined,
+    actions: Array<ActionArg<Context, Event, Computed>> | undefined,
     event: Event,
   ) => {
     if (!actions) return
-    for (const action of actions) action({ context, setContext, event, send, computed })
+    for (const action of actions) runAction(action, event)
   }
 
   const send = (event: Event) => {
