@@ -169,6 +169,13 @@ export interface GuardParams<Context, Event, Computed = Record<string, never>> {
   context: Context
   event: Event
   computed: Computed
+  /**
+   * Resolve another guard — a registered name or an inline fn — against these
+   * same params (4c). The channel combinators use, so `and('a', not(b))`
+   * resolves names through the runtime's single guard registry. User guards
+   * may also call it to consult another guard.
+   */
+  guard: (g: GuardArg<Context, Event, Computed>) => boolean
 }
 
 /** An inline guard: a predicate over the params. */
@@ -192,6 +199,36 @@ export type GuardArg<Context, Event, Computed = Record<string, never>> =
   | string
 
 const isDev = process.env.NODE_ENV !== 'production'
+
+// -----------------------------------------------------------------------------
+// Round 4c: guard combinators and / or / not (DECIDED)
+// -----------------------------------------------------------------------------
+//
+// Compose guards without naming every combination. Args are GuardArgs — names
+// OR inline fns — each resolved through `params.guard()`, the runtime's single
+// registry channel. So `and('isOpen', not('isAnimating'))` works, and so does
+// `and(isOpenFn, not(isAnimatingFn))`. Compose arbitrarily deep. Short-circuit.
+
+/** AND — true iff every guard passes. Zero args → true (empty intersection). */
+export function and<Context, Event, Computed = Record<string, never>>(
+  ...guards: Array<GuardArg<Context, Event, Computed>>
+): Guard<Context, Event, Computed> {
+  return params => guards.every(g => params.guard(g))
+}
+
+/** OR — true iff any guard passes. Zero args → false (empty union). */
+export function or<Context, Event, Computed = Record<string, never>>(
+  ...guards: Array<GuardArg<Context, Event, Computed>>
+): Guard<Context, Event, Computed> {
+  return params => guards.some(g => params.guard(g))
+}
+
+/** NOT — logical negation of a single guard. */
+export function not<Context, Event, Computed = Record<string, never>>(
+  guard: GuardArg<Context, Event, Computed>,
+): Guard<Context, Event, Computed> {
+  return params => !params.guard(guard)
+}
 
 /** A single transition: optional target, optional guard, optional actions. */
 export interface Transition<
@@ -289,16 +326,30 @@ export function createTransitions<
     return fn(params)
   }
 
+  // Build the params a guard receives for this event. `guard` lets a guard
+  // (or a combinator from 4c) resolve another guard against these same params.
+  const guardParams = (event: Event): GuardParams<Context, Event, Computed> => {
+    const params: GuardParams<Context, Event, Computed> = {
+      context,
+      event,
+      computed,
+      guard: g => resolveGuard(g, params),
+    }
+    return params
+  }
+
   // 3c: resolve an entry (single or array) to the first transition whose
   // guard passes. No guard = always passes. Guards get { context, event,
-  // computed } (4a); a guard may be an inline fn or a registered name (4b).
+  // computed, guard } (4a); a guard may be an inline fn, a name (4b), or a
+  // combinator of those (4c).
   const resolve = (
     entry: TransitionEntry<State, Context, Event, Computed> | undefined,
     event: Event,
   ) => {
     if (!entry) return undefined
     const list = Array.isArray(entry) ? entry : [entry]
-    return list.find(t => (t.guard ? resolveGuard(t.guard, { context, event, computed }) : true))
+    const params = guardParams(event)
+    return list.find(t => (t.guard ? resolveGuard(t.guard, params) : true))
   }
 
   // 3d: the queue. send() enqueues; the first send drains the queue, so a
