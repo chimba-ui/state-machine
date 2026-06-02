@@ -379,13 +379,63 @@ export interface TransitionConfig<
   /** Any-state events. Per-state `on` takes precedence over this. */
   on?: Record<string, TransitionEntry<State, Context, Event, Computed>>
   /** Named implementations referenced by string in transitions. */
-  implementations?: {
-    /** Reusable named guards (4b). Referenced by name in a transition `guard`. */
-    guards?: Record<string, Guard<Context, Event, Computed>>
-    /** Reusable named actions (5b). Referenced by name in an `actions` list. */
-    actions?: Record<string, Action<Context, Event, Computed>>
-    /** Reusable named effects (6). The adapter (withAdapter) overrides these. */
-    effects?: Record<string, Effect<Context, Event, Computed>>
+  implementations?: Implementations<Context, Event, Computed>
+}
+
+/** The named-implementation registries a config (and an adapter) supply. */
+export interface Implementations<Context, Event, Computed = Record<string, never>> {
+  /** Reusable named guards (4b). Referenced by name in a transition `guard`. */
+  guards?: Record<string, Guard<Context, Event, Computed>>
+  /** Reusable named actions (5b). Referenced by name in an `actions` list. */
+  actions?: Record<string, Action<Context, Event, Computed>>
+  /** Reusable named effects (6). The adapter (withAdapter) overrides these. */
+  effects?: Record<string, Effect<Context, Event, Computed>>
+}
+
+// -----------------------------------------------------------------------------
+// Round 6c: withAdapter — platform injection seam (DECIDED)
+// -----------------------------------------------------------------------------
+//
+// A config names effects/actions ('trackOutsideClick', 'focusFirstItem') but
+// the implementation is platform-specific (DOM addEventListener vs canvas
+// hit-test vs TUI key handler). withAdapter merges a platform's actions +
+// effects over the config's implementations (decision B: those two are the
+// platform seam; guards stay config-only — pure predicates over context/event,
+// identical on every platform). The agnostic config stays pure; the platform
+// is applied at the edge: createMachine(withAdapter(config, domAdapter)).
+
+/**
+ * Platform implementations swapped per target. Only actions + effects — the
+ * things that touch the platform. On a name collision the adapter WINS
+ * (decision 3): the config's named impl is the default, the platform overrides.
+ */
+export type Adapter<Context, Event, Computed = Record<string, never>> = Pick<
+  Implementations<Context, Event, Computed>,
+  'actions' | 'effects'
+>
+
+/**
+ * Merge a platform `adapter` over `config.implementations`, adapter winning on
+ * name collisions. Returns a NEW config — the input stays untouched, so one
+ * agnostic config can be adapted for many platforms.
+ */
+export function withAdapter<
+  State extends string,
+  Context,
+  Event extends { type: string },
+  Computed = Record<string, never>,
+>(
+  config: TransitionConfig<State, Context, Event, Computed>,
+  adapter: Adapter<Context, Event, Computed>,
+): TransitionConfig<State, Context, Event, Computed> {
+  const base = config.implementations
+  return {
+    ...config,
+    implementations: {
+      guards: base?.guards,
+      actions: { ...base?.actions, ...adapter.actions },
+      effects: { ...base?.effects, ...adapter.effects },
+    },
   }
 }
 
