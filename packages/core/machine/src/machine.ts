@@ -200,6 +200,13 @@ export type GuardArg<Context, Event, Computed = Record<string, never>> =
 
 const isDev = process.env.NODE_ENV !== 'production'
 
+/**
+ * The event the engine synthesizes when it starts the initial state's effects
+ * at construction (6, decision A/B). Dotted so it can't collide with a domain
+ * event; exported so a boot effect can branch on it: `event.type === MACHINE_INIT`.
+ */
+export const MACHINE_INIT = 'machine.init' as const
+
 // -----------------------------------------------------------------------------
 // Round 4c: guard combinators and / or / not (DECIDED)
 // -----------------------------------------------------------------------------
@@ -560,6 +567,13 @@ export function createTransitions<
     for (const cleanup of activeCleanups) cleanup()
     activeCleanups.length = 0
   }
+
+  // 6 (decision B): start the INITIAL state's effects at construction — unlike
+  // entry (5d), which fires only on a transition IN. A resting initial state
+  // (a closed dropdown still listening for its trigger) needs its listeners up
+  // immediately. The synthetic boot event is MACHINE_INIT so an effect can tell
+  // "started fresh" from "entered via transition". Cleanup runs on first exit.
+  startEffects(config.initial, { type: MACHINE_INIT } as Event)
 
   return {
     get state() {
