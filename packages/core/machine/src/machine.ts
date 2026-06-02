@@ -498,6 +498,21 @@ export interface Selection<Value> {
   subscribe: (listener: (value: Value) => void, equals?: EqualityFn<Value>) => () => void
 }
 
+/**
+ * The `select` builder: callable for the function form (8b), with typed
+ * named-scope methods (8c). Each form returns a Selection.
+ */
+export interface Select<State extends string, Context, Computed> {
+  /** Function form: derived/composite selection over anything (8b). */
+  <Value>(selector: () => Value): Selection<Value>
+  /** A single context field, by key. Exact return type + autocomplete (8c). */
+  context: <K extends keyof Context>(key: K) => Selection<Context[K]>
+  /** A single computed value, by key (8c). */
+  computed: <K extends keyof Computed>(key: K) => Selection<Computed[K]>
+  /** The current state string (8c). */
+  state: () => Selection<State>
+}
+
 export interface TransitionLayer<
   State extends string,
   Context,
@@ -514,9 +529,9 @@ export interface TransitionLayer<
   /** 8a: coarse subscription — listener fires on ANY subsequent change (state
    * or context). Does not fire on subscribe. Returns a bare unsubscribe. */
   subscribe: (listener: () => void) => () => void
-  /** 8b: narrow to a derived/composite slice. Returns a value-deduped Selection.
-   * Named-scope forms (select.context/.computed/.state) are added in 8c. */
-  select: <Value>(selector: () => Value) => Selection<Value>
+  /** 8b/8c: narrow to a value-deduped Selection. Callable for the function form
+   * (select(fn)); typed named scopes (select.context/.computed/.state). */
+  select: Select<State, Context, Computed>
 }
 
 /**
@@ -758,8 +773,16 @@ export function createTransitions<
 
   // 8b: function-form selector. Wrap in a lazy/memoized preact computed so it
   // auto-tracks exactly the cells/computeds it reads — selecting from anything.
-  const select = <Value>(selector: () => Value): Selection<Value> =>
-    makeSelection(preactComputed(selector))
+  // 8c: attach typed named-scope sugar (context/computed/state). Each builds the
+  // SAME Selection over a computed reading one named field — exact return types,
+  // autocomplete, and compile-time typo safety on the key.
+  const select = (<Value>(selector: () => Value): Selection<Value> =>
+    makeSelection(preactComputed(selector))) as Select<State, Context, Computed>
+  select.context = <K extends keyof Context>(key: K) =>
+    makeSelection(preactComputed(() => context[key]))
+  select.computed = <K extends keyof Computed>(key: K) =>
+    makeSelection(preactComputed(() => computed[key]))
+  select.state = () => makeSelection(preactComputed(() => st.state))
 
   return {
     get state() {
