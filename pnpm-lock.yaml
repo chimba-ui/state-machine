@@ -175,6 +175,9 @@ importers:
       '@render-experiment/machine-core':
         specifier: workspace:*
         version: link:../../core/machine
+      '@render-experiment/utils':
+        specifier: workspace:*
+        version: link:../../shared/utils
       react:
         specifier: '*'
         version: 19.2.6
@@ -223,6 +226,9 @@ importers:
       '@render-experiment/machine-core':
         specifier: workspace:*
         version: link:../../core/machine
+      '@render-experiment/utils':
+        specifier: workspace:*
+        version: link:../../shared/utils
       react:
         specifier: '*'
         version: 19.2.6

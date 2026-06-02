@@ -9,7 +9,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@render-experiment/machine-core": "workspace:*"
+    "@render-experiment/machine-core": "workspace:*",
+    "@render-experiment/utils": "workspace:*"
   },
   "peerDependencies": {
     "react": "*"

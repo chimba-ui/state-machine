@@ -2,5 +2,6 @@ export { useMachine } from './use-machine'
 export { useApi } from './use-api'
 export { normalize } from './normalize'
 export type { Bindings } from './normalize'
-// Re-export for ergonomics — render layers usually use mergeProps alongside normalize.
-export { mergeProps } from '@render-experiment/machine-core'
+// RN-aware mergeProps (handler compose + style array) layered on the
+// substrate-agnostic mergeProps in @render-experiment/utils.
+export { mergeProps } from './merge-props'
