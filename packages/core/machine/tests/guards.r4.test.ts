@@ -5,11 +5,11 @@
  * params (computed is {} until R7), and an inline guard gates a transition.
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 describe('R4a — inline guards', () => {
   it('an inline guard gates the transition (true = taken)', () => {
-    const m = createTransitions<'idle', { allow: boolean }, { type: 'go' }>({
+    const m = machine<'idle', { allow: boolean }, { type: 'go' }>({
       initial: 'idle',
       context: { allow: true },
       states: {
@@ -30,7 +30,7 @@ describe('R4a — inline guards', () => {
   })
 
   it('a guard can read the event payload', () => {
-    const m = createTransitions<'idle', { n: number }, { type: 'add'; by: number }>({
+    const m = machine<'idle', { n: number }, { type: 'add'; by: number }>({
       initial: 'idle',
       context: { n: 0 },
       states: {
@@ -54,7 +54,7 @@ describe('R4a — inline guards', () => {
 
   it('guard params include `computed` (empty until R7) — destructurable now', () => {
     let sawComputed: unknown
-    const m = createTransitions<'idle', object, { type: 'check' }>({
+    const m = machine<'idle', object, { type: 'check' }>({
       initial: 'idle',
       context: {},
       states: {

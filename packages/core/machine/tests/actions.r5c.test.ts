@@ -6,12 +6,12 @@
  * a list, and branch guards use names/inline/combinators.
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions, oneOf } from '../src/machine'
+import { machine, oneOf } from '../src/machine'
 
 describe('R5c — oneOf', () => {
   it('runs the first branch whose guard passes', () => {
     const hit: string[] = []
-    const m = createTransitions<'idle', { kind: 'a' | 'b' | 'c' }, { type: 'go' }>({
+    const m = machine<'idle', { kind: 'a' | 'b' | 'c' }, { type: 'go' }>({
       initial: 'idle',
       context: { kind: 'b' },
       states: {
@@ -36,7 +36,7 @@ describe('R5c — oneOf', () => {
 
   it('guardless branch is the fallback when nothing matches', () => {
     const hit: string[] = []
-    const m = createTransitions<'idle', { n: number }, { type: 'go' }>({
+    const m = machine<'idle', { n: number }, { type: 'go' }>({
       initial: 'idle',
       context: { n: 0 },
       states: {
@@ -60,7 +60,7 @@ describe('R5c — oneOf', () => {
 
   it('runs nothing if no branch matches and there is no fallback', () => {
     const hit: string[] = []
-    const m = createTransitions<'idle', { n: number }, { type: 'go' }>({
+    const m = machine<'idle', { n: number }, { type: 'go' }>({
       initial: 'idle',
       context: { n: 0 },
       states: {
@@ -81,7 +81,7 @@ describe('R5c — oneOf', () => {
 
   it('composes with unconditional actions in the same list, in order', () => {
     const order: string[] = []
-    const m = createTransitions<'idle', { mobile: boolean }, { type: 'open' }>({
+    const m = machine<'idle', { mobile: boolean }, { type: 'open' }>({
       initial: 'idle',
       context: { mobile: true },
       states: {
@@ -108,7 +108,7 @@ describe('R5c — oneOf', () => {
 
   it('branch guards accept registered names', () => {
     const hit: string[] = []
-    const m = createTransitions<'idle', { admin: boolean }, { type: 'go' }>({
+    const m = machine<'idle', { admin: boolean }, { type: 'go' }>({
       initial: 'idle',
       context: { admin: true },
       states: {

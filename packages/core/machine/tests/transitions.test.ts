@@ -6,11 +6,11 @@
  * send (a re-entrant send completes the current transition first).
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
-describe('createTransitions (R3 layer)', () => {
+describe('machine (R3 layer)', () => {
   it('moves between states on a matching event', () => {
-    const m = createTransitions<'closed' | 'open', { n: number }, { type: 'open' | 'close' }>({
+    const m = machine<'closed' | 'open', { n: number }, { type: 'open' | 'close' }>({
       initial: 'closed',
       context: { n: 0 },
       states: {
@@ -26,7 +26,7 @@ describe('createTransitions (R3 layer)', () => {
   })
 
   it('ignores events with no transition in the current state', () => {
-    const m = createTransitions<'closed' | 'open', object, { type: 'open' | 'close' }>({
+    const m = machine<'closed' | 'open', object, { type: 'open' | 'close' }>({
       initial: 'closed',
       context: {},
       states: {
@@ -39,7 +39,7 @@ describe('createTransitions (R3 layer)', () => {
   })
 
   it('top-level `on` handles any-state events; per-state takes precedence', () => {
-    const m = createTransitions<'a' | 'b' | 'gone', object, { type: 'go' | 'kill' }>({
+    const m = machine<'a' | 'b' | 'gone', object, { type: 'go' | 'kill' }>({
       initial: 'a',
       context: {},
       states: {
@@ -56,7 +56,7 @@ describe('createTransitions (R3 layer)', () => {
   })
 
   it('guard fallthrough: first transition whose guard passes wins', () => {
-    const m = createTransitions<'idle', { x: number }, { type: 'tick' }>({
+    const m = machine<'idle', { x: number }, { type: 'tick' }>({
       initial: 'idle',
       context: { x: 5 },
       states: {
@@ -83,7 +83,7 @@ describe('createTransitions (R3 layer)', () => {
 
   it('internal self-transition runs actions without exit/entry', () => {
     let ran = 0
-    const m = createTransitions<'idle', { n: number }, { type: 'bump' }>({
+    const m = machine<'idle', { n: number }, { type: 'bump' }>({
       initial: 'idle',
       context: { n: 0 },
       states: {
@@ -114,7 +114,7 @@ describe('createTransitions (R3 layer)', () => {
     // queue, auto.close is processed against the NEW state ('open'), so it
     // matches and closes — final state 'closed'. (Pure-sync would lose it.)
     const order: string[] = []
-    const m = createTransitions<'closed' | 'open', object, { type: 'open' | 'auto.close' }>({
+    const m = machine<'closed' | 'open', object, { type: 'open' | 'auto.close' }>({
       initial: 'closed',
       context: {},
       states: {
@@ -146,7 +146,7 @@ describe('createTransitions (R3 layer)', () => {
 
   it('QUEUED send: events from outside also serialize (no interleaving)', () => {
     const seen: string[] = []
-    const m = createTransitions<'a' | 'b' | 'c', object, { type: 'toB' | 'toC' }>({
+    const m = machine<'a' | 'b' | 'c', object, { type: 'toB' | 'toC' }>({
       initial: 'a',
       context: {},
       states: {

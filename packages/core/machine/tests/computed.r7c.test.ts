@@ -8,11 +8,11 @@
  */
 import { effect } from '@preact/signals-core'
 import { describe, expect, it } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 describe('R7c — computed on the layer', () => {
   it('exposes m.computed.x reflecting the current derived value', () => {
-    const m = createTransitions<'idle', { items: number[] }, { type: 'add' }, { count: number }>({
+    const m = machine<'idle', { items: number[] }, { type: 'add' }, { count: number }>({
       initial: 'idle',
       context: { items: [] },
       computed: { count: ({ context }) => context.items.length },
@@ -32,7 +32,7 @@ describe('R7c — computed on the layer', () => {
   })
 
   it('reading m.computed.x is tracked — a preact effect re-runs on change', () => {
-    const m = createTransitions<'idle', { n: number }, { type: 'inc' }, { double: number }>({
+    const m = machine<'idle', { n: number }, { type: 'inc' }, { double: number }>({
       initial: 'idle',
       context: { n: 1 },
       computed: { double: ({ context }) => context.n * 2 },
@@ -54,7 +54,7 @@ describe('R7c — computed on the layer', () => {
   })
 
   it('m.computed reflects chained computeds too', () => {
-    const m = createTransitions<
+    const m = machine<
       'idle',
       { first: string; last: string },
       { type: 'noop' },

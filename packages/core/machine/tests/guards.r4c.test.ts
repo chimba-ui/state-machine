@@ -5,12 +5,12 @@
  * through the runtime's single registry channel (params.guard). Compose deep.
  */
 import { describe, expect, it } from 'vitest'
-import { and, createTransitions, not, or } from '../src/machine'
+import { and, machine, not, or } from '../src/machine'
 
 describe('R4c — and / or / not', () => {
   it('and(): true only when every sub-guard passes (names)', () => {
     let ran = false
-    const m = createTransitions<'idle', { a: boolean; b: boolean }, { type: 'go' }>({
+    const m = machine<'idle', { a: boolean; b: boolean }, { type: 'go' }>({
       initial: 'idle',
       context: { a: true, b: true },
       states: {
@@ -37,7 +37,7 @@ describe('R4c — and / or / not', () => {
 
   it('and(): blocks when one sub-guard fails', () => {
     let ran = false
-    const m = createTransitions<'idle', { a: boolean; b: boolean }, { type: 'go' }>({
+    const m = machine<'idle', { a: boolean; b: boolean }, { type: 'go' }>({
       initial: 'idle',
       context: { a: true, b: false },
       states: {
@@ -64,7 +64,7 @@ describe('R4c — and / or / not', () => {
 
   it('or(): true when any passes; not(): negates; mixed names + inline fns', () => {
     let ran = false
-    const m = createTransitions<'idle', { locked: boolean }, { type: 'go'; force?: boolean }>({
+    const m = machine<'idle', { locked: boolean }, { type: 'go'; force?: boolean }>({
       initial: 'idle',
       context: { locked: true },
       states: {
@@ -93,7 +93,7 @@ describe('R4c — and / or / not', () => {
   it('combinators accept inline functions too (not just names)', () => {
     let ran = false
     const isPos = ({ context }: { context: { n: number } }) => context.n > 0
-    const m = createTransitions<'idle', { n: number }, { type: 'go' }>({
+    const m = machine<'idle', { n: number }, { type: 'go' }>({
       initial: 'idle',
       context: { n: 5 },
       states: {
@@ -120,7 +120,7 @@ describe('R4c — and / or / not', () => {
 
   it('nests deeply: and(or(...), not(and(...)))', () => {
     let ran = false
-    const m = createTransitions<'idle', { x: number }, { type: 'go' }>({
+    const m = machine<'idle', { x: number }, { type: 'go' }>({
       initial: 'idle',
       context: { x: 2 },
       states: {

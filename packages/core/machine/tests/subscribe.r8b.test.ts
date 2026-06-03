@@ -9,10 +9,10 @@
  */
 import { effect } from '@preact/signals-core'
 import { describe, expect, it, vi } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 const counter = () =>
-  createTransitions<'idle', { items: number[] }, { type: 'add' | 'noop' }>({
+  machine<'idle', { items: number[] }, { type: 'add' | 'noop' }>({
     initial: 'idle',
     context: { items: [] },
     states: {
@@ -71,7 +71,7 @@ describe('R8b — select(fn)', () => {
   })
 
   it('a composite selection uses optional equals to dedup structurally', () => {
-    const m = createTransitions<
+    const m = machine<
       'idle',
       { x: number; y: number; other: number },
       { type: 'moveX' | 'bumpOther' }

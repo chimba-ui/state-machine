@@ -178,6 +178,7 @@ describe('setup().guards combinators', () => {
     event: { type: 'tick' }
     state: 'idle'
     guards: 'isPositive' | 'isEven'
+    actions: 'mark'
   }
 
   it('resolves named guards via the implementations registry', () => {
@@ -224,10 +225,11 @@ describe('setup().guards combinators', () => {
       states: {
         idle: {
           on: {
+            // x=-3: positive (false) OR negative (true) → true → fires `mark`.
             tick: {
               guard: or('isPositive', ({ context }) => context.x < 0),
               target: 'idle',
-              actions: [],
+              actions: ['mark'],
             },
           },
         },
@@ -237,15 +239,156 @@ describe('setup().guards combinators', () => {
           isPositive: ({ context }) => context.x > 0,
           isEven: ({ context }) => context.x % 2 === 0,
         },
+        // observable side-effect proving the guarded transition was taken
+        actions: { mark: ({ context, setContext }) => setContext({ x: context.x + 100 }) },
       },
     })
 
-    // x=-3: positive (false) OR negative (true) → true, transition fires.
+    // Probe the transition by its observable effect (the action ran), not by
+    // a notify count — the signal-backed subscribe fires on observable change,
+    // not on every matched transition.
     const m = createMachine(cfg, {})
     m.start()
-    let fired = 0
-    m.subscribe(() => fired++)
+    expect(m.getContext().x).toBe(-3)
     m.send({ type: 'tick' })
-    expect(fired).toBe(1)
+    expect(m.getContext().x).toBe(97) // guard passed → `mark` ran
+  })
+})
+
+// -----------------------------------------------------------------------------
+// subscribeSelector — fine-grained, selector-based subscription (the payoff)
+//
+// The whole point of the signal-backed context: a selector reads cells/state
+// through the tracked snapshot, so it auto-subscribes to exactly what it
+// touches and fires only when its selected value changes (O(readers), not
+// O(all)). The coarse `subscribe` still wakes on any change.
+// -----------------------------------------------------------------------------
+
+describe('subscribeSelector (fine-grained)', () => {
+  type Ctx = { a: number; b: number }
+  type Ev = { type: 'setA' } | { type: 'setB' }
+
+  const make = () => {
+    const cfg: MachineConfig<Ctx, object, Ev> = {
+      initial: 'idle',
+      context: () => ({ a: 0, b: 0 }),
+      states: {
+        idle: {
+          on: {
+            setA: { actions: ['bumpA'] },
+            setB: { actions: ['bumpB'] },
+          },
+        },
+      },
+      implementations: {
+        actions: {
+          bumpA: ({ context, setContext }) => setContext({ a: context.a + 1 }),
+          bumpB: ({ context, setContext }) => setContext({ b: context.b + 1 }),
+        },
+      },
+    }
+    const m = createMachine(cfg, {})
+    m.start()
+    return m
+  }
+
+  it('wakes only the selector that read the changed cell', () => {
+    const m = make()
+    let aFires = 0
+    let bFires = 0
+    m.subscribeSelector(
+      s => s.context.a,
+      () => aFires++,
+    )
+    m.subscribeSelector(
+      s => s.context.b,
+      () => bFires++,
+    )
+
+    m.send({ type: 'setA' })
+    expect(aFires).toBe(1)
+    expect(bFires).toBe(0) // b's selector didn't read a → must not fire
+
+    m.send({ type: 'setB' })
+    expect(aFires).toBe(1) // a stays put
+    expect(bFires).toBe(1)
+  })
+
+  it('fires only when the SELECTED value changes, not on every cell write', () => {
+    const m = make()
+    let fires = 0
+    // selector derives a boolean; it changes value only when a crosses 2
+    m.subscribeSelector(
+      s => s.context.a > 2,
+      () => fires++,
+    )
+    m.send({ type: 'setA' }) // a=1, false → false: no fire
+    m.send({ type: 'setA' }) // a=2, false → false: no fire
+    expect(fires).toBe(0)
+    m.send({ type: 'setA' }) // a=3, false → true: FIRE
+    expect(fires).toBe(1)
+  })
+
+  it('a multi-cell selector wakes when either cell it read changes', () => {
+    const m = make()
+    let fires = 0
+    m.subscribeSelector(
+      s => s.context.a + s.context.b,
+      () => fires++,
+    )
+    m.send({ type: 'setA' })
+    m.send({ type: 'setB' })
+    expect(fires).toBe(2)
+  })
+
+  it('select() reads the current selected value', () => {
+    const m = make()
+    expect(m.select(s => s.context.a)).toBe(0)
+    m.send({ type: 'setA' })
+    expect(m.select(s => s.context.a)).toBe(1)
+  })
+
+  it('coarse subscribe still wakes on any cell change', () => {
+    const m = make()
+    let coarse = 0
+    m.subscribe(() => coarse++)
+    m.send({ type: 'setA' })
+    m.send({ type: 'setB' })
+    expect(coarse).toBe(2)
+  })
+
+  it('a state selector wakes on state transitions', () => {
+    const cfg: MachineConfig<{ n: number }, object, { type: 'go' }> = {
+      initial: 'one',
+      context: () => ({ n: 0 }),
+      states: {
+        one: { on: { go: { target: 'two' } } },
+        two: {},
+      },
+    }
+    const m = createMachine(cfg, {})
+    m.start()
+    let stateFires = 0
+    m.subscribeSelector(
+      s => s.state,
+      () => stateFires++,
+    )
+    m.send({ type: 'go' })
+    expect(stateFires).toBe(1)
+    expect(m.getState()).toBe('two')
+  })
+
+  it('unsubscribe stops further notifications', () => {
+    const m = make()
+    let aFires = 0
+    const off = m.subscribeSelector(
+      s => s.context.a,
+      () => aFires++,
+    )
+    m.send({ type: 'setA' })
+    expect(aFires).toBe(1)
+    off()
+    m.send({ type: 'setA' })
+    expect(aFires).toBe(1) // no longer notified
   })
 })

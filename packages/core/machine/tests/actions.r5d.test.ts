@@ -6,12 +6,12 @@
  * entry+exit. Entry/exit reuse the action machinery (names, inline, oneOf).
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions, oneOf } from '../src/machine'
+import { machine, oneOf } from '../src/machine'
 
 describe('R5d — entry / exit', () => {
   it('runs entry of the initial-targeted state and orders exit→actions→entry', () => {
     const order: string[] = []
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' }>({
       initial: 'a',
       context: {},
       states: {
@@ -29,7 +29,7 @@ describe('R5d — entry / exit', () => {
 
   it('does NOT run entry of the initial state at construction', () => {
     const order: string[] = []
-    createTransitions<'a', object, { type: 'noop' }>({
+    machine<'a', object, { type: 'noop' }>({
       initial: 'a',
       context: {},
       states: { a: { entry: [() => order.push('entry:a')] } },
@@ -39,7 +39,7 @@ describe('R5d — entry / exit', () => {
 
   it('internal self-transition (no target) skips entry+exit', () => {
     const order: string[] = []
-    const m = createTransitions<'a', { n: number }, { type: 'tick' }>({
+    const m = machine<'a', { n: number }, { type: 'tick' }>({
       initial: 'a',
       context: { n: 0 },
       states: {
@@ -59,7 +59,7 @@ describe('R5d — entry / exit', () => {
 
   it('self-transition WITH explicit same target also skips entry+exit', () => {
     const order: string[] = []
-    const m = createTransitions<'a', object, { type: 'self' }>({
+    const m = machine<'a', object, { type: 'self' }>({
       initial: 'a',
       context: {},
       states: {
@@ -76,7 +76,7 @@ describe('R5d — entry / exit', () => {
 
   it('entry/exit run by name and via oneOf', () => {
     const order: string[] = []
-    const m = createTransitions<'a' | 'b', { mobile: boolean }, { type: 'toB' }>({
+    const m = machine<'a' | 'b', { mobile: boolean }, { type: 'toB' }>({
       initial: 'a',
       context: { mobile: true },
       states: {
@@ -102,7 +102,7 @@ describe('R5d — entry / exit', () => {
 
   it('entry can queue an event that triggers the next transition (run-to-completion)', () => {
     const order: string[] = []
-    const m = createTransitions<'a' | 'b' | 'c', object, { type: 'toB' | 'auto' }>({
+    const m = machine<'a' | 'b' | 'c', object, { type: 'toB' | 'auto' }>({
       initial: 'a',
       context: {},
       states: {

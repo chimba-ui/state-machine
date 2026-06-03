@@ -7,7 +7,7 @@
  * mutated, so one config adapts to many platforms.
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions, withAdapter } from '../src/machine'
+import { machine, withAdapter } from '../src/machine'
 
 type Ctx = { disabled: boolean }
 type Ev = { type: 'open' | 'close' }
@@ -39,7 +39,8 @@ describe('R6c — withAdapter', () => {
         },
       },
     }
-    const m = createTransitions<'closed' | 'open', Ctx, Ev>(withAdapter(baseConfig, domAdapter))
+    const m = machine<'closed' | 'open', Ctx, Ev>(withAdapter(baseConfig, domAdapter))
+    m.start()
     m.send({ type: 'open' }) // canOpen passes → entry focuses, effect starts
     expect(log).toEqual(['dom:focus', 'dom:track:start'])
     m.send({ type: 'close' }) // effect cleanup runs first on exit
@@ -57,10 +58,10 @@ describe('R6c — withAdapter', () => {
       effects: { trackOutsideClick: () => {} },
     }
 
-    createTransitions<'closed' | 'open', Ctx, Ev>(withAdapter(baseConfig, dom)).send({
+    machine<'closed' | 'open', Ctx, Ev>(withAdapter(baseConfig, dom)).send({
       type: 'open',
     })
-    createTransitions<'closed' | 'open', Ctx, Ev>(withAdapter(baseConfig, canvas)).send({
+    machine<'closed' | 'open', Ctx, Ev>(withAdapter(baseConfig, canvas)).send({
       type: 'open',
     })
     expect(log).toEqual(['dom', 'canvas'])
@@ -77,14 +78,14 @@ describe('R6c — withAdapter', () => {
       },
     }
     const adapter = { actions: { focusFirstItem: () => log.push('platform') } }
-    createTransitions<'closed' | 'open', Ctx, Ev>(withAdapter(configWithDefault, adapter)).send({
+    machine<'closed' | 'open', Ctx, Ev>(withAdapter(configWithDefault, adapter)).send({
       type: 'open',
     })
     expect(log).toEqual(['platform']) // adapter overrode the config default
   })
 
   it('preserves config guards (adapter does not touch them)', () => {
-    const m = createTransitions<'closed' | 'open', Ctx, Ev>(
+    const m = machine<'closed' | 'open', Ctx, Ev>(
       withAdapter(
         { ...baseConfig, context: { disabled: true } as Ctx },
         { actions: { focusFirstItem: () => {} }, effects: { trackOutsideClick: () => {} } },
@@ -111,9 +112,10 @@ describe('R6c — withAdapter', () => {
         b: {},
       },
     }
-    const m = createTransitions<'a' | 'b', object, { type: 'go' }>(
+    const m = machine<'a' | 'b', object, { type: 'go' }>(
       withAdapter(cfg, { effects: { e: () => void log.push('e') } }), // no actions key
     )
-    expect(log).toEqual(['e']) // boot-started the initial effect
+    m.start()
+    expect(log).toEqual(['e']) // start booted the initial effect
   })
 })

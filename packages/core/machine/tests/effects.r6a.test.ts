@@ -8,12 +8,12 @@
  * these tests transition INTO a state to observe start.
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 describe('R6a — effects (enter → cleanup on exit)', () => {
   it('runs the effect body on enter and its cleanup on exit', () => {
     const log: string[] = []
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' | 'toA' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' | 'toA' }>({
       initial: 'a',
       context: {},
       states: {
@@ -29,6 +29,7 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
         },
       },
     })
+    m.start()
     m.send({ type: 'toB' })
     expect(log).toEqual(['start:b']) // body ran on enter; no cleanup yet
     m.send({ type: 'toA' })
@@ -37,7 +38,7 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
 
   it('cleanup runs BEFORE exit actions (bookend / decision A)', () => {
     const order: string[] = []
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' | 'toA' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' | 'toA' }>({
       initial: 'a',
       context: {},
       states: {
@@ -49,6 +50,7 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
         },
       },
     })
+    m.start()
     m.send({ type: 'toB' })
     m.send({ type: 'toA' })
     expect(order).toEqual(['cleanup', 'exit-action'])
@@ -56,7 +58,7 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
 
   it('start runs AFTER entry actions (mirror bookend on enter)', () => {
     const order: string[] = []
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' }>({
       initial: 'a',
       context: {},
       states: {
@@ -71,13 +73,14 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
         },
       },
     })
+    m.start()
     m.send({ type: 'toB' })
     expect(order).toEqual(['entry-action', 'start'])
   })
 
   it('an effect returning nothing is fine (no cleanup stashed)', () => {
     const log: string[] = []
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' | 'toA' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' | 'toA' }>({
       initial: 'a',
       context: {},
       states: {
@@ -85,6 +88,7 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
         b: { effects: [() => void log.push('fire-and-forget')], on: { toA: { target: 'a' } } },
       },
     })
+    m.start()
     m.send({ type: 'toB' })
     m.send({ type: 'toA' }) // exit must not throw despite no cleanup
     expect(log).toEqual(['fire-and-forget'])
@@ -93,7 +97,7 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
 
   it('resolves a named effect from implementations.effects', () => {
     const log: string[] = []
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' | 'toA' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' | 'toA' }>({
       initial: 'a',
       context: {},
       states: {
@@ -109,6 +113,7 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
         },
       },
     })
+    m.start()
     m.send({ type: 'toB' })
     m.send({ type: 'toA' })
     expect(log).toEqual(['watch:start', 'watch:cleanup'])
@@ -116,7 +121,7 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
 
   it('multiple effects clean up together on exit', () => {
     const log: string[] = []
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' | 'toA' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' | 'toA' }>({
       initial: 'a',
       context: {},
       states: {
@@ -127,13 +132,14 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
         },
       },
     })
+    m.start()
     m.send({ type: 'toB' })
     m.send({ type: 'toA' })
     expect(log).toEqual(['c1', 'c2'])
   })
 
   it('throws in dev when an effect name is not registered', () => {
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' }>({
       initial: 'a',
       context: {},
       states: {
@@ -141,12 +147,13 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
         b: { effects: ['missing'] },
       },
     })
+    m.start()
     expect(() => m.send({ type: 'toB' })).toThrow(/no effect "missing"/)
   })
 
   it('an effect can read context/event and queue events via send', () => {
     const seen: string[] = []
-    const m = createTransitions<'a' | 'b', { label: string }, { type: 'toB' | 'mark' }>({
+    const m = machine<'a' | 'b', { label: string }, { type: 'toB' | 'mark' }>({
       initial: 'a',
       context: { label: 'hello' },
       states: {
@@ -162,6 +169,7 @@ describe('R6a — effects (enter → cleanup on exit)', () => {
         },
       },
     })
+    m.start()
     m.send({ type: 'toB' })
     expect(seen).toEqual(['hello', 'marked'])
   })

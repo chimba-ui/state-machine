@@ -7,11 +7,11 @@
  * no-op write (value unchanged) does not fire (cell-level Object.is dedup).
  */
 import { describe, expect, it, vi } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 describe('R8a — coarse subscribe', () => {
   it('does NOT fire on subscribe; fires on a context change', () => {
-    const m = createTransitions<'idle', { n: number }, { type: 'inc' }>({
+    const m = machine<'idle', { n: number }, { type: 'inc' }>({
       initial: 'idle',
       context: { n: 0 },
       states: {
@@ -28,7 +28,7 @@ describe('R8a — coarse subscribe', () => {
   })
 
   it('fires on a state change', () => {
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' }>({
       initial: 'a',
       context: {},
       states: { a: { on: { toB: { target: 'b' } } }, b: {} },
@@ -40,7 +40,7 @@ describe('R8a — coarse subscribe', () => {
   })
 
   it('unsubscribe stops further notifications', () => {
-    const m = createTransitions<'idle', { n: number }, { type: 'inc' }>({
+    const m = machine<'idle', { n: number }, { type: 'inc' }>({
       initial: 'idle',
       context: { n: 0 },
       states: {
@@ -59,7 +59,7 @@ describe('R8a — coarse subscribe', () => {
   })
 
   it('multiple subscribers all fire', () => {
-    const m = createTransitions<'idle', { n: number }, { type: 'inc' }>({
+    const m = machine<'idle', { n: number }, { type: 'inc' }>({
       initial: 'idle',
       context: { n: 0 },
       states: {
@@ -78,7 +78,7 @@ describe('R8a — coarse subscribe', () => {
   })
 
   it('a batched multi-field write coalesces to a single notification', () => {
-    const m = createTransitions<'idle', { a: number; b: number }, { type: 'both' }>({
+    const m = machine<'idle', { a: number; b: number }, { type: 'both' }>({
       initial: 'idle',
       context: { a: 0, b: 0 },
       states: {
@@ -92,7 +92,7 @@ describe('R8a — coarse subscribe', () => {
   })
 
   it('a no-op write (unchanged value) does not fire', () => {
-    const m = createTransitions<'idle', { n: number }, { type: 'same' }>({
+    const m = machine<'idle', { n: number }, { type: 'same' }>({
       initial: 'idle',
       context: { n: 5 },
       states: { idle: { on: { same: { actions: [({ setContext }) => setContext({ n: 5 })] } } } },

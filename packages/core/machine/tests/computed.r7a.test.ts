@@ -7,17 +7,12 @@
  * params. Layer-surfacing (m.computed) is 7c; here we observe via params.
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 describe('R7a — computed from context', () => {
   it('derives a value from context, readable in an action', () => {
     let seen: boolean | undefined
-    const m = createTransitions<
-      'idle',
-      { items: number[] },
-      { type: 'check' },
-      { isEmpty: boolean }
-    >({
+    const m = machine<'idle', { items: number[] }, { type: 'check' }, { isEmpty: boolean }>({
       initial: 'idle',
       context: { items: [] },
       computed: { isEmpty: ({ context }) => context.items.length === 0 },
@@ -41,26 +36,25 @@ describe('R7a — computed from context', () => {
 
   it('recomputes after the context it reads changes', () => {
     const seen: boolean[] = []
-    const m = createTransitions<
-      'idle',
-      { items: number[] },
-      { type: 'add' | 'check' },
-      { isEmpty: boolean }
-    >({
-      initial: 'idle',
-      context: { items: [] },
-      computed: { isEmpty: ({ context }) => context.items.length === 0 },
-      states: {
-        idle: {
-          on: {
-            add: {
-              actions: [({ context, setContext }) => setContext({ items: [...context.items, 1] })],
+    const m = machine<'idle', { items: number[] }, { type: 'add' | 'check' }, { isEmpty: boolean }>(
+      {
+        initial: 'idle',
+        context: { items: [] },
+        computed: { isEmpty: ({ context }) => context.items.length === 0 },
+        states: {
+          idle: {
+            on: {
+              add: {
+                actions: [
+                  ({ context, setContext }) => setContext({ items: [...context.items, 1] }),
+                ],
+              },
+              check: { actions: [({ computed }) => seen.push(computed.isEmpty)] },
             },
-            check: { actions: [({ computed }) => seen.push(computed.isEmpty)] },
           },
         },
       },
-    })
+    )
     m.send({ type: 'check' }) // empty → true
     m.send({ type: 'add' })
     m.send({ type: 'check' }) // now has 1 item → false
@@ -68,7 +62,7 @@ describe('R7a — computed from context', () => {
   })
 
   it('is available to a guard', () => {
-    const m = createTransitions<
+    const m = machine<
       'idle' | 'done',
       { items: number[] },
       { type: 'finish' },
@@ -87,9 +81,9 @@ describe('R7a — computed from context', () => {
     expect(m.state).toBe('done') // has items → not empty → guard passes
   })
 
-  it('is available to an effect at boot', () => {
+  it('is available to an effect at start', () => {
     let seen: number | undefined
-    createTransitions<'idle', { items: number[] }, { type: 'noop' }, { count: number }>({
+    const m = machine<'idle', { items: number[] }, { type: 'noop' }, { count: number }>({
       initial: 'idle',
       context: { items: [1, 2, 3] },
       computed: { count: ({ context }) => context.items.length },
@@ -103,12 +97,13 @@ describe('R7a — computed from context', () => {
         },
       },
     })
+    m.start()
     expect(seen).toBe(3)
   })
 
   it('memoizes: the def only runs when its input changes', () => {
     let runs = 0
-    const m = createTransitions<
+    const m = machine<
       'idle',
       { n: number; other: number },
       { type: 'bumpOther' | 'read' },
@@ -144,7 +139,7 @@ describe('R7a — computed from context', () => {
 
   it('no computed config → params.computed is an empty bag', () => {
     let seen: unknown
-    const m = createTransitions<'idle', object, { type: 'go' }>({
+    const m = machine<'idle', object, { type: 'go' }>({
       initial: 'idle',
       context: {},
       states: { idle: { on: { go: { actions: [({ computed }) => (seen = computed)] } } } },
@@ -160,7 +155,7 @@ describe('R7b — computed from computed (chaining)', () => {
 
   it('a computed can derive from another computed', () => {
     let seen: string | undefined
-    const m = createTransitions<'idle', Ctx, { type: 'read' }, Comp>({
+    const m = machine<'idle', Ctx, { type: 'read' }, Comp>({
       initial: 'idle',
       context: { first: 'Ada', last: 'Lovelace' },
       computed: {
@@ -177,7 +172,7 @@ describe('R7b — computed from computed (chaining)', () => {
 
   it('an upstream context change propagates through the chain (glitch-free)', () => {
     const seen: string[] = []
-    const m = createTransitions<'idle', Ctx, { type: 'rename' | 'read' }, Comp>({
+    const m = machine<'idle', Ctx, { type: 'rename' | 'read' }, Comp>({
       initial: 'idle',
       context: { first: 'Ada', last: 'Lovelace' },
       computed: {
@@ -201,12 +196,7 @@ describe('R7b — computed from computed (chaining)', () => {
 
   it('forward reference: a def may read a computed defined LATER (lazy)', () => {
     let seen: string | undefined
-    const m = createTransitions<
-      'idle',
-      Ctx,
-      { type: 'read' },
-      { greeting: string; fullName: string }
-    >({
+    const m = machine<'idle', Ctx, { type: 'read' }, { greeting: string; fullName: string }>({
       initial: 'idle',
       context: { first: 'Ada', last: 'Lovelace' },
       computed: {
@@ -225,7 +215,7 @@ describe('R7b — computed from computed (chaining)', () => {
   it('multi-level chain recomputes only the affected branch (memoized)', () => {
     let baseRuns = 0
     let derivedRuns = 0
-    const m = createTransitions<
+    const m = machine<
       'idle',
       { n: number; unrelated: number },
       { type: 'bumpN' | 'bumpUnrelated' | 'read' },

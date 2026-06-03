@@ -10,14 +10,14 @@
  *  - select is forwarded for per-field (canvas/Lit) consumption.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { connector, createTransitions } from '../src/machine'
+import { connector, machine } from '../src/machine'
 
 type Ctx = { count: number }
 type Ev = { type: 'inc' }
 type Props = { label: string }
 
 const setup = (initialProps: Props = { label: 'hi' }) => {
-  const m = createTransitions<'a' | 'b', Ctx, Ev | { type: 'toB' }>({
+  const m = machine<'a' | 'b', Ctx, Ev | { type: 'toB' }>({
     initial: 'a',
     context: { count: 0 },
     // `inc` is any-state so it works in both a and b; `toB` lives on a.

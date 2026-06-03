@@ -12,9 +12,10 @@
  *   This mirrors Solid's store split (plain tracked reads, explicit writes)
  *   — no assignment-reactive footgun, no per-cell .get()/.set() ceremony.
  *
- * Everything below this layer (state, transitions, guards, actions, effects,
- * computed, subscription, connect) is STUBBED and will be built in later
- * rounds. The build is intentionally incomplete until then.
+ * The full engine is assembled here across R1–R9: context, state, queued
+ * transitions, guards, actions, effects (+ adapter), computed, subscription,
+ * and the connector boundary. The single public factory is `machine(config)`,
+ * which builds a stopped service you `.start()` / `.stop()`.
  */
 
 import {
@@ -519,7 +520,13 @@ export interface Select<State extends string, Context, Computed> {
   state: () => Selection<State>
 }
 
-export interface TransitionLayer<
+/**
+ * A machine service — the live, running instance produced by `machine(config)`.
+ * Built stopped; `start()` boots its effects, `stop()` runs their cleanups.
+ * Reads (state/context/computed) are tracked signal getters; transitions go
+ * through `send`; observe via `subscribe` (coarse) or `select` (fine-grained).
+ */
+export interface Machine<
   State extends string,
   Context,
   Event extends { type: string },
@@ -538,23 +545,30 @@ export interface TransitionLayer<
   /** 8b/8c: narrow to a value-deduped Selection. Callable for the function form
    * (select(fn)); typed named scopes (select.context/.computed/.state). */
   select: Select<State, Context, Computed>
+  /** Lifecycle (A1): boot the machine's effects (initial-state effects fire on
+   * the first start; matches R6b's MACHINE_INIT boot, now deferred to start).
+   * Idempotent; a re-start after stop re-boots. */
+  start: () => void
+  /** Lifecycle (A1): run all active effect cleanups and mark stopped.
+   * Consumer subscriptions (subscribe/select) are the consumer's to dispose. */
+  stop: () => void
 }
 
 /**
- * Round 3 building block: state + context + queued, guarded transitions.
- *
- * NOT the machine — a composable layer. `createMachine` (the single public
- * factory) is assembled from these pieces in the final round. Guards and
- * actions are inline functions for now (named registries arrive in R4/R5).
+ * The single public factory (A1). `machine(config)` builds a stopped service
+ * that composes every layer — context (R1), state (R2), queued transitions
+ * (R3), guards (R4), actions (R5), effects (R6), computed (R7), subscription
+ * (R8). It is BUILT but not running: `.start()` boots its effects, `.stop()`
+ * runs their cleanups. Reads are tracked getters; observe via subscribe/select.
  */
-export function createTransitions<
+export function machine<
   State extends string,
   Context extends object,
   Event extends { type: string },
   Computed = Record<string, never>,
 >(
   config: TransitionConfig<State, Context, Event, Computed>,
-): TransitionLayer<State, Context, Event, Computed> {
+): Machine<State, Context, Event, Computed> {
   const st = createState<State>(config.initial, config.states)
   const { context, setContext } = createContext<Context>(config.context)
 
@@ -677,8 +691,10 @@ export function createTransitions<
         // 3c: internal self-transition runs actions only, skips exit/entry.
         // 6 (decision A): effect cleanups bookend the exit — they run FIRST,
         // before exit actions, so the resource is alive for the whole state.
+        // A1: effect boot/cleanup only while running; a stopped machine still
+        // transitions + runs entry/exit ACTIONS, just no effects.
         if (changed) {
-          stopEffects(cur)
+          if (running) stopEffects(cur)
           runExit(cur, e)
         }
         runActions(t.actions, e)
@@ -686,7 +702,7 @@ export function createTransitions<
           st.set(next)
           runEntry(next, e)
           // start LAST on enter — the mirror of cleanup-first on exit.
-          startEffects(next, e)
+          if (running) startEffects(next, e)
         }
       }
     } finally {
@@ -727,12 +743,24 @@ export function createTransitions<
     activeCleanups.length = 0
   }
 
-  // 6 (decision B): start the INITIAL state's effects at construction — unlike
-  // entry (5d), which fires only on a transition IN. A resting initial state
-  // (a closed dropdown still listening for its trigger) needs its listeners up
-  // immediately. The synthetic boot event is MACHINE_INIT so an effect can tell
-  // "started fresh" from "entered via transition". Cleanup runs on first exit.
-  startEffects(config.initial, { type: MACHINE_INIT } as Event)
+  // A1: lifecycle. The machine is built STOPPED — no effects run until start().
+  // start() boots the initial state's effects (R6b's MACHINE_INIT boot, now
+  // deferred from construction): a resting initial state's listeners come up
+  // here. stop() runs all active effect cleanups. Restartable. send() works
+  // regardless of `running` (transitions are pure state); but transition
+  // effects only boot/cleanup while running, so a stopped machine mutates state
+  // without side-effects.
+  let running = false
+  const start = () => {
+    if (running) return
+    running = true
+    startEffects(config.initial, { type: MACHINE_INIT } as Event)
+  }
+  const stop = () => {
+    if (!running) return
+    running = false
+    stopEffects(st.state)
+  }
 
   // 8a: coarse subscribe — wake on ANY change. One preact effect reads the
   // state + every context cell, so any state transition or context write
@@ -808,6 +836,8 @@ export function createTransitions<
     send,
     subscribe,
     select,
+    start,
+    stop,
   }
 }
 
@@ -882,7 +912,7 @@ export function connector<
   Api,
   Computed = Record<string, never>,
 >(
-  machine: TransitionLayer<State, Context, Event, Computed>,
+  service: Machine<State, Context, Event, Computed>,
   connect: Connect<State, Context, Event, Props, Api, Computed>,
   initialProps: Props,
 ): Connector<State, Context, Api, Props, Computed> {
@@ -892,21 +922,21 @@ export function connector<
 
   // The snapshot is a memoized Selection over connect's output: its identity is
   // stable until connect's inputs (state/context/computed/props) change.
-  const snap = machine.select(() =>
+  const snap = service.select(() =>
     connect({
       get state() {
-        return machine.state
+        return service.state
       },
       get context() {
-        return machine.context
+        return service.context
       },
       get computed() {
-        return machine.computed
+        return service.computed
       },
       get props() {
         return propsSig.value
       },
-      send: machine.send,
+      send: service.send,
     }),
   )
 
@@ -921,7 +951,7 @@ export function connector<
     subscribe(listener) {
       return snap.subscribe(() => listener())
     },
-    select: machine.select,
+    select: service.select,
     setProps(props) {
       propsSig.value = props
     },
@@ -929,16 +959,9 @@ export function connector<
 }
 
 // -----------------------------------------------------------------------------
-// STUBS — to be designed in later rounds. Not wired, not final.
+// All rounds complete. The single public factory is `machine(config)` (A1),
+// assembled from createContext (R1), createState (R2), and the transition/
+// guard/action/effect/computed/subscription machinery (R3–R8) inlined here,
+// plus the connector boundary (R9). `withAdapter` (R6c) injects per-target
+// effect/action impls; `bindings` is the agnostic vocabulary connect() speaks.
 // -----------------------------------------------------------------------------
-//
-// Round 4: guards (and/or/not — kept concept)
-// Round 5: actions (+ choose, + entry/exit lists — kept concept)
-// Round 6: effects (+ adapter injection — kept concept)
-// Round 7: computed (kept concept)
-// Round 8: subscription surface (subscribe / subscribeSelector / select)
-// Round 9: connect / connector boundary (kept concept)
-//
-// `createMachine` (the SINGLE public factory) is assembled from these
-// composable pieces — createContext, createState, createTransitions, … — in
-// the final round. None of the per-round building blocks is named `*Machine`.

@@ -5,11 +5,11 @@
  * implementations.guards) or an inline fn; a missing name throws in dev.
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 describe('R4b — named guards', () => {
   it('resolves a guard by name from implementations.guards', () => {
-    const m = createTransitions<'idle', { allow: boolean }, { type: 'go' }>({
+    const m = machine<'idle', { allow: boolean }, { type: 'go' }>({
       initial: 'idle',
       context: { allow: true },
       states: {
@@ -30,7 +30,7 @@ describe('R4b — named guards', () => {
   })
 
   it('named and inline guards coexist (fallthrough array)', () => {
-    const m = createTransitions<'idle', { n: number }, { type: 'tick' }>({
+    const m = machine<'idle', { n: number }, { type: 'tick' }>({
       initial: 'idle',
       context: { n: 0 },
       states: {
@@ -53,7 +53,7 @@ describe('R4b — named guards', () => {
   })
 
   it('throws in dev when a guard name is not registered', () => {
-    const m = createTransitions<'idle', object, { type: 'go' }>({
+    const m = machine<'idle', object, { type: 'go' }>({
       initial: 'idle',
       context: {},
       states: { idle: { on: { go: { guard: 'missing', actions: [] } } } },

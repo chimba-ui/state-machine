@@ -6,11 +6,11 @@
  * can mutate context, read the event, and queue events.
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 describe('R5a — inline actions', () => {
   it('runs an inline action that mutates context', () => {
-    const m = createTransitions<'idle', { n: number }, { type: 'inc' }>({
+    const m = machine<'idle', { n: number }, { type: 'inc' }>({
       initial: 'idle',
       context: { n: 0 },
       states: {
@@ -26,7 +26,7 @@ describe('R5a — inline actions', () => {
 
   it('runs multiple actions in order', () => {
     const order: string[] = []
-    const m = createTransitions<'idle', object, { type: 'go' }>({
+    const m = machine<'idle', object, { type: 'go' }>({
       initial: 'idle',
       context: {},
       states: {
@@ -44,7 +44,7 @@ describe('R5a — inline actions', () => {
   })
 
   it('an action can read the event payload', () => {
-    const m = createTransitions<'idle', { last: string }, { type: 'set'; value: string }>({
+    const m = machine<'idle', { last: string }, { type: 'set'; value: string }>({
       initial: 'idle',
       context: { last: '' },
       states: {
@@ -59,7 +59,7 @@ describe('R5a — inline actions', () => {
 
   it('an action can queue an event via send (R3 queue)', () => {
     const seen: string[] = []
-    const m = createTransitions<'a' | 'b', object, { type: 'toB' | 'mark' }>({
+    const m = machine<'a' | 'b', object, { type: 'toB' | 'mark' }>({
       initial: 'a',
       context: {},
       states: {
@@ -74,7 +74,7 @@ describe('R5a — inline actions', () => {
 
   it('action params include `computed` (empty until R7)', () => {
     let sawComputed: unknown
-    const m = createTransitions<'idle', object, { type: 'go' }>({
+    const m = machine<'idle', object, { type: 'go' }>({
       initial: 'idle',
       context: {},
       states: {

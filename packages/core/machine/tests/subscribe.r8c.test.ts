@@ -7,11 +7,11 @@
  * reads/.value and .subscribe with the same semantics as 8b.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 describe('R8c — select.context / .computed / .state', () => {
   it('select.context(key) selects one field with the exact value type', () => {
-    const m = createTransitions<'idle', { x: number; label: string }, { type: 'moveX' | 'moveY' }>({
+    const m = machine<'idle', { x: number; label: string }, { type: 'moveX' | 'moveY' }>({
       initial: 'idle',
       context: { x: 0, label: 'a' },
       states: {
@@ -37,24 +37,20 @@ describe('R8c — select.context / .computed / .state', () => {
   })
 
   it('select.computed(key) selects a derived value', () => {
-    const m = createTransitions<'idle', { items: number[] }, { type: 'add' }, { isEmpty: boolean }>(
-      {
-        initial: 'idle',
-        context: { items: [] },
-        computed: { isEmpty: ({ context }) => context.items.length === 0 },
-        states: {
-          idle: {
-            on: {
-              add: {
-                actions: [
-                  ({ context, setContext }) => setContext({ items: [...context.items, 1] }),
-                ],
-              },
+    const m = machine<'idle', { items: number[] }, { type: 'add' }, { isEmpty: boolean }>({
+      initial: 'idle',
+      context: { items: [] },
+      computed: { isEmpty: ({ context }) => context.items.length === 0 },
+      states: {
+        idle: {
+          on: {
+            add: {
+              actions: [({ context, setContext }) => setContext({ items: [...context.items, 1] })],
             },
           },
         },
       },
-    )
+    })
     const isEmpty = m.select.computed('isEmpty')
     const v: boolean = isEmpty.value // type: boolean
     expect(v).toBe(true)
@@ -68,7 +64,7 @@ describe('R8c — select.context / .computed / .state', () => {
   })
 
   it('select.state() selects the state string and fires on transitions', () => {
-    const m = createTransitions<'a' | 'b' | 'c', object, { type: 'next' }>({
+    const m = machine<'a' | 'b' | 'c', object, { type: 'next' }>({
       initial: 'a',
       context: {},
       states: {
@@ -91,7 +87,7 @@ describe('R8c — select.context / .computed / .state', () => {
   })
 
   it('select(fn) function form still works alongside the scope methods', () => {
-    const m = createTransitions<'idle', { a: number; b: number }, { type: 'go' }>({
+    const m = machine<'idle', { a: number; b: number }, { type: 'go' }>({
       initial: 'idle',
       context: { a: 1, b: 2 },
       states: {

@@ -6,11 +6,11 @@
  * list and run in order; a missing name throws in dev.
  */
 import { describe, expect, it } from 'vitest'
-import { createTransitions } from '../src/machine'
+import { machine } from '../src/machine'
 
 describe('R5b — named actions', () => {
   it('resolves actions by name from implementations.actions', () => {
-    const m = createTransitions<'idle', { n: number }, { type: 'go' }>({
+    const m = machine<'idle', { n: number }, { type: 'go' }>({
       initial: 'idle',
       context: { n: 0 },
       states: { idle: { on: { go: { actions: ['inc', 'inc'] } } } },
@@ -24,7 +24,7 @@ describe('R5b — named actions', () => {
 
   it('named and inline actions coexist and run in order', () => {
     const order: string[] = []
-    const m = createTransitions<'idle', object, { type: 'go' }>({
+    const m = machine<'idle', object, { type: 'go' }>({
       initial: 'idle',
       context: {},
       states: {
@@ -42,7 +42,7 @@ describe('R5b — named actions', () => {
   })
 
   it('throws in dev when an action name is not registered', () => {
-    const m = createTransitions<'idle', object, { type: 'go' }>({
+    const m = machine<'idle', object, { type: 'go' }>({
       initial: 'idle',
       context: {},
       states: { idle: { on: { go: { actions: ['missing'] } } } },
