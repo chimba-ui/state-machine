@@ -25,6 +25,12 @@ import {
   type Signal,
 } from '@preact/signals-core'
 
+// 9a: the agnostic bindings vocabulary (event + attr) a component's connect()
+// emits. Re-exported here so the rebuilt engine is one import surface; the
+// target-side `normalize` translates these to real props (onPress→onClick, …).
+// The vocabulary itself is reviewed in depth during the target sync (later).
+export type { AttrBindings, EventBindings, KeyboardPayload, PointerPayload } from './bindings'
+
 // -----------------------------------------------------------------------------
 // Round 1: context layer
 // -----------------------------------------------------------------------------
