@@ -1,11 +1,12 @@
 /**
- * Wire a machine to RN and return a connect() API, cached across
- * renders by the machine's version counter. See machine-react's
- * counterpart for the full rationale; this file is a near-duplicate so
- * native-specific concerns can land here later without coupling.
+ * Wire a machine to RN and return a connect() API. The machine is
+ * signal-backed (no version counter); we track a local tick bumped by the
+ * machine's coarse `subscribe`, which both drives the re-render and keys the
+ * api cache. See machine-react's counterpart for the full rationale; this is
+ * a near-duplicate so native-specific concerns can land here later.
  */
 
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useSyncExternalStore } from 'react'
 import { type Connect, type EventObject, type MachineConfig } from '@render-experiment/machine-core'
 import { useMachine } from './use-machine'
 
@@ -23,23 +24,33 @@ export function useApi<
 ): Api {
   const machine = useMachine<Context, Props, Event, Computed>(config, props)
 
+  const tickRef = useRef(0)
+  const tick = useSyncExternalStore(
+    onStoreChange =>
+      machine.subscribe(() => {
+        tickRef.current++
+        onStoreChange()
+      }),
+    () => tickRef.current,
+    () => tickRef.current,
+  )
+
   const cacheRef = useRef<{
     machineToken: object
-    version: number
+    tick: number
     api: Api
   } | null>(null)
 
   const machineToken = useMemo(() => ({}), [machine])
-  const version = machine.getVersion()
 
   if (
     !cacheRef.current ||
     cacheRef.current.machineToken !== machineToken ||
-    cacheRef.current.version !== version
+    cacheRef.current.tick !== tick
   ) {
     cacheRef.current = {
       machineToken,
-      version,
+      tick,
       api: connect({
         state: machine.getState() as State,
         context: machine.getContext(),

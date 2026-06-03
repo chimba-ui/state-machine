@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import {
   createMachine,
   type EventObject,
@@ -7,16 +7,15 @@ import {
 } from '@render-experiment/machine-core'
 
 /**
- * React reactivity bridge for a machine instance.
+ * React lifecycle bridge for a machine instance.
  *
- * Owns the lifecycle (start on mount, stop on unmount) and re-renders via
- * `useSyncExternalStore`, using the machine's monotonic version counter
- * as the snapshot. `Number === Number` is allocation-free and avoids
- * serializing the context on every render.
+ * Creates the machine once, starts it on mount, stops it on unmount, and
+ * keeps `props` fresh every render (so controlled flags / callbacks / timing
+ * read current values inside actions/guards/effects).
  *
- * `props` are forwarded every render so controlled-mode flags (`open`),
- * callbacks (`onOpenChange`), and timing knobs (`openDelay`) stay fresh
- * inside actions/guards/effects.
+ * It does NOT subscribe for re-renders — that's the caller's job. `useApi`
+ * owns the single coarse subscription; leaves use `useCell`. (Subscribing
+ * here too would double-wake.)
  */
 export function useMachine<
   Context extends object,
@@ -42,12 +41,6 @@ export function useMachine<
     machine.start()
     return () => machine.stop()
   }, [machine])
-
-  useSyncExternalStore(
-    notify => machine.subscribe(notify),
-    () => machine.getVersion(),
-    () => machine.getVersion(),
-  )
 
   return machine
 }

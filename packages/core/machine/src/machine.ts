@@ -260,7 +260,11 @@ export interface Transition<
   Event,
   Computed = Record<string, never>,
 > {
-  target?: State
+  // NoInfer: `target` is CHECKED against the State union (defined by the states
+  // keys) rather than contributing to inferring it — so a bad target errors at
+  // the target and autocompletes the declared states, instead of silently
+  // widening State.
+  target?: NoInfer<State>
   /** Inline predicate (4a) or a registered guard name (4b). */
   guard?: GuardArg<Context, Event, Computed>
   /** Actions to run: inline fns (5a) or registered names (5b), in order. */
@@ -402,7 +406,10 @@ export interface TransitionConfig<
   Event extends { type: string },
   Computed = Record<string, never>,
 > {
-  initial: State
+  // NoInfer: `initial` is checked against the State union, which is inferred
+  // SOLELY from the `states` keys below (the single source of truth) — so a
+  // mistyped initial errors and autocompletes the declared states.
+  initial: NoInfer<State>
   context: Context
   states: Record<
     State,
@@ -414,6 +421,11 @@ export interface TransitionConfig<
       exit?: Array<ActionArg<Context, Event, Computed>>
       /** 6: effects started on enter; their cleanups run first on exit. */
       effects?: Array<EffectArg<Context, Event, Computed>>
+      /** 10: timed transitions. Each key is a delay — a number of ms (e.g. 200)
+       * or a name resolved from implementations.delays. The transition fires
+       * after the delay WHILE in this state; auto-cancelled on exit. Reuses
+       * guard fallthrough (a delay may map to a transition array). */
+      after?: Record<string, TransitionEntry<State, Context, Event, Computed>>
     }
   >
   /** Any-state events. Per-state `on` takes precedence over this. */
@@ -421,9 +433,56 @@ export interface TransitionConfig<
   /** 7: derived state. Each def becomes a lazy, memoized computed signal read
    * via the `computed` bag in guard/action/effect params (and on the layer). */
   computed?: ComputedDefs<Context, Computed>
+  /** 11: data-reactions. Each key is a context (or computed) field; its actions
+   * run whenever that field changes — in ANY state, while the machine runs.
+   * Started on start(), cleaned up on stop(). The action's `event` is the
+   * MACHINE_INIT marker (a data change isn't an event). */
+  watch?: {
+    [K in keyof Context | keyof Computed]?: Array<ActionArg<Context, Event, Computed>>
+  }
   /** Named implementations referenced by string in transitions. */
   implementations?: Implementations<Context, Event, Computed>
 }
+
+/**
+ * Public alias for the machine config shape. Annotating a config with this
+ * still requires the generics (`const c: MachineConfig<'a' | 'b', Ctx, Ev>`);
+ * for type-checking + inference at the definition site with no manual generics,
+ * prefer the `config(...)` helper below.
+ */
+export type MachineConfig<
+  State extends string,
+  Context,
+  Event extends { type: string },
+  Computed = Record<string, never>,
+> = TransitionConfig<State, Context, Event, Computed>
+
+/**
+ * Identity helper for authoring a config as a standalone const with full
+ * type-checking and inference — no manual generics. Returns the config
+ * unchanged; its only job is to apply the `TransitionConfig` constraint so the
+ * literal is checked (typos in `initial`, invalid `target`s, wrong param shapes
+ * all error here) and its narrow types are captured for `machine()`.
+ *
+ *   const cfg = config({ initial: 'closed', context: {}, states: { ... } })
+ *   const m = machine(cfg)
+ */
+export function config<
+  State extends string,
+  Context extends object,
+  Event extends { type: string },
+  Computed = Record<string, never>,
+>(
+  c: TransitionConfig<State, Context, Event, Computed>,
+): TransitionConfig<State, Context, Event, Computed> {
+  return c
+}
+
+/** A named delay (10): resolves to a number of ms, may read context/computed
+ * so a prop-driven delay is dynamic. Referenced by name in a state's `after`. */
+export type Delay<Context, Event, Computed = Record<string, never>> = (
+  params: GuardParams<Context, Event, Computed>,
+) => number
 
 /** The named-implementation registries a config (and an adapter) supply. */
 export interface Implementations<Context, Event, Computed = Record<string, never>> {
@@ -433,6 +492,8 @@ export interface Implementations<Context, Event, Computed = Record<string, never
   actions?: Record<string, Action<Context, Event, Computed>>
   /** Reusable named effects (6). The adapter (withAdapter) overrides these. */
   effects?: Record<string, Effect<Context, Event, Computed>>
+  /** Reusable named delays (10). Referenced by name as an `after` key. */
+  delays?: Record<string, Delay<Context, Event, Computed>>
 }
 
 // -----------------------------------------------------------------------------
@@ -677,6 +738,30 @@ export function machine<
     for (const action of actions) runAction(action, event)
   }
 
+  // Apply one already-resolved transition: exit (cleanup effects + exit
+  // actions) → transition actions → switch → entry actions + start effects.
+  // Shared by event-driven (send) and delay-driven (after) transitions.
+  const applyTransition = (t: Transition<State, Context, Event, Computed>, event: Event) => {
+    const cur = st.state
+    const next = t.target ?? cur
+    const changed = next !== cur
+    // 3c: internal self-transition runs actions only, skips exit/entry.
+    // 6 (decision A): effect cleanups bookend the exit — they run FIRST, before
+    // exit actions, so the resource is alive for the whole state. A1: effect
+    // boot/cleanup only while running; a stopped machine still transitions +
+    // runs entry/exit ACTIONS, just no effects (and timers don't fire stopped).
+    if (changed) {
+      if (running) stopEffects(cur)
+      runExit(cur, event)
+    }
+    runActions(t.actions, event)
+    if (changed) {
+      st.set(next)
+      runEntry(next, event)
+      if (running) startEffects(next, event) // 10: startEffects also (re)schedules `after` timers
+    }
+  }
+
   const send = (event: Event) => {
     queue.push(event)
     if (draining) return
@@ -687,26 +772,7 @@ export function machine<
         // 3b: per-state `on` first, then top-level `on`.
         const entry = config.states[st.state].on?.[e.type] ?? config.on?.[e.type]
         const t = resolve(entry, e)
-        if (!t) continue
-        const cur = st.state
-        const next = t.target ?? cur
-        const changed = next !== cur
-        // 3c: internal self-transition runs actions only, skips exit/entry.
-        // 6 (decision A): effect cleanups bookend the exit — they run FIRST,
-        // before exit actions, so the resource is alive for the whole state.
-        // A1: effect boot/cleanup only while running; a stopped machine still
-        // transitions + runs entry/exit ACTIONS, just no effects.
-        if (changed) {
-          if (running) stopEffects(cur)
-          runExit(cur, e)
-        }
-        runActions(t.actions, e)
-        if (changed) {
-          st.set(next)
-          runEntry(next, e)
-          // start LAST on enter — the mirror of cleanup-first on exit.
-          if (running) startEffects(next, e)
-        }
+        if (t) applyTransition(t, e)
       }
     } finally {
       draining = false
@@ -726,7 +792,65 @@ export function machine<
   // latter is what the adapter overrides. Missing name → throw dev / warn prod.
   const effectRegistry = config.implementations?.effects
   const activeCleanups: Array<() => void> = []
+
+  // 10: resolve an `after` delay key → ms. A numeric key ("200") is its value;
+  // otherwise it's a name looked up in implementations.delays (which may read
+  // context/computed, so a prop-driven delay is dynamic). Missing → dev throw.
+  const delayRegistry = config.implementations?.delays
+  const resolveDelay = (key: string, event: Event): number => {
+    const asNum = Number(key)
+    if (!Number.isNaN(asNum)) return asNum
+    const fn = delayRegistry?.[key]
+    if (!fn) {
+      const msg = `[machine] no delay "${key}"`
+      if (isDev) throw new Error(msg)
+      console.warn(msg)
+      return 0
+    }
+    return fn(guardParams(event))
+  }
+
+  // 10: a fired timer applies the FIRST `after` transition whose guard passes —
+  // but only if still in the scheduling state (a late timer after a re-entry is
+  // ignored) and still running. Routed through the queue (draining guard) so it
+  // respects run-to-completion like send().
+  const dispatchAfter = (scheduledIn: State, key: string, event: Event) => {
+    if (!running || st.state !== scheduledIn) return
+    // If a send() drain is in flight (a timer fired mid-transition), defer to a
+    // microtask so we run AFTER it completes — preserving run-to-completion
+    // without dropping the after-transition. The deferred call re-checks
+    // running/state, so a state change in the meantime correctly cancels it.
+    if (draining) {
+      queueMicrotask(() => dispatchAfter(scheduledIn, key, event))
+      return
+    }
+    const t = resolve(config.states[scheduledIn].after?.[key], event)
+    if (!t) return
+    draining = true
+    try {
+      applyTransition(t, event)
+      while (queue.length) {
+        const e = queue.shift()!
+        const next = resolve(config.states[st.state].on?.[e.type] ?? config.on?.[e.type], e)
+        if (next) applyTransition(next, e)
+      }
+    } finally {
+      draining = false
+    }
+  }
+
+  // startEffects also (re)schedules this state's `after` timers (10). Both are
+  // state-scoped resources, so a timer's clearTimeout joins activeCleanups and
+  // is cleared on exit alongside effect cleanups.
   const startEffects = (state: State, event: Event) => {
+    const after = config.states[state].after
+    if (after) {
+      for (const key in after) {
+        const ms = resolveDelay(key, event)
+        const id = setTimeout(() => dispatchAfter(state, key, event), ms)
+        activeCleanups.push(() => clearTimeout(id))
+      }
+    }
     const effects = config.states[state].effects
     if (!effects) return
     for (const effect of effects) {
@@ -746,23 +870,58 @@ export function machine<
     activeCleanups.length = 0
   }
 
+  // 11: watchers — machine-global data-reactions. Each watched field becomes a
+  // preact effect that reads that field (context or computed) and runs its
+  // actions on CHANGE — skipping the priming run (no fire on setup). Their
+  // cleanups live in their OWN list (not activeCleanups) because watchers span
+  // the whole run (start→stop), NOT a single state — stopEffects clears
+  // activeCleanups on every state exit, which must not tear watchers down.
+  const watchConfig = config.watch
+  const watcherCleanups: Array<() => void> = []
+  const readField = (key: string): unknown =>
+    key in context
+      ? (context as Record<string, unknown>)[key]
+      : (computed as Record<string, unknown>)[key]
+  const startWatchers = () => {
+    if (!watchConfig) return
+    for (const key in watchConfig) {
+      const actions = watchConfig[key as keyof typeof watchConfig]
+      if (!actions) continue
+      let primed = false
+      const dispose = preactEffect(() => {
+        readField(key) // tracked read → re-runs when this field changes
+        if (!primed) {
+          primed = true
+          return
+        }
+        runActions(actions, { type: MACHINE_INIT } as Event)
+      })
+      watcherCleanups.push(dispose)
+    }
+  }
+  const stopWatchers = () => {
+    for (const dispose of watcherCleanups) dispose()
+    watcherCleanups.length = 0
+  }
+
   // A1: lifecycle. The machine is built STOPPED — no effects run until start().
   // start() boots the initial state's effects (R6b's MACHINE_INIT boot, now
-  // deferred from construction): a resting initial state's listeners come up
-  // here. stop() runs all active effect cleanups. Restartable. send() works
-  // regardless of `running` (transitions are pure state); but transition
-  // effects only boot/cleanup while running, so a stopped machine mutates state
-  // without side-effects.
+  // deferred from construction) + the global watchers (11). stop() runs all
+  // active effect/watcher cleanups. Restartable. send() works regardless of
+  // `running` (transitions are pure state); but effects/watchers/timers only
+  // run while running, so a stopped machine mutates state without side-effects.
   let running = false
   const start = () => {
     if (running) return
     running = true
+    startWatchers()
     startEffects(config.initial, { type: MACHINE_INIT } as Event)
   }
   const stop = () => {
     if (!running) return
     running = false
     stopEffects(st.state)
+    stopWatchers() // 11: watchers span the whole run — torn down here, not on exit
   }
 
   // 8a: coarse subscribe — wake on ANY change. One preact effect reads the

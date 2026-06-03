@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import {
   createMachine,
   type EventObject,
@@ -7,17 +7,12 @@ import {
 } from '@render-experiment/machine-core'
 
 /**
- * React Native reactivity bridge for a machine instance.
+ * React Native lifecycle bridge for a machine instance.
  *
- * Mechanically identical to the React DOM useMachine (RN uses the same
- * React renderer and scheduler), kept as a duplicate file rather than a
- * re-export so RN-specific concerns can land here without coupling to
- * the React DOM package:
- *   - InteractionManager integration if heavy effects coincide with gestures
- *   - LogBox/error-handling differences
- *   - Reanimated/worklet-driven snapshots in the future
- *
- * Today it's a clean copy.
+ * Mirrors the React DOM useMachine (RN uses the same React renderer): create
+ * once, start/stop with mount, keep props fresh. Does NOT subscribe for
+ * re-renders — `useApi` owns the single coarse subscription, leaves use
+ * `useCell`. Kept as a duplicate file so RN-specific concerns can land here.
  */
 export function useMachine<
   Context extends object,
@@ -41,12 +36,6 @@ export function useMachine<
     machine.start()
     return () => machine.stop()
   }, [machine])
-
-  useSyncExternalStore(
-    notify => machine.subscribe(notify),
-    () => machine.getVersion(),
-    () => machine.getVersion(),
-  )
 
   return machine
 }

@@ -14,9 +14,28 @@
  * transitions or its context changes — exactly when subscribers care.
  */
 
-import { useMemo, useRef } from 'react'
-import { type Connect, type EventObject, type MachineConfig } from '@render-experiment/machine-core'
+import { useMemo, useRef, useSyncExternalStore } from 'react'
+import {
+  type Connect,
+  type EventObject,
+  type Machine,
+  type MachineConfig,
+} from '@render-experiment/machine-core'
 import { useMachine } from './use-machine'
+
+// The api object exposes its machine on a non-enumerable symbol, so leaf
+// components can reach the machine for fine-grained `useSelector` without the
+// api surface (or the generated useXxxApi return type) changing for anyone.
+const MACHINE = Symbol.for('render-experiment.machine')
+
+/** Retrieve the machine attached to an api by `useApi`. */
+export function getMachine<M extends Machine<object, object, EventObject, unknown>>(
+  api: object,
+): M {
+  const m = (api as Record<symbol, unknown>)[MACHINE]
+  if (!m) throw new Error('getMachine: api was not produced by useApi')
+  return m as M
+}
 
 export function useApi<
   Context extends object,
@@ -32,34 +51,48 @@ export function useApi<
 ): Api {
   const machine = useMachine<Context, Props, Event, Computed>(config, props)
 
-  // Cache by (machine instance, version). A new machine instance can
-  // appear after hot-reload or via key-driven remount; in either case
-  // the previous cache is dead by definition.
+  // The machine has no version counter; we track a local tick bumped by the
+  // machine's coarse `subscribe` (any observable change). useSyncExternalStore
+  // both drives the re-render and gives us a stable snapshot to key the cache
+  // on, so the api object rebuilds exactly when something changed.
+  const tickRef = useRef(0)
+  const tick = useSyncExternalStore(
+    onStoreChange =>
+      machine.subscribe(() => {
+        tickRef.current++
+        onStoreChange()
+      }),
+    () => tickRef.current,
+    () => tickRef.current,
+  )
+
+  // Cache by (machine instance, tick). A new machine instance can appear
+  // after hot-reload or via key-driven remount; the previous cache is dead.
   const cacheRef = useRef<{
     machineToken: object
-    version: number
+    tick: number
     api: Api
   } | null>(null)
 
   const machineToken = useMemo(() => ({}), [machine])
-  const version = machine.getVersion()
 
   if (
     !cacheRef.current ||
     cacheRef.current.machineToken !== machineToken ||
-    cacheRef.current.version !== version
+    cacheRef.current.tick !== tick
   ) {
-    cacheRef.current = {
-      machineToken,
-      version,
-      api: connect({
-        state: machine.getState() as State,
-        context: machine.getContext(),
-        props: machine.getProps(),
-        send: machine.send,
-        computed: machine.getComputed(),
-      })(),
+    const api = connect({
+      state: machine.getState() as State,
+      context: machine.getContext(),
+      props: machine.getProps(),
+      send: machine.send,
+      computed: machine.getComputed(),
+    })()
+    // Attach the machine (non-enumerable) so leaves can `useSelector` over it.
+    if (api && typeof api === 'object') {
+      Object.defineProperty(api, MACHINE, { value: machine, enumerable: false, configurable: true })
     }
+    cacheRef.current = { machineToken, tick, api }
   }
 
   return cacheRef.current.api

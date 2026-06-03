@@ -9,7 +9,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@preact/signals-core": "^1.14.2",
-    "@render-experiment/store": "workspace:*"
+    "@preact/signals-core": "^1.14.2"
   }
 }
