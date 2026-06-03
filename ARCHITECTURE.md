@@ -23,7 +23,8 @@ target side fulfills the contract.
 
 | File / location                        | What it owns                                        |
 | -------------------------------------- | --------------------------------------------------- |
-| `packages/core/machine/`               | State-machine engine, store, bindings, mergeProps   |
+| `packages/core/machine/`               | State-machine engine, store, bindings               |
+| `packages/shared/utils/`               | mergeProps, composeHandlers, positioning, memo      |
 | `packages/core/components/<comp>/`     | Per-component agnostic spec — see structure below   |
 | `packages/<target>/machine/`           | Hook + normalize per substrate (react, native, ...) |
 | `packages/<target>/components/<comp>/` | View, context, adapter, generated elements + api    |
