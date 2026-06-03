@@ -119,7 +119,10 @@ export interface State<T extends string> {
   set: (next: T) => void
 }
 
-export function createState<T extends string>(initial: T, nodes: Record<T, StateNode>): State<T> {
+export function createState<T extends string>(
+  initial: NoInfer<T>,
+  nodes: Record<T, StateNode>,
+): State<T> {
   const stateSig = signal<T>(initial)
 
   // Precompute each state's tag set once (lookup is per-read, must be cheap).
