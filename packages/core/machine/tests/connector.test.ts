@@ -130,3 +130,60 @@ describe('connector', () => {
     expect(fn).toHaveBeenLastCalledWith(1)
   })
 })
+
+describe('connector reactions', () => {
+  // A connect with a declared reaction: when state reaches 'b', call props.onB.
+  type RProps = { onB?: (v: boolean) => void }
+  const connect = Object.assign((s: { state: 'a' | 'b' }) => ({ state: s.state }), {
+    reactions: [
+      {
+        select: (m: { matches: (n: 'a' | 'b') => boolean }) => m.matches('b'),
+        onChange: (inB: boolean, props: RProps) => props.onB?.(inB),
+      },
+    ],
+  })
+
+  it('fires a reaction on the selected value change, with current props; not on setup', () => {
+    const m = machine<'a' | 'b', object, { type: 'toB' }>({
+      initial: 'a',
+      context: {},
+      states: { a: { on: { toB: { target: 'b' } } }, b: {} },
+    })
+    const onB = vi.fn()
+    connector(m, connect, { onB })
+    expect(onB).not.toHaveBeenCalled() // no fire on setup
+    m.send({ type: 'toB' }) // state a→b → reaction fires with current props.onB
+    expect(onB).toHaveBeenCalledWith(true)
+  })
+
+  it('dispose() tears the reaction down', () => {
+    const m = machine<'a' | 'b', object, { type: 'toB' | 'toA' }>({
+      initial: 'a',
+      context: {},
+      states: { a: { on: { toB: { target: 'b' } } }, b: { on: { toA: { target: 'a' } } } },
+    })
+    const onB = vi.fn()
+    const c = connector(m, connect, { onB })
+    m.send({ type: 'toB' })
+    expect(onB).toHaveBeenCalledTimes(1)
+    c.dispose()
+    m.send({ type: 'toA' })
+    m.send({ type: 'toB' }) // reaction disposed → no further calls
+    expect(onB).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads the latest props via setProps when the reaction fires', () => {
+    const m = machine<'a' | 'b', object, { type: 'toB' }>({
+      initial: 'a',
+      context: {},
+      states: { a: { on: { toB: { target: 'b' } } }, b: {} },
+    })
+    const first = vi.fn()
+    const second = vi.fn()
+    const c = connector(m, connect, { onB: first })
+    c.setProps({ onB: second }) // swap the callback before the reaction fires
+    m.send({ type: 'toB' })
+    expect(first).not.toHaveBeenCalled()
+    expect(second).toHaveBeenCalledWith(true)
+  })
+})

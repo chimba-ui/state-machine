@@ -49,6 +49,14 @@ export function connector<
     }),
   )
 
+  // Register the component's declared reactions (state-change → prop-callback),
+  // ONCE. Each watches its selection (value-deduped) and fires onChange with the
+  // current props. Disposed via the connector's dispose().
+  const reactionOffs = (connect.reactions ?? []).map(r => {
+    const sel = service.select(() => r.select(service))
+    return sel.subscribe(value => r.onChange(value, propsSig.value))
+  })
+
   return {
     get snapshot() {
       return snap.value
@@ -63,6 +71,9 @@ export function connector<
     select: service.select,
     setProps(props) {
       propsSig.value = props
+    },
+    dispose() {
+      for (const off of reactionOffs) off()
     },
   }
 }

@@ -26,6 +26,27 @@ the agnostic description, and once in each `<target>/components/<comp>/`
 as the substrate-specific view. The agnostic side declares names; the
 target side fulfills the contract.
 
+## The core rule: the machine never sees props
+
+A machine is pure behavior — states, transitions, context, effects. It does
+**not** read the consumer's props. Props are where the environment leaks in (a
+DOM event handed to `onOpenChange`, a platform timer, a host-specific callback);
+if the machine read them, it would be coupled to the shape one runtime happens
+to give it.
+
+So props enter only at the **edge**, never the machine:
+
+- **config the transitions need** (delays, flags like `disabled`) → seeded into
+  the machine's **context** (and updated via `setContext` when props change);
+- **callbacks + controlled state** (`onOpenChange`, controlled `open`) → handled
+  by the **connector / connect**, which observes the machine and calls back;
+- **initial state derived from props** → computed before `machine()` is built.
+
+This is the rule that makes one machine run byte-for-byte identically on React,
+React Native, a canvas loop, or a test — each target varies only the thin
+connector/adapter layer around it. (It's the one place this engine diverges from
+Zag, whose machines read props directly.)
+
 ## Project structure
 
 | File / location                        | What it owns                                        |
@@ -162,9 +183,10 @@ What happens when a consumer renders a component in their app:
    ┌──────────────────────────────────────────────────────┐
    │  CONNECT  (core)                                     │
    │                                                      │
-   │  Takes (state, context, props), returns the          │
-   │  logical surface: per-part bindings (handlers,       │
-   │  attrs) the view will spread.                        │
+   │  Takes the machine snapshot (state, context,         │
+   │  computed, send) + props, returns the logical        │
+   │  surface: per-part bindings (handlers, attrs) the    │
+   │  view spreads. Props enter HERE, not the machine.    │
    └──────────────────────────────────────────────────────┘
 ```
 
@@ -178,9 +200,10 @@ which spreads them onto styled elements.
 `machine.ts` is the state graph (states, transitions, action impls). It
 changes when behavior changes.
 
-`connect.ts` is the function that translates `(state, context, props)`
-into the surface a view consumes (handlers + attrs per part). It changes
-when the API surface changes.
+`connect.ts` is the function that translates the machine snapshot + props
+into the surface a view consumes (handlers + attrs per part). This is the
+layer that reads props (see "the machine never sees props" above) and fires
+the consumer's callbacks. It changes when the API surface changes.
 
 Cross-instance singletons (e.g. "only one tooltip open at a time") were
 previously a `core/store` package; that's been removed. Per-machine state is

@@ -109,6 +109,21 @@ statechart). Here it's **intrinsic to the machine and auto-tracked** — no host
 framework, no DOM, no named slice. (Zag's `computed`/`watch`, like this engine's,
 are themselves Vue/Lit-inspired — no novelty claimed there.)
 
+### One thing that's different from Zag: where props live
+
+In Zag the machine reads your component's props directly (delays, callbacks like
+`onOpenChange`, controlled `open`). **Here the machine never sees props** — it's
+pure behavior (states + transitions); props enter only at the connector, which
+feeds config into context and fires callbacks from `connect`.
+
+**This is what makes one machine run across every JS environment.** Props are
+where the environment leaks in — a DOM event handed to `onOpenChange`, a
+platform-specific timer or callback. If the machine read props, it would be
+coupled to the shape one environment happens to give it. By keeping props at the
+connector edge, the machine's behavior is byte-for-byte identical on React, React
+Native, a canvas loop, or a test — and each target varies only the thin
+connector/adapter layer around it.
+
 ---
 
 ## API at a glance

@@ -1,46 +1,71 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import {
-  createMachine,
-  type EventObject,
-  type Machine,
-  type MachineConfig,
+  connector,
+  machine,
+  withAdapter,
+  type Adapter,
+  type Connect,
+  type TransitionConfig,
 } from '@render-experiment/machine-core'
 
 /**
- * React lifecycle bridge for a machine instance.
+ * The one generic React bridge. Every component's generated api.ts calls this
+ * with three core pieces — a config factory, the connect, the per-target
+ * adapter — plus the resolved props:
  *
- * Creates the machine once, starts it on mount, stops it on unmount, and
- * keeps `props` fresh every render (so controlled flags / callbacks / timing
- * read current values inside actions/guards/effects).
+ *   useMachine(tooltipMachineConfig, connectTooltip, tooltipAdapter, props)
  *
- * It does NOT subscribe for re-renders — that's the caller's job. `useApi`
- * owns the single coarse subscription; leaves use `useCell`. (Subscribing
- * here too would double-wake.)
+ * It: builds the machine from props (with the adapter merged in), wraps it in a
+ * connector, starts on mount / stops on unmount, keeps props fresh via
+ * setProps, and drives React via useSyncExternalStore over the connector's
+ * stable snapshot. Returns the connect() api.
+ *
+ * The machine is built ONCE (from the first render's props); later prop changes
+ * flow through setProps — recreating would lose state.
  */
 export function useMachine<
+  State extends string,
   Context extends object,
-  Props extends object,
-  Event extends EventObject = EventObject,
+  Event extends { type: string },
+  Props,
+  Api,
   Computed = Record<string, never>,
 >(
-  config: MachineConfig<Context, Props, Event, Computed>,
+  createConfig: (props: Props) => TransitionConfig<State, Context, Event, Computed>,
+  connect: Connect<State, Context, Event, Props, Api, Computed>,
+  adapter: Adapter<Context, Event, Computed>,
   props: Props,
-): Machine<Context, Props, Event, Computed> {
-  const configRef = useRef(config)
-  const machine = useMemo(
-    () => createMachine(configRef.current, props),
-    // Machine is created once; subsequent config or props updates flow
-    // through setProps below — recreating would lose state.
+): { api: Api; machine: ReturnType<typeof machine<State, Context, Event, Computed>> } {
+  // Build machine + connector once. The first render's props seed context +
+  // initial state; the adapter supplies platform effects.
+  const { service, conn } = useMemo(
+    () => {
+      const service = machine(withAdapter(createConfig(props), adapter))
+      const conn = connector(service, connect, props)
+      return { service, conn }
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
 
-  machine.setProps(props)
+  // Keep consumer props fresh every render (controlled flags, callbacks).
+  conn.setProps(props)
 
+  // Lifecycle: boot effects on mount, tear down on unmount.
   useEffect(() => {
-    machine.start()
-    return () => machine.stop()
-  }, [machine])
+    service.start()
+    return () => {
+      conn.dispose()
+      service.stop()
+    }
+  }, [service, conn])
 
-  return machine
+  // Drive re-renders off the connector's stable, memoized snapshot.
+  useSyncExternalStore(
+    conn.subscribe,
+    () => conn.snapshot,
+    () => conn.snapshot,
+  )
+
+  return { api: conn.snapshot, machine: service }
 }

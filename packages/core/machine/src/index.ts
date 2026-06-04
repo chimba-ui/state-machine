@@ -50,6 +50,10 @@ export type { Connect, Connector, ConnectSnapshot } from './types'
 export { compose } from './compose'
 export type { Composition } from './compose'
 
+// A tiny signal-backed store for cross-instance singletons (wrap in a facade).
+export { createStore } from './store'
+export type { Store, Listener, SetStateAction } from './store'
+
 // Bindings vocabulary (agnostic event + attr) connect() speaks.
 export type { AttrBindings, EventBindings, KeyboardPayload, PointerPayload } from './bindings'
 

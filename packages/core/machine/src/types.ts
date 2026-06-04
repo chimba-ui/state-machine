@@ -331,7 +331,31 @@ export interface ConnectSnapshot<
   send: (event: Event) => void
 }
 
-/** A pure connect(): snapshot → view-facing api. */
+/**
+ * A substrate-agnostic reaction: when the value `select` derives from the
+ * machine changes, the connector calls `onChange(value, props)`. This is how a
+ * component declares "machine-state change → consumer callback" ONCE (e.g.
+ * `onOpenChange`), fired identically on every target — the machine never reads
+ * props or fires callbacks itself. (Platform-specific reactions like a DOM
+ * Escape listener stay in the per-target adapter.)
+ */
+export interface Reaction<
+  State extends string,
+  Context,
+  Event extends { type: string },
+  Props,
+  Computed = Record<string, never>,
+  Value = unknown,
+> {
+  select: (machine: Machine<State, Context, Event, Computed>) => Value
+  onChange: (value: Value, props: Props) => void
+}
+
+/**
+ * A pure connect(): snapshot → view-facing api. It MAY carry a static
+ * `reactions` array — declarative state-change → prop-callback bindings the
+ * connector registers once (the mapping itself stays pure / side-effect free).
+ */
 export type Connect<
   State extends string,
   Context,
@@ -339,7 +363,10 @@ export type Connect<
   Props,
   Api,
   Computed = Record<string, never>,
-> = (snapshot: ConnectSnapshot<State, Context, Event, Props, Computed>) => Api
+> = ((snapshot: ConnectSnapshot<State, Context, Event, Props, Computed>) => Api) & {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  reactions?: Array<Reaction<State, Context, Event, Props, Computed, any>>
+}
 
 /** The live, subscribable connector: snapshot + subscribe + select + setProps. */
 export interface Connector<
@@ -358,4 +385,7 @@ export interface Connector<
   select: Select<State, Context, Computed>
   /** Update consumer props (a reactive input) — recomputes snapshot + wakes. */
   setProps: (props: Props) => void
+  /** Tear down the connector's reaction subscriptions (the bridge calls this on
+   * unmount). Does not stop the machine — lifecycle is the bridge's. */
+  dispose: () => void
 }

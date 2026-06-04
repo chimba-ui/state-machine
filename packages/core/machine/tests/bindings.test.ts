@@ -42,16 +42,6 @@ describe('bindings vocabulary', () => {
     expect(attrs.expanded).toBe(true)
   })
 
-  it('AttrBindings open index allows data-*/aria-* passthrough', () => {
-    const attrs: AttrBindings = {
-      id: 'x',
-      'data-state': 'open', // verbatim passthrough on web, dropped on RN
-      'data-part': 'content',
-      'aria-live': 'polite',
-    }
-    expect(attrs['data-state']).toBe('open')
-  })
-
   it('payload preventDefault is callable and optional', () => {
     let prevented = false
     const onPress: EventBindings['onPress'] = e => e?.preventDefault?.()

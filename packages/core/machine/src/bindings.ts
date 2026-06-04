@@ -11,6 +11,14 @@
  *   Native (RN) : machine-native/normalize  (onPress → Pressable.onPress, …)
  *   Surface     : machine-surface/normalize (future)
  *
+ * A part's surface is two buckets:
+ *   - handlers (EventBindings)  — input → events
+ *   - attrs    (AttrBindings)   — substrate attributes (id, role, aria-*)
+ *
+ * Semantic state (machine state, side, …) is NOT collapsed into `data-*` here.
+ * Core stays agnostic; each adapter derives whatever `data-*` it wants from the
+ * machine state + the part's own fields.
+ *
  * The payload types below pin the fields a handler can rely on across
  * substrates. Anything substrate-specific (clientX, nativeEvent,
  * currentTarget) lives behind the adapter and is invisible to component
@@ -94,13 +102,4 @@ export interface AttrBindings {
 
   /** ARIA role on web; equivalent semantic tag on other substrates. */
   role?: string
-
-  /**
-   * Open slot for substrate-specific attributes the named keys don't
-   * cover. Common case: `data-*` and `aria-*` attrs the React adapter
-   * passes through verbatim; the native adapter drops unknown keys.
-   * Keep values primitive (string / number / boolean) so adapters can
-   * serialize them.
-   */
-  [key: string]: string | number | boolean | undefined
 }
