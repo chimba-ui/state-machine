@@ -82,24 +82,24 @@ not `O(all)`), which matters when **many independent machines run at once**.
 
 ### How it compares
 
-| Capability                                | Zag                            | XState                                                 | machine-core               |
-| ----------------------------------------- | ------------------------------ | ------------------------------------------------------ | -------------------------- |
-| States / transitions / guards             | ✅                             | ✅                                                     | ✅                         |
-| Guard combinators (`and`/`or`/`not`)      | ✅                             | ✅                                                     | ✅                         |
-| Conditional actions                       | ✅ `choose`                    | ✅ `choose`                                            | ✅ `oneOf`                 |
-| `entry` / `exit`                          | ✅                             | ✅                                                     | ✅                         |
-| Effects with cleanup                      | ✅                             | ✅ (invoked callbacks)                                 | ✅ `effects`               |
-| Computed / derived                        | ✅                             | ✅                                                     | ✅                         |
-| Timed transitions (`after`)               | ✅                             | ✅                                                     | ✅                         |
-| Watch (react to data change)              | ✅ `watch`                     | ⚠️ via `always`                                        | ✅ `watch` (name from Zag) |
-| Per-platform late binding                 | ✅                             | ⚠️ via `.provide()`                                    | ✅ via `withAdapter`       |
-| **Where fine-grained reactivity lives**   | ⚠️ delegated to host framework | ⚠️ manual selectors (`actor.select` / `@xstate/store`) | ✅ intrinsic, auto-tracked |
-| **Works with no host framework / no DOM** | ❌ (needs a framework + DOM)   | varies                                                 | ✅                         |
+| Capability                                | Zag                            | XState                                                 | machine-core                     |
+| ----------------------------------------- | ------------------------------ | ------------------------------------------------------ | -------------------------------- |
+| States / transitions / guards             | ✅                             | ✅                                                     | ✅                               |
+| Guard combinators (`and`/`or`/`not`)      | ✅                             | ✅                                                     | ✅                               |
+| Conditional actions                       | ✅ `choose`                    | ✅ `choose`                                            | ✅ `oneOf`                       |
+| `entry` / `exit`                          | ✅                             | ✅                                                     | ✅                               |
+| Effects with cleanup                      | ✅                             | ✅ (invoked callbacks)                                 | ✅ `effects`                     |
+| Computed / derived                        | ✅                             | ✅                                                     | ✅                               |
+| Timed transitions (`after`)               | ✅                             | ✅                                                     | ✅                               |
+| Watch (react to data change)              | ✅ `watch`                     | ⚠️ via `always`                                        | ✅ `watch` (name from Zag)       |
+| Per-platform late binding                 | ✅                             | ⚠️ via `.provide()`                                    | ✅ via `withAdapter`             |
+| **Where fine-grained reactivity lives**   | ⚠️ delegated to host framework | ⚠️ manual selectors (`actor.select` / `@xstate/store`) | ✅ intrinsic, auto-tracked       |
+| **Works with no host framework / no DOM** | ❌ (needs a framework + DOM)   | varies                                                 | ✅                               |
 | Parallel / orthogonal regions             | ✅ (parallel states)           | ✅ (parallel states)                                   | ✅ via `compose` (peer machines) |
-| Nested / hierarchical states              | ✅                             | ✅                                                     | ❌ (flat states)           |
-| Spawned child machines / actors           | ❌                             | ✅ (`invoke` / `spawn`)                                | ❌                         |
-| Pre-built framework bindings              | ✅ React/Vue/Solid/Svelte      | ✅ many                                                | ❌ (write per target)      |
-| Pre-built components                      | ✅ ~40                         | —                                                      | ❌ (built on top)          |
+| Nested / hierarchical states              | ✅                             | ✅                                                     | ❌ (flat states)                 |
+| Spawned child machines / actors           | ❌                             | ✅ (`invoke` / `spawn`)                                | ❌                               |
+| Pre-built framework bindings              | ✅ React/Vue/Solid/Svelte      | ✅ many                                                | ❌ (write per target)            |
+| Pre-built components                      | ✅ ~40                         | —                                                      | ❌ (built on top)                |
 
 The line that earns building locally isn't "they're coarse" — they're not. It's
 **where the reactivity lives and how it's expressed**: Zag delegates fine-graining
@@ -109,36 +109,58 @@ statechart). Here it's **intrinsic to the machine and auto-tracked** — no host
 framework, no DOM, no named slice. (Zag's `computed`/`watch`, like this engine's,
 are themselves Vue/Lit-inspired — no novelty claimed there.)
 
-### One thing that's different from Zag: where props live
+### The machine never sees props
 
-In Zag the machine reads your component's props directly (delays, callbacks like
-`onOpenChange`, controlled `open`). **Here the machine never sees props** — it's
-pure behavior (states + transitions); props enter only at the connector, which
-feeds config into context and fires callbacks from `connect`.
+This is the single most important thing to understand about `machine-core`, and
+the one place it deliberately diverges from Zag and XState.
 
-**This is what makes one machine run across every JS environment.** Props are
-where the environment leaks in — a DOM event handed to `onOpenChange`, a
-platform-specific timer or callback. If the machine read props, it would be
-coupled to the shape one environment happens to give it. By keeping props at the
-connector edge, the machine's behavior is byte-for-byte identical on React, React
-Native, a canvas loop, or a test — and each target varies only the thin
-connector/adapter layer around it.
+In the other libs the machine reads your component's props directly: `prop("open")`
+appear _inside_ the machine, on transitions and in actions. **Here the machine
+never sees props — ever.** It has no `props` argument, no `prop()` accessor. It
+is pure behavior: states, transitions, context, guards. Nothing else.
+
+Props are the edge where the environment leaks in — a DOM event handed to
+`onOpenChange`, a host-specific timer, a controlled value owned by React state.
+The moment a machine reads a prop, it is coupled to the shape _one_ environment
+happens to hand it, and it can no longer run unchanged anywhere else. So props
+are kept entirely **at the edge** (the connector + adapter), never crossing into
+the machine. The payoff: **one machine's behavior is byte-for-byte identical on
+all enviroments**.
+
+#### So where _do_ props go?
+
+Every job a prop does lands at the edge, never in the machine:
+
+| A prop that…            | …goes here                      |
+| ----------------------- | ------------------------------- |
+| **configures** behavior | seeded into `context` once      |
+| **fires a callback**    | a **reaction** on the connector |
+| **is controlled** state | resolved into the initial state |
+
+So `onOpenChange` fires like this: the machine just transitions `closed → open`
+and has no idea the callback exists; the **connector** notices `open` flipped and
+calls `props.onOpenChange` from the outside (see
+[Reactions](#reactions--firing-prop-callbacks-without-the-machine-knowing)).
+Platform-specific bits (a DOM `keydown` for Escape) live in the **target's
+effects** — e.g. the React bridge's `ComponentEffect` (see the React bindings) —
+which listens, applies any prop-gated veto, then sends the machine a plain event.
+The core stays pure throughout.
 
 ---
 
 ## API at a glance
 
-| Export                               | What it is                                                                                                                      |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `machine(config)`                    | build a service (stopped); `.start()` / `.stop()` / `.send()` / `.state` / `.context` / `.computed` / `.subscribe` / `.select`  |
-| `withAdapter(config, adapter)`       | merge a platform's `actions` + `effects` into a config                                                                          |
-| `connector(service, connect, props)` | live, memoized, subscribable view snapshot                                                                                      |
-| `compose({ a, b })`                  | run several machines as one (orthogonal regions): bundled `start`/`stop` + `.sync()` + `.combine()`                            |
-| `and` / `or` / `not`                 | guard combinators                                                                                                               |
-| `oneOf([...])`                       | conditional action branch                                                                                                       |
-| `MACHINE_INIT`                       | the synthetic event fired when effects/watchers boot on `start()`                                                               |
-| `createContext` / `createState`      | the underlying building blocks (advanced)                                                                                       |
-| Types                                | `Machine`, `TransitionConfig`, `Guard`, `Action`, `Effect`, `Delay`, `Selection`, `Connect`, `EventBindings`, `AttrBindings`, … |
+| Export                               | What it is                                                                                                                              |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `machine(config)`                    | build a service (stopped); `.start()` / `.stop()` / `.send()` / `.state` / `.context` / `.computed` / `.subscribe` / `.select`          |
+| `withAdapter(config, adapter)`       | merge a platform's `actions` + `effects` into a config                                                                                  |
+| `connector(service, connect, props)` | live, memoized, subscribable view snapshot; `.snapshot` / `.subscribe` / `.select` / `.setProps` / `.reactions()` (fire prop-callbacks) |
+| `compose({ a, b })`                  | run several machines as one (orthogonal regions): bundled `start`/`stop` + `.sync()` + `.combine()`                                     |
+| `and` / `or` / `not`                 | guard combinators                                                                                                                       |
+| `oneOf([...])`                       | conditional action branch                                                                                                               |
+| `MACHINE_INIT`                       | the synthetic event fired when effects/watchers boot on `start()`                                                                       |
+| `createContext` / `createState`      | the underlying building blocks (advanced)                                                                                               |
+| Types                                | `Machine`, `TransitionConfig`, `Guard`, `Action`, `Effect`, `Delay`, `Selection`, `Connect`, `EventBindings`, `AttrBindings`, …         |
 
 ---
 
@@ -523,6 +545,7 @@ c.snapshot // memoized api; identity is stable until something changes
 c.subscribe(rerender) // coarse — wake the view
 c.select // forwarded fine-grained path
 c.setProps(newProps) // props are a reactive input; recomputes the snapshot
+const off = c.reactions() // activate prop-callback reactions; off() tears down
 ```
 
 `c.snapshot`'s identity changes only when the machine (or props) changes — so it
@@ -536,6 +559,60 @@ read.
 > (`onClick`, `aria-describedby`) — so the same `connect` can target the DOM,
 > React Native, or any other surface.
 
+### Reactions — firing prop-callbacks without the machine knowing
+
+Because [the machine never sees props](#the-machine-never-sees-props),
+a callback like `onOpenChange` can't fire from inside it. A **reaction** is how
+the connector bridges that gap from the _outside_: a declared
+`{ selector, callback }` pair that watches a value derived from machine state
+and, when it changes, calls the matching prop.
+
+```ts
+// declared on connect (agnostic — no DOM, no framework):
+connectTooltip.reactions = [
+  {
+    selector: m => m.matches('open') || m.matches('closing'), // a fact about state
+    callback: (open, props) => props.onOpenChange?.({ open }), // → the consumer's callback
+  },
+]
+```
+
+The machine just transitions `closed → open`; it has no idea `onOpenChange`
+exists. The connector runs `selector` as a value-deduped `select(...)`, and when
+the result flips it calls `callback` with the **current** props (so a swapped
+callback is always the one that fires). This is the inversion from Zag for exmaple, which
+fires the same callback as an `invokeOnOpen` _action inside_ the machine — here
+the firing is pulled out to the edge, which is what keeps the machine pure.
+
+`selector` is always a **function** (no state-name shorthand): it reads whatever
+it needs off the machine — `m.matches('open')` for a state-based reaction, or
+`m.context.highlightedValue` for a value-based one — so a single shape covers
+every reaction whether it keys off state or context.
+
+Reactions are **inert until activated**: the bridge calls `c.reactions()` inside
+its lifecycle and runs the returned teardown on unmount — so the subscriptions
+are created and destroyed together:
+
+```ts
+useEffect(() => {
+  service.start()
+  const off = conn.reactions() // wire reactions when the machine boots
+  return () => {
+    off() // tear down with the machine
+    service.stop()
+  }
+}, [service, conn])
+```
+
+Contrast with the **target's effects**: a reaction is for pure state→callback
+(portable, declared once, runs on every target). Anything needing the platform
+itself — a DOM `keydown` listener for Escape — lives in the target's effect
+layer (the React bridge's `ComponentEffect`), which gates it and then `send()`s a
+plain event the machine already handles.
+
+- reaction = agnostic edge (state → callback, every target)
+- target effect = platform edge (DOM/RN listeners → `send()`)
+
 ---
 
 ## Composing machines
@@ -548,8 +625,12 @@ each dimension is its own machine, and `compose` runs them as one unit
 ```ts
 import { compose } from '@render-experiment/machine-core'
 
-const popup = machine({ /* closed / open */ })
-const submenu = machine({ /* none / shown */ })
+const popup = machine({
+  /* closed / open */
+})
+const submenu = machine({
+  /* none / shown */
+})
 
 const combobox = compose({ popup, submenu })
 combobox.start() // starts every member; .stop() stops all + disposes the helpers below

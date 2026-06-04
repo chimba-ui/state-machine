@@ -38,34 +38,41 @@ export function useMachine<
 ): { api: Api; machine: ReturnType<typeof machine<State, Context, Event, Computed>> } {
   // Build machine + connector once. The first render's props seed context +
   // initial state; the adapter supplies platform effects.
-  const { service, conn } = useMemo(
+  const { service, connection } = useMemo(
     () => {
       const service = machine(withAdapter(createConfig(props), adapter))
-      const conn = connector(service, connect, props)
-      return { service, conn }
+      const connection = connector(service, connect, props)
+      return { service, connection }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
 
-  // Keep consumer props fresh every render (controlled flags, callbacks).
-  conn.setProps(props)
+  // Keep consumer props fresh (controlled flags, callbacks) — but in a PASSIVE
+  // effect, never during render. setProps writes a signal the snapshot reads;
+  // doing it in the render body would notify useSyncExternalStore mid-render and
+  // loop ("cannot update a component while rendering"). The connector was seeded
+  // with the first render's props in useMemo, so the initial snapshot is correct;
+  // this only pushes subsequent changes. setProps value-dedups, so a consumer
+  // that rebuilds an equal props object each render doesn't churn.
+  useEffect(() => {
+    connection.setProps(props)
+  })
 
-  // Lifecycle: boot effects on mount, tear down on unmount.
+  // Lifecycle: boot on mount, tear down on unmount. The connector wired its
+  // reactions to the machine's start/stop, so start()/stop() is all the bridge
+  // needs — reactions follow automatically, StrictMode remount included.
   useEffect(() => {
     service.start()
-    return () => {
-      conn.dispose()
-      service.stop()
-    }
-  }, [service, conn])
+    return () => service.stop()
+  }, [service])
 
   // Drive re-renders off the connector's stable, memoized snapshot.
   useSyncExternalStore(
-    conn.subscribe,
-    () => conn.snapshot,
-    () => conn.snapshot,
+    connection.subscribe,
+    () => connection.snapshot,
+    () => connection.snapshot,
   )
 
-  return { api: conn.snapshot, machine: service }
+  return { api: connection.snapshot, machine: service }
 }

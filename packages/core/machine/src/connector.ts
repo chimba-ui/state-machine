@@ -49,12 +49,21 @@ export function connector<
     }),
   )
 
-  // Register the component's declared reactions (state-change → prop-callback),
-  // ONCE. Each watches its selection (value-deduped) and fires onChange with the
-  // current props. Disposed via the connector's dispose().
-  const reactionOffs = (connect.reactions ?? []).map(r => {
-    const sel = service.select(() => r.select(service))
-    return sel.subscribe(value => r.onChange(value, propsSig.value))
+  // Reactions (declared state-change → prop-callback) live exactly as long as
+  // the machine runs: wired on every start(), torn down on stop(). Hooking the
+  // machine's own lifecycle (not the connector's construction) means a restart —
+  // notably React StrictMode's mount→unmount→mount — cleanly re-establishes them
+  // without the bridge threading any teardown. Symmetric with effects/watchers.
+  let reactionOffs: Array<() => void> = []
+  service.onStart(() => {
+    reactionOffs = (connect.reactions ?? []).map(r => {
+      const sel = service.select(() => r.selector(service))
+      return sel.subscribe(value => r.callback(value, propsSig.value))
+    })
+  })
+  service.onStop(() => {
+    for (const off of reactionOffs) off()
+    reactionOffs = []
   })
 
   return {
@@ -70,10 +79,25 @@ export function connector<
     },
     select: service.select,
     setProps(props) {
+      // Value-dedup: consumers often rebuild an equal props object every render
+      // (new identity, same values). Writing the signal then would needlessly
+      // recompute the snapshot and wake every subscriber. Skip when shallow-equal.
+      if (shallowEqual(propsSig.peek(), props)) return
       propsSig.value = props
     },
-    dispose() {
-      for (const off of reactionOffs) off()
-    },
   }
+}
+
+function shallowEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true
+  if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false
+  const ak = Object.keys(a as object)
+  const bk = Object.keys(b as object)
+  if (ak.length !== bk.length) return false
+  for (const k of ak) {
+    if (!Object.is((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])) {
+      return false
+    }
+  }
+  return true
 }

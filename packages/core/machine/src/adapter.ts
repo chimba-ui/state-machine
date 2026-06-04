@@ -24,7 +24,10 @@ export function withAdapter<
   return {
     ...config,
     implementations: {
-      guards: base?.guards,
+      // Carry everything through (delays, guards, …); the adapter only layers
+      // over actions + effects. Spreading base first keeps non-overridable
+      // implementations (notably `delays`) intact.
+      ...base,
       actions: { ...base?.actions, ...adapter.actions },
       effects: { ...base?.effects, ...adapter.effects },
     },

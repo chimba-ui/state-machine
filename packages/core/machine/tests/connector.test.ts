@@ -137,13 +137,13 @@ describe('connector reactions', () => {
   const connect = Object.assign((s: { state: 'a' | 'b' }) => ({ state: s.state }), {
     reactions: [
       {
-        select: (m: { matches: (n: 'a' | 'b') => boolean }) => m.matches('b'),
-        onChange: (inB: boolean, props: RProps) => props.onB?.(inB),
+        selector: (m: { matches: (n: 'a' | 'b') => boolean }) => m.matches('b'),
+        callback: (inB: boolean, props: RProps) => props.onB?.(inB),
       },
     ],
   })
 
-  it('fires a reaction on the selected value change, with current props; not on setup', () => {
+  it('fires a reaction on the selected value change once the machine starts', () => {
     const m = machine<'a' | 'b', object, { type: 'toB' }>({
       initial: 'a',
       context: {},
@@ -151,25 +151,46 @@ describe('connector reactions', () => {
     })
     const onB = vi.fn()
     connector(m, connect, { onB })
+    m.start() // connector wired its reactions to the machine's start
     expect(onB).not.toHaveBeenCalled() // no fire on setup
     m.send({ type: 'toB' }) // state a→b → reaction fires with current props.onB
     expect(onB).toHaveBeenCalledWith(true)
   })
 
-  it('dispose() tears the reaction down', () => {
+  it('reactions stay inert until the machine starts', () => {
+    const m = machine<'a' | 'b', object, { type: 'toB' }>({
+      initial: 'a',
+      context: {},
+      states: { a: { on: { toB: { target: 'b' } } }, b: {} },
+    })
+    const onB = vi.fn()
+    connector(m, connect, { onB })
+    // Not started → no reaction even on a real transition.
+    m.send({ type: 'toB' })
+    expect(onB).not.toHaveBeenCalled()
+  })
+
+  it('stop() tears reactions down; a restart re-establishes them', () => {
     const m = machine<'a' | 'b', object, { type: 'toB' | 'toA' }>({
       initial: 'a',
       context: {},
       states: { a: { on: { toB: { target: 'b' } } }, b: { on: { toA: { target: 'a' } } } },
     })
     const onB = vi.fn()
-    const c = connector(m, connect, { onB })
+    connector(m, connect, { onB })
+    m.start()
     m.send({ type: 'toB' })
     expect(onB).toHaveBeenCalledTimes(1)
-    c.dispose()
+    m.stop() // reactions torn down with the machine
     m.send({ type: 'toA' })
-    m.send({ type: 'toB' }) // reaction disposed → no further calls
+    m.send({ type: 'toB' }) // stopped → no reaction fire
     expect(onB).toHaveBeenCalledTimes(1)
+    // Restart (e.g. StrictMode remount) re-wires them — they fire again.
+    m.start()
+    onB.mockClear()
+    m.send({ type: 'toA' }) // b→a → selector true→false → fire
+    m.send({ type: 'toB' }) // a→b → selector false→true → fire
+    expect(onB).toHaveBeenCalledTimes(2)
   })
 
   it('reads the latest props via setProps when the reaction fires', () => {
@@ -181,6 +202,7 @@ describe('connector reactions', () => {
     const first = vi.fn()
     const second = vi.fn()
     const c = connector(m, connect, { onB: first })
+    m.start()
     c.setProps({ onB: second }) // swap the callback before the reaction fires
     m.send({ type: 'toB' })
     expect(first).not.toHaveBeenCalled()

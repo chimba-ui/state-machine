@@ -95,7 +95,9 @@ shared                                cross-target, cross-component artifacts
 
 <target>                              one substrate (react, native, …)
 ├── machine                           runtime, hooks, and props translator for this target
-│   ├── use-machine / use-api         lifecycle bridge for hook-based targets (react, native)
+│   ├── use-machine                   lifecycle bridge (build + start/stop + useSyncExternalStore)
+│   ├── use-effects                   runs a component's ComponentEffect (prop-dep'd transport)
+│   ├── use-selector                  fine-grained leaf subscription (O(readers))
 │   └── normalize                     bindings → target props
 │
 └── components
@@ -210,14 +212,27 @@ previously a `core/store` package; that's been removed. Per-machine state is
 the engine's own signal-based context, and a small shared store for the few
 genuine singletons is still to be (re)introduced.
 
-### Host declares effects consumers implement them
+### Two kinds of substrate effect
 
-Some effects only make sense per substrate: a `trackEscapeKey` effect
-on web uses `document.addEventListener`; on RN it uses `BackHandler`;
-on a TV remote app it'd watch the remote's events. The machine declares
-the effect by _name_ and provides a no-op placeholder; each adapter
-overrides the named entry via `withAdapter()`. This keeps the machine
-substrate-free without losing the contract.
+A behavior that touches the platform lives in one of two places, depending on
+whether the **machine** schedules it or the **view** does:
+
+1. **Machine effect (`withAdapter`)** — an effect the machine runs on entering a
+   state, named in the config and implemented per substrate. The machine
+   declares it by _name_; each target supplies the implementation via
+   `withAdapter()` (web `addEventListener`, RN `BackHandler`, …). Use this when
+   the machine owns the lifecycle (effect scoped to a state) and the effect needs
+   no props.
+
+2. **Component effect (`ComponentEffect`)** — a view-side, **prop-dependent**
+   listener that the machine can't own because [it never sees props](packages/core/machine/README.md#the-machine-never-sees-props).
+   The tooltip's real Escape is this: it needs `closeOnEscape` and a prevent-able
+   `onEscapeKeyDown` veto. It lives in the target's `effects.ts` as a plain
+   `(machine, props) => cleanup` + the prop names it depends on; the generated
+   `useApi` owns the `useEffect` (see the React bindings' `useEffects`). The
+   agnostic _decision_ still lives in core (`resolveEscape`); only the DOM
+   listener is per-target. On accept it `send()`s a plain event the machine
+   already understands.
 
 ## The codegen pipeline
 

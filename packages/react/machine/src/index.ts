@@ -1,4 +1,5 @@
 export { useMachine } from './use-machine'
+export { useEffects, type ComponentEffect } from './use-effects'
 export { useSelector } from './use-selector'
 export { normalize, type Bindings } from './normalize'
 export { mergeProps } from './merge-props'

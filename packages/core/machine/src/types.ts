@@ -310,6 +310,13 @@ export interface Machine<
   /** Run all active effect/watcher cleanups and mark stopped. Consumer
    * subscriptions (subscribe/select) are the consumer's to dispose. */
   stop: () => void
+  /** Register a listener fired on every `start()` (and immediately if already
+   * running). Returns an unregister. Lets an outer layer hang start-scoped work
+   * off the lifecycle — e.g. the connector wiring its reactions. */
+  onStart: (fn: () => void) => () => void
+  /** Register a listener fired on every `stop()`. Returns an unregister.
+   * The teardown counterpart to onStart. */
+  onStop: (fn: () => void) => () => void
 }
 
 // -----------------------------------------------------------------------------
@@ -332,8 +339,8 @@ export interface ConnectSnapshot<
 }
 
 /**
- * A substrate-agnostic reaction: when the value `select` derives from the
- * machine changes, the connector calls `onChange(value, props)`. This is how a
+ * A substrate-agnostic reaction: when the value `selector` derives from the
+ * machine changes, the connector calls `callback(value, props)`. This is how a
  * component declares "machine-state change → consumer callback" ONCE (e.g.
  * `onOpenChange`), fired identically on every target — the machine never reads
  * props or fires callbacks itself. (Platform-specific reactions like a DOM
@@ -347,8 +354,8 @@ export interface Reaction<
   Computed = Record<string, never>,
   Value = unknown,
 > {
-  select: (machine: Machine<State, Context, Event, Computed>) => Value
-  onChange: (value: Value, props: Props) => void
+  selector: (machine: Machine<State, Context, Event, Computed>) => Value
+  callback: (value: Value, props: Props) => void
 }
 
 /**
@@ -385,7 +392,8 @@ export interface Connector<
   select: Select<State, Context, Computed>
   /** Update consumer props (a reactive input) — recomputes snapshot + wakes. */
   setProps: (props: Props) => void
-  /** Tear down the connector's reaction subscriptions (the bridge calls this on
-   * unmount). Does not stop the machine — lifecycle is the bridge's. */
-  dispose: () => void
 }
+
+// Reactions (state-change → prop-callback) are wired automatically: the
+// connector hooks the machine's onStart/onStop, so they live exactly as long as
+// the machine runs — no manual activation, and a restart re-establishes them.

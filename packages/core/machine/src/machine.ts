@@ -298,18 +298,37 @@ export function machine<
   // regardless of `running` (transitions are pure state); effects, watchers, and
   // timers only run while running, so a stopped machine mutates state without
   // side-effects.
+  // Lifecycle listeners. `onStart`/`onStop` let an OUTER layer (the connector)
+  // hang start/stop-scoped work off the machine's lifecycle without the machine
+  // knowing what it is — e.g. the connector wires its reactions on start and
+  // tears them down on stop, symmetric with effects/watchers. Both fire on every
+  // start/stop (a machine can restart), so listeners must be idempotent.
+  const startListeners = new Set<() => void>()
+  const stopListeners = new Set<() => void>()
+  const onStart = (fn: () => void) => {
+    startListeners.add(fn)
+    if (running) fn() // already running → run now so late registrants don't miss it
+    return () => startListeners.delete(fn)
+  }
+  const onStop = (fn: () => void) => {
+    stopListeners.add(fn)
+    return () => stopListeners.delete(fn)
+  }
+
   let running = false
   const start = () => {
     if (running) return
     running = true
     startWatchers()
     startEffects(config.initial, { type: MACHINE_INIT } as Event)
+    for (const fn of startListeners) fn()
   }
   const stop = () => {
     if (!running) return
     running = false
     stopEffects(st.state)
     stopWatchers() // watchers span the whole run — torn down here, not on exit
+    for (const fn of stopListeners) fn()
   }
 
   // Coarse subscribe: one preact effect reads the state + every context cell, so
@@ -382,5 +401,7 @@ export function machine<
     select,
     start,
     stop,
+    onStart,
+    onStop,
   }
 }
