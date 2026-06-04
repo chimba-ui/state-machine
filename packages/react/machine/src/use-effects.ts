@@ -1,18 +1,18 @@
 import { useEffect } from 'react'
 
 /**
- * A component's substrate-specific effect, declared as a plain
- * setup/teardown function plus the prop names it depends on:
+ * One substrate-specific effect, declared as a plain setup/teardown function
+ * plus the prop names it depends on:
  *
- *   const tooltipEffects: ComponentEffect<TooltipMachine, TooltipMachineProps> = [
+ *   const escape: ComponentEffect<Machine, Props> = [
  *     (machine, props) => { ...addEventListener...; return () => ...remove... },
  *     ['closeOnEscape', 'onEscapeKeyDown'], // re-run when these props change
  *   ]
  *
- * The author writes no React. The generated `useApi` runs it through
- * `useEffects`, which owns the `useEffect` and builds a precise dependency array
- * from the named props (so it re-subscribes only when one of them actually
- * changes — not every render, not stale). `machine` is always an implicit dep.
+ * The author writes no React. The deps are prop NAMES (typed `(keyof Props)[]`,
+ * so typos are compile errors); the bridge turns them into a precise React dep
+ * array, so the effect re-subscribes only when one of those props actually
+ * changes — not every render, never stale. `machine` is always an implicit dep.
  */
 export type ComponentEffect<Machine, Props> = [
   effect: (machine: Machine, props: Props) => (() => void) | void,
@@ -20,20 +20,36 @@ export type ComponentEffect<Machine, Props> = [
 ]
 
 /**
- * Run a `ComponentEffect` as a React effect. The dependency array is
- * `[machine, ...the named prop values]`, so the effect re-runs exactly when the
- * machine instance or one of its declared props changes.
+ * A component's full set of substrate effects — a list, since one component can
+ * have several independent effects with DIFFERENT deps (e.g. an Escape listener
+ * gated by `closeOnEscape` and a Tab trap gated by `focusTrap`). Each gets its
+ * own React effect so only the one whose dep changed re-subscribes.
+ *
+ * MUST be a stable module constant (e.g. `export const xEffects = [...]`): the
+ * bridge calls one `useEffect` per entry, so the list's length has to be
+ * identical across renders (React's rules-of-hooks). A static export guarantees
+ * that — never build this array conditionally or per-render.
+ */
+export type ComponentEffects<Machine, Props> = ComponentEffect<Machine, Props>[]
+
+/**
+ * Run a component's `ComponentEffects` — one React effect per entry, each with
+ * its own dependency array `[machine, ...the named prop values]`. The generated
+ * `useApi` calls this with the component's static effects export, so authors
+ * never touch `useEffect`.
  */
 export function useEffects<Machine, Props>(
-  effect: ComponentEffect<Machine, Props> | undefined,
+  effects: ComponentEffects<Machine, Props>,
   machine: Machine,
   props: Props,
 ): void {
-  const fn = effect?.[0]
-  const deps = effect?.[1] ?? []
-  useEffect(
-    () => (fn ? fn(machine, props) : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [machine, ...deps.map(k => props[k])],
-  )
+  // Safe to loop hooks: `effects` is a stable module constant (see the type
+  // doc), so the count never changes between renders.
+  for (const [fn, deps] of effects) {
+    useEffect(
+      () => fn(machine, props),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [machine, ...deps.map(k => props[k])],
+    )
+  }
 }
