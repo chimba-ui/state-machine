@@ -10,15 +10,16 @@ import {
 
 /**
  * The one generic React bridge. Every component's generated api.ts calls this
- * with three core pieces — a config factory, the connect, the per-target
+ * with the agnostic pieces — a config factory, the connect, the per-target
  * adapter — plus the resolved props:
  *
  *   useMachine(tooltipMachineConfig, connectTooltip, tooltipAdapter, props)
  *
  * It: builds the machine from props (with the adapter merged in), wraps it in a
- * connector, starts on mount / stops on unmount, keeps props fresh via
- * setProps, and drives React via useSyncExternalStore over the connector's
- * stable snapshot. Returns the connect() api.
+ * connector, starts on mount / stops on unmount (the connector's reactions
+ * follow the machine's lifecycle automatically), keeps props fresh via setProps,
+ * and drives React via useSyncExternalStore over the connector's stable
+ * snapshot. Returns the connect() api + the running machine.
  *
  * The machine is built ONCE (from the first render's props); later prop changes
  * flow through setProps — recreating would lose state.
