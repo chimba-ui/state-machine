@@ -3,7 +3,6 @@
  * Recompute only when a read input changes; available in guard/action/effect
  * params, and surfaced on the machine as `m.computed.x` (a tracked read).
  */
-import { effect } from '@preact/signals-core'
 import { machine } from '../src'
 import { describe, expect, it } from 'vitest'
 
@@ -277,7 +276,7 @@ describe('surfaced on the machine', () => {
     expect(m.computed.count).toBe(1)
   })
 
-  it('reading m.computed.x is tracked — a preact effect re-runs on change', () => {
+  it('a computed selection fires on change and dedups (value-gated)', () => {
     const m = machine<'idle', { n: number }, { type: 'inc' }, { double: number }>({
       initial: 'idle',
       context: { n: 1 },
@@ -289,14 +288,12 @@ describe('surfaced on the machine', () => {
       },
     })
     const seen: number[] = []
-    const dispose = effect(() => {
-      seen.push(m.computed.double) // subscribes to the computed signal
-    })
-    m.send({ type: 'inc' }) // n 1→2 → double 2→4 → effect re-runs
-    m.send({ type: 'inc' }) // n 2→3 → double 4→6 → effect re-runs
-    dispose()
-    m.send({ type: 'inc' }) // disposed → no further pushes
-    expect(seen).toEqual([2, 4, 6])
+    const off = m.select.computed('double').subscribe(v => seen.push(v))
+    m.send({ type: 'inc' }) // n 1→2 → double 2→4 → fires
+    m.send({ type: 'inc' }) // n 2→3 → double 4→6 → fires
+    off()
+    m.send({ type: 'inc' }) // unsubscribed → no further pushes
+    expect(seen).toEqual([4, 6]) // fires on change (does not fire on subscribe)
   })
 
   it('m.computed reflects chained computeds too', () => {

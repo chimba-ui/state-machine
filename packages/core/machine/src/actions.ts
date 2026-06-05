@@ -1,4 +1,4 @@
-import type { OneOf, OneOfBranch } from './types'
+import type { ActionArg, OneOf, OneOfBranch } from './types'
 
 /**
  * `oneOf([...])` is the conditional-action analog of fallthrough transitions:
@@ -19,4 +19,23 @@ export function oneOf<Context, Event, Computed = Record<string, never>>(
   branches: Array<OneOfBranch<Context, Event, Computed>>,
 ): OneOf<Context, Event, Computed> {
   return { __oneOf: true, branches }
+}
+
+/**
+ * Recognize a `oneOf(...)` sentinel in an actions list. Lives next to `oneOf`
+ * (the only place that stamps `__oneOf`) so the marker has a single source of
+ * truth. The runtime uses this to expand a oneOf into its winning branch.
+ *
+ * Generic over the action-arg union so it narrows to the SAME Context/Event/
+ * Computed as the value passed in (rather than defaulting to `unknown`), keeping
+ * `branch.actions` correctly typed at the call site.
+ */
+export function isOneOf<Context, Event, Computed>(
+  action: ActionArg<Context, Event, Computed>,
+): action is OneOf<Context, Event, Computed> {
+  return (
+    typeof action === 'object' &&
+    action !== null &&
+    (action as { __oneOf?: boolean }).__oneOf === true
+  )
 }

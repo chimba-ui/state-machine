@@ -1,45 +1,56 @@
-import { batch, signal, type Signal } from '@preact/signals-core'
-
 /**
- * Build the reactive context from a plain initial object.
+ * Context — the machine's reactive data, held as a PLAIN object.
  *
- * Returns:
- *   - `context`: a read view. `context.field` is a getter over the field's
- *     signal — reading it inside a tracked scope subscribes the reader to just
- *     that field.
- *   - `setContext(patch)`: the single write entry point. Batched so a
- *     multi-field patch notifies each subscriber at most once; signals' own
- *     Object.is skips no-op writes.
+ * Reads are plain property access (`context.field`). Writes go through one entry
+ * point, `setContext({ field })`, which shallow-equal-dedups (a no-op write is
+ * skipped) and, on a real change, calls `notify()` so observers (`subscribe` /
+ * `select`) re-evaluate.
  *
- * The setup loop runs once per machine (never on read/write), so per-read cost
- * is a plain accessor — no Proxy.
+ * Copy-on-write: the backing object starts as the SHARED config reference and is
+ * copied on the first write, so an idle/never-written machine costs zero
+ * per-field bytes beyond a shared pointer (flat memory in field count); the
+ * original object is never mutated.
+ *
+ * The returned `context` is a STABLE wrapper whose per-field getters read the
+ * current backing object — so `const { context } = createContext(...)` stays
+ * valid across writes (destructuring snapshots the wrapper, not a value). The
+ * assembled machine doesn't use this wrapper; it reads its own `this.ctx`
+ * directly. This helper is for advanced composition / tests.
  */
 export function createContext<Context extends object>(
   initial: Context,
+  notify: () => void = () => {},
 ): {
   context: Context
   setContext: (patch: Partial<Context>) => void
 } {
-  const cells = {} as { [K in keyof Context]: Signal<Context[K]> }
-  const context = {} as Context
-
-  for (const key in initial) {
-    const k = key as keyof Context
-    const cell = signal(initial[k])
-    cells[k] = cell
-    Object.defineProperty(context, k, {
-      get: () => cell.value,
-      enumerable: true,
-      configurable: false,
-    })
-  }
+  let backing = initial
+  let owns = false
 
   const setContext = (patch: Partial<Context>) => {
-    batch(() => {
-      for (const key in patch) {
-        const cell = cells[key as keyof Context]
-        if (cell) cell.value = patch[key as keyof Context]!
+    let changed = false
+    for (const key in patch) {
+      if (!Object.is(backing[key as keyof Context], patch[key as keyof Context])) {
+        changed = true
+        break
       }
+    }
+    if (!changed) return
+    if (!owns) {
+      backing = { ...backing }
+      owns = true
+    }
+    Object.assign(backing, patch)
+    notify()
+  }
+
+  // Stable wrapper: one getter per key, reading the (possibly copied) backing
+  // object. Destructure-safe — the wrapper identity never changes.
+  const context = {} as Context
+  for (const key in initial) {
+    Object.defineProperty(context, key, {
+      get: () => backing[key as keyof Context],
+      enumerable: true,
     })
   }
 

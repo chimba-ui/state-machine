@@ -1,7 +1,22 @@
-import { computed as preactComputed, effect as preactEffect } from '@preact/signals-core'
+/**
+ * The single public factory. `machine(config)` builds a stopped service that
+ * composes every concern — context, state, queued transitions, guards, actions,
+ * effects, computed, the subscription surface — into one running instance. It is
+ * BUILT but not running: `.start()` boots its effects, `.stop()` runs their
+ * cleanups. Reads are plain getters; observe via subscribe (coarse) / select
+ * (value-deduped).
+ *
+ * Implemented as a class so the engine logic lives on the prototype (one shared
+ * copy) and each instance holds only data — the per-machine footprint is flat in
+ * field/state count (no per-field reactive cell, no per-instance closure tree).
+ * The reactivity kernel is a tiny coarse bus: a write (`setContext` / state
+ * change) bumps `version` and notifies every listener; `select` re-evaluates +
+ * value-compares so it fires only on a real change (O(changed) at the listener),
+ * and `computed` memoizes against `version`. No external reactivity dependency.
+ */
+import { isOneOf } from './actions'
 import { MACHINE_INIT } from './constants'
-import { createContext } from './context'
-import { createState } from './state'
+import { tagsForNodes } from './state'
 import type {
   ActionArg,
   GuardArg,
@@ -17,19 +32,445 @@ import type {
 
 const isDev = process.env.NODE_ENV !== 'production'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Any = any
+
+class MachineImpl<
+  State extends string,
+  Context extends object,
+  Event extends { type: string },
+  Computed,
+> {
+  config: TransitionConfig<State, Context, Event, Computed>
+  ctx: Context
+  stateValue: State
+  tagsOf: Record<State, ReadonlySet<string>>
+  // Monotonic change counter, bumped on every notify. Lets `computed` memoize
+  // (recompute only when something changed since its last read) without per-field
+  // dependency tracking.
+  version = 0
+  // The coarse notification bus: listeners under subscribe + select.
+  bus = new Set<() => void>()
+  queue: Event[] = []
+  draining = false
+  running = false
+  activeCleanups: Array<() => void> = []
+  watcherCleanups: Array<() => void> = []
+  // lazily created — a machine with no reactions/connector pays nothing
+  startListeners: Set<() => void> | null = null
+  stopListeners: Set<() => void> | null = null
+  computed: Computed
+  // Copy-on-write: share the config's context object until the first write, then
+  // own a private copy. An idle/never-written machine costs zero per-instance
+  // context bytes beyond a shared pointer — flat memory regardless of field
+  // count. `ownsCtx` flips on first setContext; the config object is never mutated.
+  ownsCtx = false
+  // stable bound refs handed to actions/effects (the only per-instance closures)
+  setContext: (patch: Partial<Context>) => void
+  send: (event: Event) => void
+
+  constructor(config: TransitionConfig<State, Context, Event, Computed>) {
+    this.config = config
+    this.ctx = config.context // SHARED ref (copy-on-write below)
+    this.stateValue = config.initial
+    // shared per-config tag sets (not rebuilt per instance) — see tagsForNodes
+    this.tagsOf = tagsForNodes(config.states as Record<State, { tags?: string[] }>)
+
+    // Computed bag with read-key tracking: each def records exactly which
+    // context keys and which other computeds it read (via a tracking proxy on
+    // first/every recompute), and only recomputes when one of THOSE inputs
+    // changed — not on any context write. This keeps signal-level laziness (an
+    // expensive computed in a churny machine doesn't recompute when an unrelated
+    // field moves) without per-field reactive cells. Chains resolve transitively
+    // and glitch-free: a dep on another computed is checked by reading that
+    // computed (which lazily recomputes itself first if stale).
+    this.computed = {} as Computed
+    if (config.computed) {
+      for (const key in config.computed) {
+        const k = key as keyof Computed
+        const def = config.computed[k]
+        let computedOnce = false
+        let cachedValue: Computed[keyof Computed]
+        // recorded deps from the last run: context keys + computed keys read
+        let ctxDeps: string[] = []
+        let computedDeps: string[] = []
+        let ctxSnapshot: Record<string, unknown> = {}
+        let computedSnapshot: Record<string, unknown> = {}
+
+        const stale = (): boolean => {
+          for (const dk of ctxDeps) {
+            if (!Object.is(ctxSnapshot[dk], (this.ctx as Record<string, unknown>)[dk])) return true
+          }
+          // reading a computed dep below resolves ITS staleness first, so a
+          // transitive change surfaces as a value difference here
+          for (const dk of computedDeps) {
+            if (!Object.is(computedSnapshot[dk], (this.computed as Record<string, unknown>)[dk]))
+              return true
+          }
+          return false
+        }
+
+        Object.defineProperty(this.computed, k, {
+          enumerable: true,
+          get: () => {
+            if (computedOnce && !stale()) return cachedValue
+            // recompute under tracking proxies that record which keys are read
+            const ctxRead = new Set<string>()
+            const computedRead = new Set<string>()
+            const trackedCtx = new Proxy(this.ctx as Record<string, unknown>, {
+              get: (t, p: string) => {
+                ctxRead.add(p)
+                return t[p]
+              },
+            })
+            const trackedComputed = new Proxy(this.computed as Record<string, unknown>, {
+              get: (t, p: string) => {
+                computedRead.add(p)
+                return t[p]
+              },
+            })
+            cachedValue = def({
+              context: trackedCtx as Context,
+              computed: trackedComputed as Computed,
+            }) as Computed[keyof Computed]
+            ctxDeps = [...ctxRead]
+            computedDeps = [...computedRead]
+            ctxSnapshot = {}
+            for (const dk of ctxDeps) ctxSnapshot[dk] = (this.ctx as Record<string, unknown>)[dk]
+            computedSnapshot = {}
+            for (const dk of computedDeps) {
+              computedSnapshot[dk] = (this.computed as Record<string, unknown>)[dk]
+            }
+            computedOnce = true
+            return cachedValue
+          },
+        })
+      }
+    }
+
+    this.setContext = patch => {
+      let changed = false
+      for (const key in patch) {
+        if (!Object.is((this.ctx as Any)[key], (patch as Any)[key])) {
+          changed = true
+          break
+        }
+      }
+      if (!changed) return
+      // copy-on-first-write: stop sharing the config's object before mutating
+      if (!this.ownsCtx) {
+        this.ctx = { ...this.ctx } as Context
+        this.ownsCtx = true
+      }
+      Object.assign(this.ctx, patch)
+      this.bump()
+    }
+    this.send = event => this.doSend(event)
+  }
+
+  // ---- kernel notify ----
+  private bump(): void {
+    this.version++
+    // copy guard: a listener may unsubscribe (or subscribe) during iteration
+    for (const l of [...this.bus]) l()
+  }
+
+  // ---- reads ----
+  get state(): State {
+    return this.stateValue
+  }
+  get context(): Context {
+    return this.ctx
+  }
+  hasTag = (tag: string): boolean => this.tagsOf[this.stateValue].has(tag)
+  matches = (name: State): boolean => this.stateValue === name
+
+  private setState(next: State): void {
+    if (next === this.stateValue) return
+    this.stateValue = next
+    this.bump()
+  }
+
+  // ---- guards / resolution ----
+  private guardParams(event: Event): GuardParams<Context, Event, Computed> {
+    const params: GuardParams<Context, Event, Computed> = {
+      context: this.ctx,
+      event,
+      computed: this.computed,
+      guard: g => this.resolveGuard(g, params),
+    }
+    return params
+  }
+  private resolveGuard(
+    guard: GuardArg<Context, Event, Computed>,
+    params: GuardParams<Context, Event, Computed>,
+  ): boolean {
+    if (typeof guard === 'function') return guard(params)
+    const fn = this.config.implementations?.guards?.[guard]
+    if (!fn) {
+      const msg = `[machine] no guard "${guard}"`
+      if (isDev) throw new Error(msg)
+      console.warn(msg)
+      return false
+    }
+    return fn(params)
+  }
+  private resolve(
+    entry: TransitionEntry<State, Context, Event, Computed> | undefined,
+    event: Event,
+  ): Transition<State, Context, Event, Computed> | undefined {
+    if (!entry) return undefined
+    const list = Array.isArray(entry) ? entry : [entry]
+    const params = this.guardParams(event)
+    return list.find(t => (t.guard ? this.resolveGuard(t.guard, params) : true))
+  }
+
+  // ---- actions ----
+  private runAction(action: ActionArg<Context, Event, Computed>, event: Event): void {
+    if (isOneOf(action)) {
+      const params = this.guardParams(event)
+      const branch = action.branches.find((b: Any) =>
+        b.guard ? this.resolveGuard(b.guard, params) : true,
+      )
+      if (branch) this.runActions(branch.actions, event)
+      return
+    }
+    // past the oneOf guard, `action` is an inline fn or a registered name
+    const named = action as Exclude<typeof action, OneOf<Context, Event, Computed>>
+    const fn = typeof named === 'function' ? named : this.config.implementations?.actions?.[named]
+    if (!fn) {
+      const msg = `[machine] no action "${action as string}"`
+      if (isDev) throw new Error(msg)
+      console.warn(msg)
+      return
+    }
+    fn({
+      context: this.ctx,
+      setContext: this.setContext,
+      event,
+      send: this.send,
+      computed: this.computed,
+    })
+  }
+  private runActions(
+    actions: Array<ActionArg<Context, Event, Computed>> | undefined,
+    event: Event,
+  ): void {
+    if (!actions) return
+    for (const action of actions) this.runAction(action, event)
+  }
+
+  // ---- transition: exit (cleanup effects + exit actions) → transition actions →
+  // switch → entry actions + start effects. Self-transition (no state change)
+  // runs actions only, skipping exit/entry. Effect boot/cleanup only while running.
+  private applyTransition(t: Transition<State, Context, Event, Computed>, event: Event): void {
+    const cur = this.stateValue
+    const next = t.target ?? cur
+    const changed = next !== cur
+    if (changed) {
+      if (this.running) this.stopEffects()
+      this.runActions(this.config.states[cur].exit, event)
+    }
+    this.runActions(t.actions, event)
+    if (changed) {
+      this.setState(next)
+      this.runActions(this.config.states[next].entry, event)
+      if (this.running) this.startEffects(next, event)
+    }
+  }
+  // Queued: a re-entrant send (from an action) waits until the current drain ends.
+  private doSend(event: Event): void {
+    this.queue.push(event)
+    if (this.draining) return
+    this.draining = true
+    try {
+      while (this.queue.length) {
+        const e = this.queue.shift()!
+        const entry = this.config.states[this.stateValue].on?.[e.type] ?? this.config.on?.[e.type]
+        const t = this.resolve(entry, e)
+        if (t) this.applyTransition(t, e)
+      }
+    } finally {
+      this.draining = false
+    }
+  }
+
+  // ---- delays / after ----
+  private resolveDelay(key: string, event: Event): number {
+    const asNum = Number(key)
+    if (!Number.isNaN(asNum)) return asNum
+    const fn = this.config.implementations?.delays?.[key]
+    if (!fn) {
+      const msg = `[machine] no delay "${key}"`
+      if (isDev) throw new Error(msg)
+      console.warn(msg)
+      return 0
+    }
+    return fn(this.guardParams(event))
+  }
+  // A fired timer applies the first `after` transition whose guard passes — only
+  // if still in the scheduling state and still running. If a drain is in flight,
+  // defer to a microtask so it runs after the current transition completes.
+  private dispatchAfter(scheduledIn: State, key: string, event: Event): void {
+    if (!this.running || this.stateValue !== scheduledIn) return
+    if (this.draining) {
+      queueMicrotask(() => this.dispatchAfter(scheduledIn, key, event))
+      return
+    }
+    const t = this.resolve(this.config.states[scheduledIn].after?.[key], event)
+    if (!t) return
+    this.draining = true
+    try {
+      this.applyTransition(t, event)
+      while (this.queue.length) {
+        const e = this.queue.shift()!
+        const nx = this.resolve(
+          this.config.states[this.stateValue].on?.[e.type] ?? this.config.on?.[e.type],
+          e,
+        )
+        if (nx) this.applyTransition(nx, e)
+      }
+    } finally {
+      this.draining = false
+    }
+  }
+
+  // ---- effects: schedule `after` timers, then run state effects; stash cleanups ----
+  private startEffects(state: State, event: Event): void {
+    const after = this.config.states[state].after
+    if (after) {
+      for (const key in after) {
+        const ms = this.resolveDelay(key, event)
+        const id = setTimeout(() => this.dispatchAfter(state, key, event), ms)
+        this.activeCleanups.push(() => clearTimeout(id))
+      }
+    }
+    const effects = this.config.states[state].effects
+    if (!effects) return
+    for (const effect of effects) {
+      const fn =
+        typeof effect === 'function' ? effect : this.config.implementations?.effects?.[effect]
+      if (!fn) {
+        const msg = `[machine] no effect "${effect as string}"`
+        if (isDev) throw new Error(msg)
+        console.warn(msg)
+        continue
+      }
+      const cleanup = fn({
+        context: this.ctx,
+        setContext: this.setContext,
+        event,
+        send: this.send,
+        computed: this.computed,
+      })
+      if (typeof cleanup === 'function') this.activeCleanups.push(cleanup)
+    }
+  }
+  private stopEffects(): void {
+    for (const cleanup of this.activeCleanups) cleanup()
+    this.activeCleanups.length = 0
+  }
+
+  // ---- watch: machine-global data reaction. A bus listener re-reads the field
+  // and runs actions on a real change (no fire on setup). Cleanups live in their
+  // OWN list — watchers span the whole run, not a single state. ----
+  private readField(key: string): unknown {
+    return key in this.ctx
+      ? (this.ctx as Record<string, unknown>)[key]
+      : (this.computed as Record<string, unknown>)[key]
+  }
+  private startWatchers(): void {
+    const watch = this.config.watch
+    if (!watch) return
+    for (const key in watch) {
+      const actions = watch[key as keyof typeof watch]
+      if (!actions) continue
+      let prev = this.readField(key)
+      const listener = () => {
+        const next = this.readField(key)
+        if (Object.is(prev, next)) return
+        prev = next
+        this.runActions(actions, { type: MACHINE_INIT } as Event)
+      }
+      this.bus.add(listener)
+      this.watcherCleanups.push(() => this.bus.delete(listener))
+    }
+  }
+  private stopWatchers(): void {
+    for (const dispose of this.watcherCleanups) dispose()
+    this.watcherCleanups.length = 0
+  }
+
+  // ---- lifecycle: built stopped; send() works regardless of running (pure
+  // state), but effects/watchers/timers run only while running. ----
+  start = (): void => {
+    if (this.running) return
+    this.running = true
+    this.startWatchers()
+    this.startEffects(this.config.initial, { type: MACHINE_INIT } as Event)
+    if (this.startListeners) for (const fn of this.startListeners) fn()
+  }
+  stop = (): void => {
+    if (!this.running) return
+    this.running = false
+    this.stopEffects()
+    this.stopWatchers()
+    if (this.stopListeners) for (const fn of this.stopListeners) fn()
+  }
+  onStart = (fn: () => void): (() => void) => {
+    ;(this.startListeners ??= new Set()).add(fn)
+    if (this.running) fn() // already running → run now so a late registrant doesn't miss it
+    return () => this.startListeners?.delete(fn)
+  }
+  onStop = (fn: () => void): (() => void) => {
+    ;(this.stopListeners ??= new Set()).add(fn)
+    return () => this.stopListeners?.delete(fn)
+  }
+
+  // ---- subscription: coarse (any change) ----
+  subscribe = (listener: () => void): (() => void) => {
+    this.bus.add(listener)
+    return () => this.bus.delete(listener)
+  }
+
+  // A Selection re-evaluates its selector on every bus notify and fires its
+  // listener only when the selected value changes (Object.is default / equals).
+  // `value` is a plain eval. No fire on subscribe.
+  private makeSelection<Value>(selector: () => Value): Selection<Value> {
+    const bus = this.bus
+    return {
+      get value() {
+        return selector()
+      },
+      subscribe(listener, equals = Object.is) {
+        let prev = selector()
+        const l = () => {
+          const next = selector()
+          if (equals(prev, next)) return
+          prev = next
+          listener(next)
+        }
+        bus.add(l)
+        return () => bus.delete(l)
+      },
+    }
+  }
+  get select(): Select<State, Context, Computed> {
+    const sel = (<Value>(selector: () => Value) => this.makeSelection(selector)) as Select<
+      State,
+      Context,
+      Computed
+    >
+    sel.context = <K extends keyof Context>(key: K) => this.makeSelection(() => this.ctx[key])
+    sel.computed = <K extends keyof Computed>(key: K) =>
+      this.makeSelection(() => this.computed[key])
+    sel.state = () => this.makeSelection(() => this.stateValue)
+    return sel
+  }
+}
+
 /**
- * The single public factory. `machine(config)` builds a stopped service that
- * composes every concern — context, state, queued transitions, guards, actions,
- * effects, computed, the subscription surface — into one running instance. It is
- * BUILT but not running: `.start()` boots its effects, `.stop()` runs their
- * cleanups. Reads are tracked getters; observe via subscribe/select.
- *
- * The runtime is one closure on purpose: guards, actions, effects, computed,
- * transitions, watchers, and timers share mutable state (the event queue, the
- * `running` flag, the active-cleanup lists) and can't be split into modules
- * without threading that state around. The pure, standalone pieces (context,
- * state, guard combinators, oneOf, withAdapter, config, connector) live in their
- * own files; this file assembles them.
+ * Build a stopped machine service. See the file header for the architecture.
  */
 export function machine<
   State extends string,
@@ -39,369 +480,5 @@ export function machine<
 >(
   config: TransitionConfig<State, Context, Event, Computed>,
 ): Machine<State, Context, Event, Computed> {
-  const st = createState<State>(config.initial, config.states)
-  const { context, setContext } = createContext<Context>(config.context)
-
-  // Build the `computed` bag. Each def becomes a lazy, memoized preact
-  // computed() that auto-subscribes to whatever it reads and recomputes only
-  // when a read context cell (or other computed) changes. The bag is the SAME
-  // reference passed into every def, so a def reading `computed.other` chains
-  // correctly; the engine threads this bag into guard/action/effect params and
-  // surfaces it on the machine.
-  const computed = {} as Computed
-  if (config.computed) {
-    for (const key in config.computed) {
-      const k = key as keyof Computed
-      const def = config.computed[k]
-      const sig = preactComputed(() => def({ context, computed }))
-      Object.defineProperty(computed, k, {
-        get: () => sig.value,
-        enumerable: true,
-        configurable: false,
-      })
-    }
-  }
-
-  // Resolve a guard arg (inline fn or registered name) against params. Single
-  // channel so the combinators reuse it. Missing name → throw in dev, warn +
-  // false in prod.
-  const guardRegistry = config.implementations?.guards
-  const resolveGuard = (
-    guard: GuardArg<Context, Event, Computed>,
-    params: GuardParams<Context, Event, Computed>,
-  ): boolean => {
-    if (typeof guard === 'function') return guard(params)
-    const fn = guardRegistry?.[guard]
-    if (!fn) {
-      const msg = `[machine] no guard "${guard}"`
-      if (isDev) throw new Error(msg)
-      console.warn(msg)
-      return false
-    }
-    return fn(params)
-  }
-
-  // Build the params a guard receives for this event. `guard` lets a guard (or
-  // a combinator) resolve another guard against these same params.
-  const guardParams = (event: Event): GuardParams<Context, Event, Computed> => {
-    const params: GuardParams<Context, Event, Computed> = {
-      context,
-      event,
-      computed,
-      guard: g => resolveGuard(g, params),
-    }
-    return params
-  }
-
-  // Resolve an entry (single or array) to the first transition whose guard
-  // passes. No guard = always passes.
-  const resolve = (
-    entry: TransitionEntry<State, Context, Event, Computed> | undefined,
-    event: Event,
-  ) => {
-    if (!entry) return undefined
-    const list = Array.isArray(entry) ? entry : [entry]
-    const params = guardParams(event)
-    return list.find(t => (t.guard ? resolveGuard(t.guard, params) : true))
-  }
-
-  // The event queue. send() enqueues; the first send drains the queue, so a
-  // re-entrant send (from an action) waits until the current transition ends.
-  const queue: Event[] = []
-  let draining = false
-
-  // Resolve and run an action arg — inline fn, registered name, or a oneOf(...)
-  // conditional branch. Missing name → throw in dev, warn in prod.
-  const actionRegistry = config.implementations?.actions
-  const isOneOf = (a: unknown): a is OneOf<Context, Event, Computed> =>
-    typeof a === 'object' && a !== null && (a as { __oneOf?: boolean }).__oneOf === true
-  const runAction = (action: ActionArg<Context, Event, Computed>, event: Event) => {
-    if (isOneOf(action)) {
-      const params = guardParams(event)
-      const branch = action.branches.find(b => (b.guard ? resolveGuard(b.guard, params) : true))
-      if (branch) runActions(branch.actions, event)
-      return
-    }
-    const fn = typeof action === 'function' ? action : actionRegistry?.[action]
-    if (!fn) {
-      const msg = `[machine] no action "${action as string}"`
-      if (isDev) throw new Error(msg)
-      console.warn(msg)
-      return
-    }
-    fn({ context, setContext, event, send, computed })
-  }
-
-  const runActions = (
-    actions: Array<ActionArg<Context, Event, Computed>> | undefined,
-    event: Event,
-  ) => {
-    if (!actions) return
-    for (const action of actions) runAction(action, event)
-  }
-
-  // Apply one already-resolved transition: exit (cleanup effects + exit
-  // actions) → transition actions → switch → entry actions + start effects.
-  // Shared by event-driven (send) and delay-driven (after) transitions. An
-  // internal self-transition (no state change) runs actions only, skipping
-  // exit/entry. Effect boot/cleanup happens only while running; a stopped
-  // machine still transitions and runs entry/exit actions, just no effects.
-  const applyTransition = (t: Transition<State, Context, Event, Computed>, event: Event) => {
-    const cur = st.state
-    const next = t.target ?? cur
-    const changed = next !== cur
-    if (changed) {
-      if (running) stopEffects(cur)
-      runExit(cur, event)
-    }
-    runActions(t.actions, event)
-    if (changed) {
-      st.set(next)
-      runEntry(next, event)
-      if (running) startEffects(next, event) // also (re)schedules `after` timers
-    }
-  }
-
-  const send = (event: Event) => {
-    queue.push(event)
-    if (draining) return
-    draining = true
-    try {
-      while (queue.length) {
-        const e = queue.shift()!
-        // Per-state `on` first, then top-level `on`.
-        const entry = config.states[st.state].on?.[e.type] ?? config.on?.[e.type]
-        const t = resolve(entry, e)
-        if (t) applyTransition(t, e)
-      }
-    } finally {
-      draining = false
-    }
-  }
-
-  // entry/exit action lists, run by applyTransition around the switch.
-  const runEntry = (state: State, event: Event) => runActions(config.states[state].entry, event)
-  const runExit = (state: State, event: Event) => runActions(config.states[state].exit, event)
-
-  // Resolve an `after` delay key → ms. A numeric key ("200") is its own value;
-  // otherwise it's a name looked up in implementations.delays (which may read
-  // context/computed, so a prop-driven delay is dynamic). Missing → dev throw.
-  const effectRegistry = config.implementations?.effects
-  const activeCleanups: Array<() => void> = []
-  const delayRegistry = config.implementations?.delays
-  const resolveDelay = (key: string, event: Event): number => {
-    const asNum = Number(key)
-    if (!Number.isNaN(asNum)) return asNum
-    const fn = delayRegistry?.[key]
-    if (!fn) {
-      const msg = `[machine] no delay "${key}"`
-      if (isDev) throw new Error(msg)
-      console.warn(msg)
-      return 0
-    }
-    return fn(guardParams(event))
-  }
-
-  // A fired timer applies the first `after` transition whose guard passes — but
-  // only if still in the scheduling state (a late timer after a re-entry is
-  // ignored) and still running. If a send() drain is in flight (a timer fired
-  // mid-transition), defer to a microtask so it runs after the drain completes,
-  // preserving run-to-completion without dropping the transition.
-  const dispatchAfter = (scheduledIn: State, key: string, event: Event) => {
-    if (!running || st.state !== scheduledIn) return
-    if (draining) {
-      queueMicrotask(() => dispatchAfter(scheduledIn, key, event))
-      return
-    }
-    const t = resolve(config.states[scheduledIn].after?.[key], event)
-    if (!t) return
-    draining = true
-    try {
-      applyTransition(t, event)
-      while (queue.length) {
-        const e = queue.shift()!
-        const next = resolve(config.states[st.state].on?.[e.type] ?? config.on?.[e.type], e)
-        if (next) applyTransition(next, e)
-      }
-    } finally {
-      draining = false
-    }
-  }
-
-  // Start a state's resources on enter: schedule its `after` timers, then run
-  // its effects and stash any returned cleanups. Both timers and effects are
-  // state-scoped, so a timer's clearTimeout joins activeCleanups and is cleared
-  // on exit alongside effect cleanups.
-  const startEffects = (state: State, event: Event) => {
-    const after = config.states[state].after
-    if (after) {
-      for (const key in after) {
-        const ms = resolveDelay(key, event)
-        const id = setTimeout(() => dispatchAfter(state, key, event), ms)
-        activeCleanups.push(() => clearTimeout(id))
-      }
-    }
-    const effects = config.states[state].effects
-    if (!effects) return
-    for (const effect of effects) {
-      const fn = typeof effect === 'function' ? effect : effectRegistry?.[effect]
-      if (!fn) {
-        const msg = `[machine] no effect "${effect as string}"`
-        if (isDev) throw new Error(msg)
-        console.warn(msg)
-        continue
-      }
-      const cleanup = fn({ context, setContext, event, send, computed })
-      if (typeof cleanup === 'function') activeCleanups.push(cleanup)
-    }
-  }
-  const stopEffects = (_state: State) => {
-    for (const cleanup of activeCleanups) cleanup()
-    activeCleanups.length = 0
-  }
-
-  // Watchers — machine-global data-reactions. Each watched field becomes a
-  // preact effect that reads that field (context or computed) and runs its
-  // actions on change, skipping the priming run (no fire on setup). Their
-  // cleanups live in their OWN list (not activeCleanups) because watchers span
-  // the whole run (start→stop), not a single state — stopEffects clears
-  // activeCleanups on every state exit, which must not tear watchers down.
-  const watchConfig = config.watch
-  const watcherCleanups: Array<() => void> = []
-  const readField = (key: string): unknown =>
-    key in context
-      ? (context as Record<string, unknown>)[key]
-      : (computed as Record<string, unknown>)[key]
-  const startWatchers = () => {
-    if (!watchConfig) return
-    for (const key in watchConfig) {
-      const actions = watchConfig[key as keyof typeof watchConfig]
-      if (!actions) continue
-      let primed = false
-      const dispose = preactEffect(() => {
-        readField(key) // tracked read → re-runs when this field changes
-        if (!primed) {
-          primed = true
-          return
-        }
-        runActions(actions, { type: MACHINE_INIT } as Event)
-      })
-      watcherCleanups.push(dispose)
-    }
-  }
-  const stopWatchers = () => {
-    for (const dispose of watcherCleanups) dispose()
-    watcherCleanups.length = 0
-  }
-
-  // The machine is built STOPPED — no effects run until start(). send() works
-  // regardless of `running` (transitions are pure state); effects, watchers, and
-  // timers only run while running, so a stopped machine mutates state without
-  // side-effects.
-  // Lifecycle listeners. `onStart`/`onStop` let an OUTER layer (the connector)
-  // hang start/stop-scoped work off the machine's lifecycle without the machine
-  // knowing what it is — e.g. the connector wires its reactions on start and
-  // tears them down on stop, symmetric with effects/watchers. Both fire on every
-  // start/stop (a machine can restart), so listeners must be idempotent.
-  const startListeners = new Set<() => void>()
-  const stopListeners = new Set<() => void>()
-  const onStart = (fn: () => void) => {
-    startListeners.add(fn)
-    if (running) fn() // already running → run now so late registrants don't miss it
-    return () => startListeners.delete(fn)
-  }
-  const onStop = (fn: () => void) => {
-    stopListeners.add(fn)
-    return () => stopListeners.delete(fn)
-  }
-
-  let running = false
-  const start = () => {
-    if (running) return
-    running = true
-    startWatchers()
-    startEffects(config.initial, { type: MACHINE_INIT } as Event)
-    for (const fn of startListeners) fn()
-  }
-  const stop = () => {
-    if (!running) return
-    running = false
-    stopEffects(st.state)
-    stopWatchers() // watchers span the whole run — torn down here, not on exit
-    for (const fn of stopListeners) fn()
-  }
-
-  // Coarse subscribe: one preact effect reads the state + every context cell, so
-  // any state transition or context write re-runs it. (Computed changes are
-  // downstream of context, so we needn't read computeds here — and reading them
-  // would force the lazy ones.) The effect body runs once on creation to
-  // register deps; `primed` skips that first run so the listener fires only on
-  // subsequent changes. Returns a bare unsubscribe; costs nothing unless called.
-  const subscribe = (listener: () => void): (() => void) => {
-    let primed = false
-    return preactEffect(() => {
-      void st.state
-      for (const key in context) void context[key as keyof Context]
-      if (primed) listener()
-      else primed = true
-    })
-  }
-
-  // Build a Selection from a preact computed signal. `value` is a tracked read.
-  // `subscribe` runs an effect reading the signal, compares to the previous
-  // selected value (Object.is default / `equals`), and fires only on a real
-  // change — skipping the priming run.
-  const makeSelection = <Value>(sig: { value: Value }): Selection<Value> => ({
-    get value() {
-      return sig.value
-    },
-    subscribe(listener, equals = Object.is) {
-      let prev: Value
-      let primed = false
-      return preactEffect(() => {
-        const next = sig.value // tracks exactly what the selector read
-        if (!primed) {
-          prev = next
-          primed = true
-          return
-        }
-        if (equals(prev, next)) return // selected value unchanged → no fire
-        prev = next
-        listener(next)
-      })
-    },
-  })
-
-  // Function-form selector wraps the selector in a lazy/memoized preact computed
-  // so it auto-tracks exactly what it reads. The typed named-scope sugar
-  // (context/computed/state) builds the same Selection over one named field —
-  // exact return types, autocomplete, and compile-time typo safety on the key.
-  const select = (<Value>(selector: () => Value): Selection<Value> =>
-    makeSelection(preactComputed(selector))) as Select<State, Context, Computed>
-  select.context = <K extends keyof Context>(key: K) =>
-    makeSelection(preactComputed(() => context[key]))
-  select.computed = <K extends keyof Computed>(key: K) =>
-    makeSelection(preactComputed(() => computed[key]))
-  select.state = () => makeSelection(preactComputed(() => st.state))
-
-  return {
-    get state() {
-      return st.state
-    },
-    hasTag: st.hasTag,
-    matches: st.matches,
-    get context() {
-      return context
-    },
-    get computed() {
-      return computed
-    },
-    send,
-    subscribe,
-    select,
-    start,
-    stop,
-    onStart,
-    onStop,
-  }
+  return new MachineImpl(config) as unknown as Machine<State, Context, Event, Computed>
 }

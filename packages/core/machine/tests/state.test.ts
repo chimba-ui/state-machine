@@ -1,12 +1,13 @@
 /**
  * State representation.
  *
- * Pins: flat tagged states; tracked `state` / `hasTag` / `matches` reads;
- * co-located tags; fine-grained re-run (a tag-group reader does NOT wake when
- * the state moves within the same tag group).
+ * Pins: flat tagged states; plain `state` / `hasTag` / `matches` reads;
+ * co-located tags; a real transition notifies, a no-op (same state) does not.
+ * Value-gating ("a tag-group reader doesn't wake moving within the group") is a
+ * property of `select`, verified in subscribe.test.ts — createState just notifies
+ * on a real state change.
  */
-import { effect } from '@preact/signals-core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createState } from '../src'
 
 const make = () =>
@@ -43,55 +44,26 @@ describe('createState', () => {
     expect(s.hasTag('visible')).toBe(false)
   })
 
-  it('state reads are tracked: a `state` reader re-runs on every transition', () => {
-    const s = make()
-    let runs = 0
-    effect(() => {
-      s.state
-      runs++
-    })
-    expect(runs).toBe(1)
+  it('a real transition notifies once per change', () => {
+    const notify = vi.fn()
+    const s = createState(
+      'closed',
+      { closed: { tags: [] }, opening: { tags: ['visible'] }, open: { tags: ['visible'] } },
+      notify,
+    )
     s.set('opening')
-    expect(runs).toBe(2)
+    expect(notify).toHaveBeenCalledTimes(1)
     s.set('open')
-    expect(runs).toBe(3)
+    expect(notify).toHaveBeenCalledTimes(2)
+    // reads reflect the new state + tags
+    expect(s.state).toBe('open')
+    expect(s.hasTag('visible')).toBe(true)
   })
 
-  it('hasTag reads are tracked AND value-gated: moving WITHIN a tag group does not wake a tag reader', () => {
-    const s = make()
-    let runs = 0
-    // Track hasTag('visible') as a derived boolean via an effect that only
-    // re-runs the body; to gate on the boolean value we read it and compare.
-    let last = s.hasTag('visible')
-    effect(() => {
-      const v = s.hasTag('visible')
-      // count only when the selected boolean actually changes
-      if (v !== last) {
-        last = v
-        runs++
-      }
-    })
-    expect(runs).toBe(0)
-
-    s.set('opening') // closed→opening: visible false→true → counts
-    expect(runs).toBe(1)
-    s.set('open') // opening→open: visible true→true → NO count
-    expect(runs).toBe(1)
-    s.set('closing') // open→closing: still visible → NO count
-    expect(runs).toBe(1)
-    s.set('closed') // closing→closed: visible true→false → counts
-    expect(runs).toBe(2)
-  })
-
-  it('no-op transition (same state) does not wake readers', () => {
-    const s = make()
-    let runs = 0
-    effect(() => {
-      s.state
-      runs++
-    })
-    expect(runs).toBe(1)
+  it('no-op transition (same state) does not notify', () => {
+    const notify = vi.fn()
+    const s = createState('closed', { closed: { tags: [] } }, notify)
     s.set('closed') // already closed
-    expect(runs).toBe(1)
+    expect(notify).not.toHaveBeenCalled()
   })
 })

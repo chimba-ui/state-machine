@@ -42,12 +42,14 @@ describe('createStore', () => {
     expect(store.isOpen('y')).toBe(false)
   })
 
-  it('no-op set (same shallow values) still notifies (object identity changes)', () => {
-    // set always produces a new object; dedup is the consumer's (select) job.
+  it('no-op set (same shallow values) does NOT notify (Object.is dedup)', () => {
+    // set shallow-equal-dedups: writing the same value is a no-op, no wake.
     const store = createStore({ n: 5 })
     const fn = vi.fn()
     store.subscribe(fn)
-    store.set({ n: 5 })
+    store.set({ n: 5 }) // same value
+    expect(fn).not.toHaveBeenCalled()
+    store.set({ n: 6 }) // real change
     expect(fn).toHaveBeenCalledTimes(1)
   })
 })

@@ -250,10 +250,9 @@ export type Adapter<Context, Event, Computed = Record<string, never>> = Pick<
 /** Compare two selected values; return true if equal (no fire). */
 export type EqualityFn<Value> = (a: Value, b: Value) => boolean
 
-/** A narrowed, value-deduped view of the machine. Wraps a preact computed. */
+/** A narrowed, value-deduped view of the machine. */
 export interface Selection<Value> {
-  /** Current value. A tracked read (like signal.value): auto-subscribes inside
-   * a reactive scope, a plain read outside one. */
+  /** Current selected value, evaluated on read. */
   readonly value: Value
   /** Fire `listener(value)` only when the selected value changes (Object.is by
    * default, or `equals`). Does not fire on subscribe. Bare unsubscribe. */
@@ -282,8 +281,8 @@ export interface Select<State extends string, Context, Computed> {
 /**
  * A machine service — the live, running instance produced by `machine(config)`.
  * Built stopped; `start()` boots its effects, `stop()` runs their cleanups.
- * Reads (state/context/computed) are tracked signal getters; transitions go
- * through `send`; observe via `subscribe` (coarse) or `select` (fine-grained).
+ * Reads (state/context/computed) are plain getters; transitions go through
+ * `send`; observe via `subscribe` (coarse) or `select` (value-deduped).
  */
 export interface Machine<
   State extends string,

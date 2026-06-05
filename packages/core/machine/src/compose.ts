@@ -1,4 +1,3 @@
-import { computed as preactComputed, effect as preactEffect } from '@preact/signals-core'
 import type { EqualityFn, Machine, Selection } from './types'
 
 /**
@@ -76,25 +75,25 @@ export function compose<Members extends Record<string, AnyMachine>>(
       return dispose
     },
     combine<Value>(selector: () => Value): Selection<Value> {
-      const sig = preactComputed(selector)
       return {
         get value() {
-          return sig.value
+          return selector()
         },
+        // Re-evaluate the selector whenever ANY member changes (subscribe to each
+        // member's coarse bus, like `sync`), and fire only on a real change. The
+        // selector reads across members; their changes drive it. No fire on setup.
         subscribe(listener: (value: Value) => void, equals: EqualityFn<Value> = Object.is) {
-          let prev: Value
-          let primed = false
-          const dispose = preactEffect(() => {
-            const next = sig.value
-            if (!primed) {
-              prev = next
-              primed = true
-              return
-            }
+          let prev = selector()
+          const onChange = () => {
+            const next = selector()
             if (equals(prev, next)) return
             prev = next
             listener(next)
-          })
+          }
+          const offs = list.map(m => m.subscribe(onChange))
+          const dispose = () => {
+            for (const off of offs) off()
+          }
           disposers.push(dispose)
           return dispose
         },

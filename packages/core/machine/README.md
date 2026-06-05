@@ -57,28 +57,48 @@ aren't built around:
 
 ### 🏎️ Performance
 
-The differentiator is **where the fine-grained reactivity lives**.
+State is mutated **in place** and changes propagate through a tiny notifier — so a
+transition is essentially a function call and a property write. There's no
+immutable-snapshot allocation per event, and a machine carries only its own data.
+That makes the engine cheap on the two axes that matter at scale: **memory per
+machine** (flat, regardless of how many context fields or states it has) and
+**event throughput**.
 
-- **Zag** delegates it to the host framework: its `bindable` context, `computed`,
-  and `watch` map `track` onto the framework's own primitive (Vue `computed`,
-  Solid `createMemo`, Svelte `$derived`, React `useMemo`). Fine-grained — but
-  only because a host framework is there to do the tracking.
-- **XState** has deduped selection too — `actor.select(selector)` on the core
-  actor, and `@xstate/store`'s `store.select(selector)`. But they're
-  **manual selectors**: you name the slice, `state => state.context.x`.
-  (And `@xstate/store` is a store, not the statechart.)
+| Metric (single clean run, shared config) | machine-core | XState   | Zag      |
+| ---------------------------------------- | ------------ | -------- | -------- |
+| Memory / machine (4 fields)              | **~2.8 KB**  | 3.6 KB   | ~13 KB   |
+| Memory / machine (64 fields)             | **~2.8 KB**  | 3.6 KB   | ~135 KB³ |
+| Construct + start, 5 000 machines        | **~13 ms**   | ~16 ms   | ~57 ms   |
+| Apply 200 000 events to completion¹      | **~63 ms**   | ~206 ms  | ~248 ms  |
+| Bundle (min + gzip)                      | **~3.7 KB**  | ~14.5 KB | ~2.2 KB² |
 
-This engine puts the reactivity **in the machine itself, and auto-tracked**: each
-context field is its own signal, and reading one inside a `computed` / `select`
-subscribes to exactly that field — no host framework, no manual selector. So a
-change updates **only the observers that read the changed field** (`O(changed)`,
-not `O(all)`), which matters when **many independent machines run at once**.
+<sub>¹ Wall-clock to drain N events — comparable across synchronous (machine-core,
+XState) and microtask-batched (Zag) engines. ² Zag's `@zag-js/core`; a real Zag
+component also pulls `@zag-js/dom-query` + the component machine. ³ machine-core
+and XState hold context as one plain object → memory is flat in field count; Zag's
+`bindable` context allocates a reactive cell per field per instance, so its
+per-machine memory grows with the field count (~13 → ~36 → ~135 KB at 4 / 16 / 64
+fields). Measured via `@zag-js/vanilla`.</sub>
 
-> Each piece of context is its own **signal** (a reactive cell). When code reads
-> a cell, it automatically becomes a subscriber to that one cell, nothing else.
-> So when one field changes, only the readers of _that_ field re-run,
-> automatically, with no manual dependency lists or selectors. The kernel is
-> [`@preact/signals-core`](https://preactjs.com/guide/v10/signals/).
+**When throughput actually matters.** It starts to matter in one shape: **many
+machines reacting to a high-frequency event stream inside one frame/latency budget.**
+
+Some real cases:
+
+- **Trading / market-data terminals** — 2 000 ticker rows, each a machine, driven
+  by a price firehose at sub-frame latency.
+- **Canvas boards** — drag-select 3 000 shapes; `pointermove`
+  fans out to every selected element's machine, ~270 k transitions/sec inside 16 ms.
+- **Live monitoring walls** — 1 000+ hosts, each a timed
+  machine (healthy → degraded → alerting) fed by a metrics stream.
+- **Multiplayer editors** — every remote user's cursor/selection/edit replayed into
+  local entity-machines; active collaborators multiply the stream.
+- **Game HUDs** — hundreds of agents, an FSM per entity, ticked every frame.
+
+The pattern is **density × frequency**. Where machine work fights the frame budget,
+~3–4× throughput is the difference between smooth and dropped frames; pair it with
+the surgical re-renders below (one field changes → only its observers wake) and you're
+fast on both the state and the render side.
 
 ### How it compares
 
@@ -103,9 +123,9 @@ for them.
 
 | What's different                         | Zag                        | XState                                  | machine-core                          |
 | ---------------------------------------- | -------------------------- | --------------------------------------- | ------------------------------------- |
-| **Where fine-grained reactivity lives**  | host framework does it     | manual selectors (`actor.select`)       | 🟢 **intrinsic, auto-tracked**        |
+| **Fine-grained selection in the engine** | ❌ host framework does it  | ⚠️ via `actor.select` (coarse under)    | 🟢 **`select` (value-deduped)**       |
 | **Runs with no host framework / no DOM** | ❌ needs a framework + DOM | ⚠️ statechart yes, fine-graining varies | 🟢 **yes**                            |
-| **Selection is auto-tracked, not named** | n/a (framework tracks)     | ❌ you write `s => s.context.x`         | 🟢 **reads what it reads**            |
+| **Flat memory in field/state count**     | ❌ per-field reactive cell | 🟢 plain snapshot                       | 🟢 **plain context, copy-on-write**   |
 | Nested / hierarchical states             | ❌ by design               | ✅                                      | ❌ by design (flat)                   |
 | Parallel / orthogonal regions            | ❌ by design               | ✅ (true parallel states)               | ⚠️ `compose` (peers, no shared event) |
 | Spawned child machines / actors          | ❌ by design               | ✅ (`invoke` / `spawn`)                 | ❌ by design                          |
@@ -118,10 +138,40 @@ A few cells deserve their footnote so the table survives scrutiny:
   platform is injected via `withAdapter`, so the effect runs even where no DOM exists.
 - **❌-by-design** is the philosophy of keeping machines _"light-weight, simple… avoiding
   complex machine concepts like spawn, nested states, etc."_;
-- **Reactivity** is tricky, Zag delegates fine-graining to a host framework that must exist (and
-  presumes a DOM); XState exposes deduped selection but via **manual selectors**
-  (and `@xstate/store` is a store, not the statechart). Here it's **intrinsic to
-  the machine and auto-tracked** — no host framework, no DOM, no named slice.
+- **Fine-grained selection** here is built into the engine: `select(fn)` re-evaluates
+  on any change and fires its listener only when the selected value changes — so an
+  observer wakes only for the slice it reads, with no host framework or DOM required.
+  Zag delegates this to the host framework (which must exist); XState's `actor.select`
+  narrows over a coarse snapshot, and its ergonomic fine-graining (`useSelector`) is
+  framework-bound. The trade vs. signals: it's not auto-dependency-tracked — a change
+  re-runs every live selector + compares (cheap, bounded per machine), rather than
+  waking only the selectors that read the changed field.
+
+### Why it's faster
+
+**XState** is built around the **actor model**: a machine's state is a single
+immutable _snapshot_ you can serialize, persist, replay, and inspect in Stately's
+visual tools. Every transition allocates a fresh snapshot and pushes it through an
+observable to all subscribers. Those are real, valuable features — time-travel,
+server rehydration, a visualizer — but each one taxes the hot path with an
+allocation and a coarse fan-out per event. This engine makes the opposite bet: it
+**doesn't** treat state as a serializable snapshot, so it mutates context in place
+and notifies through a small notifier. The speed and the flat memory come from a
+**narrower contract**, not from better engineering.
+
+That's why it isn't a gap in XState. Dropping the snapshot model would mean
+dropping serialization, if you need to persist a machine, rewind it, or watch it
+in a debugger, XState is the right tool and worth every byte. If you're driving
+thousands of lightweight UI machines you never serialize, you're paying for capabilities
+you don't use.
+
+**Zag** sits on a different axis: it's lean too, but it delegates reactivity to the
+host framework (React/Vue/...) and presumes a DOM. This engine owns its
+reactivity internally, so the _same_ machine runs byte-for-byte identically on the
+DOM, React Native, or a bare canvas with no framework underneath.
+
+`machine-core` gives up persistence/visualization (XState) and framework-delegated
+rendering (Zag) to be the small, fast engine for **one behavior that runs unchanged on every render target.**
 
 ### The machine never sees props
 
@@ -171,7 +221,7 @@ The core stays pure throughout.
 | `withAdapter(config, adapter)`       | layer a platform's `actions` + `effects` over a config (other impls — `guards`, `delays` — carry through untouched)                                       |
 | `connector(service, connect, props)` | live, memoized, subscribable view snapshot: `.snapshot` / `.subscribe` / `.select` / `.setProps` (prop-callbacks wire automatically)                      |
 | `compose({ a, b })`                  | run several machines as one (orthogonal regions): bundled `start`/`stop` + `.sync()` + `.combine()`                                                       |
-| `createStore(initial, build?)`       | a tiny signal-backed store for cross-instance singleton state (outside any one machine)                                                                   |
+| `createStore(initial, build?)`       | a tiny reactive store (plain value + listeners) for cross-instance singleton state (outside any one machine)                                              |
 | `and` / `or` / `not`                 | guard combinators                                                                                                                                         |
 | `oneOf([...])`                       | conditional action branch                                                                                                                                 |
 | `MACHINE_INIT`                       | the synthetic event fired when effects/watchers boot on `start()`                                                                                         |
@@ -553,13 +603,12 @@ const off = m.subscribe(() => rerender()) // fires on any state/context change
 off() // unsubscribe
 ```
 
-It tracks the current state plus every context cell. Computeds aren't read
-directly (that would force the lazy ones), but since a computed only changes when
-a context cell it reads changes, computed changes are covered transitively — so
-"any change" holds in practice.
+It fires on any `setContext` or state change. A computed change is covered
+transitively (a computed only changes when context it reads changes), so "any
+change" holds in practice.
 
 **Fine-grained** `select` narrows to a slice and fires _only when that slice's
-value changes_ — the `O(changed)` path:
+value changes_:
 
 ```ts
 // a single named field (typed + autocompleted):
@@ -570,11 +619,11 @@ m.select.state().subscribe(s => console.log('state →', s))
 // or a derived/composite selection via a function:
 const view = m.select(() => ({ open: m.matches('open'), count: m.context.count }))
 view.subscribe(render, (a, b) => a.open === b.open && a.count === b.count) // optional equality
-view.value // read the current value directly (tracked, like a signal)
+view.value // read the current selected value directly
 ```
 
-A `select` that doesn't read the changed field is never even re-run — so one
-machine's change wakes only the observers of the field that moved.
+A `select` re-evaluates on any machine change but only fires its listener when the
+selected value actually changes — so an observer wakes only for the slice it reads.
 
 ---
 
@@ -633,7 +682,14 @@ and, when it changes, calls the matching prop. (Same tuple shape as a React
 
 ```ts
 // declared on connect (agnostic — no DOM, no framework):
-type TooltipReaction<V> = Reaction<TooltipState, TooltipContext, TooltipEvent, TooltipProps, never, V>
+type TooltipReaction<V> = Reaction<
+  TooltipState,
+  TooltipContext,
+  TooltipEvent,
+  TooltipProps,
+  never,
+  V
+>
 
 const onOpenChange: TooltipReaction<boolean> = [
   m => m.matches('open') || m.matches('closing'), // selector: a fact about state
@@ -719,8 +775,8 @@ combobox.sync(() => {
   if (popup.matches('closed')) submenu.send({ type: 'close' })
 })
 
-// combine — one value-deduped Selection derived across members; reads
-// auto-track, so it fires only when a read field changes (O(changed))
+// combine — one value-deduped Selection derived across members; re-evaluates on
+// any member change and fires only when the combined value changes
 const view = combobox.combine(() => ({ open: popup.matches('open'), sub: submenu.state }))
 view.value // { open: true, sub: 'shown' }
 view.subscribe(render)
@@ -743,21 +799,17 @@ only the lifecycle + coordination glue.
 
 Context lives _inside_ a machine. Some state belongs _outside_ any one machine —
 a singleton shared across instances, like "only one tooltip open at a time" or "a
-single active menu in a menubar." `createStore` is a tiny signal-backed cell for
-exactly that.
-
-It's signal-backed (not a listener `Set`), so it composes with the engine's
-reactivity: reading `get()` inside a machine `select` / `computed` / effect tracks
-it, and a store change wakes those readers the same way a context change does.
+single active menu in a menubar." `createStore` is a tiny reactive cell for
+exactly that: a plain value plus a listener set.
 
 ```ts
 import { createStore } from '@render-experiment/machine-core'
 
 const store = createStore({ count: 0 })
 
-store.get() // { count: 0 } — a tracked read inside a reactive scope
+store.get() // { count: 0 }
 store.set({ count: 1 }) // shallow-merge a patch…
-store.set(s => ({ count: s.count + 1 })) // …or an updater
+store.set(s => ({ count: s.count + 1 })) // …or an updater (no-op writes don't notify)
 const off = store.subscribe(s => console.log(s.count)) // fires on change, not on subscribe
 off()
 ```
@@ -773,11 +825,17 @@ const tooltipStore = createStore({ openId: null as string | null }, s => ({
 }))
 
 tooltipStore.setOpen('a')
-tooltipStore.isOpen('a') // true — tracked, so a machine's select can derive from it
+tooltipStore.isOpen('a') // true
 ```
 
-Because the value flows through signals, a machine can `select` over a store read
-and get the same `O(changed)` deduping it gets for its own context.
+The store is **not** wired into a machine's `select` automatically — reading
+`store.get()` inside a `select` won't re-fire when the store changes. To make a
+machine react to a shared store, bridge it explicitly: subscribe to the store and
+forward the change as an event the machine already handles.
+
+```ts
+const off = tooltipStore.subscribe(s => m.send({ type: 'activeChanged', openId: s.openId }))
+```
 
 ---
 

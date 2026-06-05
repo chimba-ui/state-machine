@@ -1,11 +1,15 @@
 /**
- * Context — reactive data cells.
+ * Context — the machine's reactive data, a plain object behind one batched
+ * write (`setContext`). Reads are plain property access; a real write notifies
+ * (so observers re-evaluate), a no-op write does not. Copy-on-write: the initial
+ * object is shared until the first write, then privately owned (never mutates the
+ * input).
  *
- * Pins the decided shape: plain tracked reads (`context.field`) + one
- * explicit batched write (`setContext({ field })`), signal-backed per cell.
+ * Fine-grained "only the readers of the changed field wake" is a property of
+ * `select` (value-deduped) — verified in subscribe.test.ts — not of createContext
+ * itself, which is now a plain store + a coarse notify.
  */
-import { effect } from '@preact/signals-core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createContext } from '../src'
 
 describe('createContext', () => {
@@ -22,54 +26,38 @@ describe('createContext', () => {
     expect(context.b).toBe(2) // untouched
   })
 
-  it('reads are tracked — a reader re-runs only when ITS field changes', () => {
-    const { context, setContext } = createContext({ a: 0, b: 0 })
-    let aRuns = 0
-    let bRuns = 0
-    // initial effect run counts once each
-    effect(() => {
-      context.a
-      aRuns++
-    })
-    effect(() => {
-      context.b
-      bRuns++
-    })
-    expect(aRuns).toBe(1)
-    expect(bRuns).toBe(1)
-
+  it('a real write calls notify; a no-op write does not', () => {
+    const notify = vi.fn()
+    const { setContext } = createContext({ a: 0, b: 0 }, notify)
     setContext({ a: 1 })
-    expect(aRuns).toBe(2) // a's reader re-ran
-    expect(bRuns).toBe(1) // b's reader did NOT — fine-grained
-
-    setContext({ b: 1 })
-    expect(aRuns).toBe(2)
-    expect(bRuns).toBe(2)
+    expect(notify).toHaveBeenCalledTimes(1)
+    setContext({ a: 1 }) // same value → no notify (Object.is dedup)
+    expect(notify).toHaveBeenCalledTimes(1)
+    setContext({ b: 2 })
+    expect(notify).toHaveBeenCalledTimes(2)
   })
 
-  it('no-op writes do not notify (signal Object.is dedup)', () => {
-    const { context, setContext } = createContext({ a: 0 })
-    let runs = 0
-    effect(() => {
-      context.a
-      runs++
-    })
-    expect(runs).toBe(1)
-    setContext({ a: 0 }) // same value
-    expect(runs).toBe(1) // no re-run
-  })
-
-  it('a multi-field setContext wakes each reader at most once (batched)', () => {
-    const { context, setContext } = createContext({ a: 0, b: 0 })
-    let aRuns = 0
-    effect(() => {
-      context.a
-      context.b
-      aRuns++
-    })
-    expect(aRuns).toBe(1)
+  it('a multi-field setContext notifies once (batched)', () => {
+    const notify = vi.fn()
+    const { context, setContext } = createContext({ a: 0, b: 0 }, notify)
     setContext({ a: 1, b: 1 }) // two fields, one batch
-    expect(aRuns).toBe(2) // exactly once, not twice
+    expect(notify).toHaveBeenCalledTimes(1) // exactly once, not twice
+    expect(context.a).toBe(1)
+    expect(context.b).toBe(1)
+  })
+
+  it('copy-on-write: never mutates the initial object', () => {
+    const initial = { a: 0, b: 0 }
+    const { context, setContext } = createContext(initial)
+    setContext({ a: 1 })
+    expect(initial.a).toBe(0) // input untouched (copy-on-write)
+    expect(context.a).toBe(1) // reads reflect the owned copy
+  })
+
+  it('reads stay valid after destructuring across writes', () => {
+    const { context, setContext } = createContext({ a: 0 })
+    setContext({ a: 1 })
+    expect(context.a).toBe(1) // destructured `context` is a stable wrapper, not stale
   })
 
   it('keys are enumerable (spreads / Object.keys see them)', () => {

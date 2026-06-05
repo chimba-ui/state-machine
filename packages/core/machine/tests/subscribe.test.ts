@@ -4,7 +4,6 @@
  * select.context/.computed/.state. Selections fire only when the selected value
  * changes (Object.is default + optional equals); none fire on subscribe.
  */
-import { effect } from '@preact/signals-core'
 import { machine } from '../src'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -202,18 +201,14 @@ describe('select(fn) — function form', () => {
     expect(fn).toHaveBeenCalledTimes(1) // fires (different object identity)
   })
 
-  it('.value is tracked — composes into a preact effect', () => {
+  it('.value reads the current selected value on demand', () => {
     const m = counter()
     const len = m.select(() => m.context.items.length)
-    const seen: number[] = []
-    const dispose = effect(() => {
-      seen.push(len.value)
-    })
+    expect(len.value).toBe(0)
     m.send({ type: 'add' })
+    expect(len.value).toBe(1) // reflects the latest value when read
     m.send({ type: 'add' })
-    dispose()
-    m.send({ type: 'add' })
-    expect(seen).toEqual([0, 1, 2])
+    expect(len.value).toBe(2)
   })
 })
 

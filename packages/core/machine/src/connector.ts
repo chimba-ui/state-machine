@@ -1,17 +1,19 @@
-import { signal } from '@preact/signals-core'
 import type { Connect, Connector, Machine } from './types'
 
 /**
  * Wrap a machine + its pure connect() into a live snapshot. `props` is a
  * reactive input: pass the initial value, push changes via setProps().
  *
- * connect() is a pure mapping (snapshot → view-facing api). The connector is the
- * reactive plumbing that keeps that mapping live: it memoizes connect's output
- * so its identity is stable until inputs change (no useSyncExternalStore
- * infinite loop), reads machine state through live getters (no tearing), makes
- * consumer `props` a reactive input (a props change recomputes the snapshot and
- * wakes subscribers), and is PASSIVE — it forwards subscribe/select but never
- * self-subscribes; the bridge owns lifecycle.
+ * connect() is a pure mapping (snapshot → view-facing api). The connector keeps
+ * that mapping live: it memoizes connect's output so the snapshot identity is
+ * stable until an input changes (no useSyncExternalStore infinite loop), reads
+ * machine state through live getters (no tearing), makes consumer `props` a
+ * reactive input (a props change recomputes the snapshot and wakes subscribers),
+ * and is PASSIVE — the bridge owns lifecycle.
+ *
+ * The snapshot recomputes on EITHER input: a machine change (via the machine's
+ * coarse subscribe) or a props change (via setProps). Both bump an internal
+ * revision; the memoized snapshot is rebuilt lazily on the next read.
  */
 export function connector<
   State extends string,
@@ -25,13 +27,14 @@ export function connector<
   connect: Connect<State, Context, Event, Props, Api, Computed>,
   initialProps: Props,
 ): Connector<State, Context, Api, Props, Computed> {
-  // props as a signal → a props change invalidates the memoized snapshot and
-  // trips the coarse subscribe, same as a context/state change.
-  const propsSig = signal(initialProps)
+  let props = initialProps
 
-  // The snapshot is a memoized Selection over connect's output: its identity is
-  // stable until connect's inputs (state/context/computed/props) change.
-  const snap = service.select(() =>
+  // Lazily memoized snapshot. `dirty` is set on any machine change or props
+  // change; the next `snapshot` read rebuilds and caches. Stable identity while
+  // clean → safe as a useSyncExternalStore getSnapshot.
+  let cached: Api
+  let dirty = true
+  const rebuild = (): Api =>
     connect({
       get state() {
         return service.state
@@ -43,22 +46,39 @@ export function connector<
         return service.computed
       },
       get props() {
-        return propsSig.value
+        return props
       },
       send: service.send,
-    }),
-  )
+    })
+  const snapshot = (): Api => {
+    if (dirty) {
+      cached = rebuild()
+      dirty = false
+    }
+    return cached
+  }
 
-  // Reactions (declared state-change → prop-callback) live exactly as long as
-  // the machine runs: wired on every start(), torn down on stop(). Hooking the
+  // Coarse listeners on this connector. A machine change or a props change marks
+  // the snapshot dirty and wakes them. We subscribe to the machine once and fan
+  // its notifications (plus props changes) out to connector subscribers.
+  const listeners = new Set<() => void>()
+  const wake = () => {
+    dirty = true
+    for (const l of [...listeners]) l()
+  }
+  // The machine's coarse subscribe drives snapshot invalidation. Subscribed for
+  // the connector's whole life (passive — the bridge still owns start/stop).
+  service.subscribe(wake)
+
+  // Reactions (declared state-change → prop-callback) live exactly as long as the
+  // machine runs: wired on every start(), torn down on stop(). Hooking the
   // machine's own lifecycle (not the connector's construction) means a restart —
-  // notably React StrictMode's mount→unmount→mount — cleanly re-establishes them
-  // without the bridge threading any teardown. Symmetric with effects/watchers.
+  // notably React StrictMode's mount→unmount→mount — cleanly re-establishes them.
   let reactionOffs: Array<() => void> = []
   service.onStart(() => {
     reactionOffs = (connect.reactions ?? []).map(([selector, callback]) => {
       const sel = service.select(() => selector(service))
-      return sel.subscribe(value => callback(value, propsSig.value))
+      return sel.subscribe(value => callback(value, props))
     })
   })
   service.onStop(() => {
@@ -68,22 +88,20 @@ export function connector<
 
   return {
     get snapshot() {
-      return snap.value
+      return snapshot()
     },
-    // Coarse: wake whenever the snapshot recomputes — i.e. on any state /
-    // context / computed / props change (connect returns a fresh object each
-    // time, so the Selection's Object.is dedup never suppresses a real change).
-    // The value arg is dropped; coarse listeners take none.
     subscribe(listener) {
-      return snap.subscribe(() => listener())
+      listeners.add(listener)
+      return () => listeners.delete(listener)
     },
     select: service.select,
-    setProps(props) {
+    setProps(next) {
       // Value-dedup: consumers often rebuild an equal props object every render
-      // (new identity, same values). Writing the signal then would needlessly
-      // recompute the snapshot and wake every subscriber. Skip when shallow-equal.
-      if (shallowEqual(propsSig.peek(), props)) return
-      propsSig.value = props
+      // (new identity, same values). Skip the wake when shallow-equal so an equal
+      // re-render doesn't needlessly recompute the snapshot or wake subscribers.
+      if (shallowEqual(props, next)) return
+      props = next
+      wake()
     },
   }
 }
