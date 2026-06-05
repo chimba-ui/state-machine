@@ -67,17 +67,17 @@ machine** (flat, regardless of how many context fields or states it has) and
 | Metric (single clean run, shared config) | machine-core | XState   | Zag      |
 | ---------------------------------------- | ------------ | -------- | -------- |
 | Memory / machine (4 fields)              | **~2.8 KB**  | 3.6 KB   | ~13 KB   |
-| Memory / machine (64 fields)             | **~2.8 KB**  | 3.6 KB   | ~135 KB³ |
-| Construct + start, 5 000 machines        | **~13 ms**   | ~16 ms   | ~57 ms   |
-| Apply 200 000 events to completion¹      | **~63 ms**   | ~206 ms  | ~248 ms  |
-| Bundle (min + gzip)                      | **~3.7 KB**  | ~14.5 KB | ~2.2 KB² |
+| Memory / machine (64 fields)             | **~2.8 KB**  | 3.6 KB   | ~136 KB³ |
+| Construct + start, 5 000 machines        | **~13 ms**   | ~19 ms   | ~81 ms   |
+| Apply 200 000 events to completion¹      | **~53 ms**   | ~199 ms  | ~204 ms  |
+| Bundle (min + gzip)                      | **~2.7 KB**  | ~14.5 KB | ~2.2 KB² |
 
 <sub>¹ Wall-clock to drain N events — comparable across synchronous (machine-core,
 XState) and microtask-batched (Zag) engines. ² Zag's `@zag-js/core`; a real Zag
 component also pulls `@zag-js/dom-query` + the component machine. ³ machine-core
 and XState hold context as one plain object → memory is flat in field count; Zag's
 `bindable` context allocates a reactive cell per field per instance, so its
-per-machine memory grows with the field count (~13 → ~36 → ~135 KB at 4 / 16 / 64
+per-machine memory grows with the field count (~13 → ~36 → ~136 KB at 4 / 16 / 64
 fields). Measured via `@zag-js/vanilla`.</sub>
 
 **When throughput actually matters.** It starts to matter in one shape: **many
