@@ -46,6 +46,12 @@ export function createContext<Context extends object>(
 
   // Stable wrapper: one getter per key, reading the (possibly copied) backing
   // object. Destructure-safe — the wrapper identity never changes.
+  //
+  // NOTE: this per-field getter is ~heavier than plain property access. It only
+  // exists for the standalone helper (advanced composition / tests); the machine
+  // does NOT use it — it reads `this.ctx` (a plain object) directly, so the engine
+  // keeps flat, getter-free context on the hot path. Don't reach for
+  // `createContext` in hot code; use the machine's context.
   const context = {} as Context
   for (const key in initial) {
     Object.defineProperty(context, key, {

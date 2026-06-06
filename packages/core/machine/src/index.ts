@@ -11,10 +11,13 @@ export { MACHINE_INIT } from './constants'
 export { config } from './config'
 export type { MachineConfig, TransitionConfig, Transition, Implementations } from './types'
 
-// Context + state building blocks (for advanced composition / tests).
-export { createContext } from './context'
-export { createState } from './state'
-export type { State, StateNode } from './types'
+// Per-state node shape (used when annotating a config's `states`).
+export type { StateNode } from './types'
+// NOTE: createContext / createState are intentionally NOT exported. They're the
+// engine's internal building blocks (the machine inlines their logic on `this`);
+// the standalone helpers carry a per-field getter cost and createContext also
+// name-collides with React's createContext. Import from './context' / './state'
+// directly if you genuinely need them (e.g. tests).
 
 // Guards: combinators + types.
 export { and, or, not } from './guards'

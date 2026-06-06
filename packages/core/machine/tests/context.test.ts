@@ -10,7 +10,7 @@
  * itself, which is now a plain store + a coarse notify.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { createContext } from '../src'
+import { createContext } from '../src/context'
 
 describe('createContext', () => {
   it('reads fields by plain property access', () => {

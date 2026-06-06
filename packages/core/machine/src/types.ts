@@ -13,11 +13,11 @@ export interface StateNode {
 }
 
 export interface State<T extends string> {
-  /** Tracked current state. */
+  /** The current state. */
   readonly state: T
-  /** Tracked: is the current state tagged `tag`? */
+  /** Is the current state tagged `tag`? */
   hasTag: (tag: string) => boolean
-  /** Tracked: is the current state exactly `name`? (sugar for state === name) */
+  /** Is the current state exactly `name`? (sugar for state === name) */
   matches: (name: T) => boolean
   /**
    * Move to a new state. Internal to the engine: the transition layer calls
@@ -395,8 +395,9 @@ export interface Connector<
   select: Select<State, Context, Computed>
   /** Update consumer props (a reactive input) — recomputes snapshot + wakes. */
   setProps: (props: Props) => void
+  /** Detach the connector from the machine: drops its bus subscription and any
+   * lifecycle hooks. Call when discarding the connector independently of the
+   * machine. (When the machine is discarded too — the common case — both are
+   * collected together and `destroy()` is optional.) */
+  destroy: () => void
 }
-
-// Reactions (state-change → prop-callback) are wired automatically: the
-// connector hooks the machine's onStart/onStop, so they live exactly as long as
-// the machine runs — no manual activation, and a restart re-establishes them.

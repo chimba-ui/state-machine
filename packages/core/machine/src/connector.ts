@@ -66,22 +66,23 @@ export function connector<
     dirty = true
     for (const l of [...listeners]) l()
   }
-  // The machine's coarse subscribe drives snapshot invalidation. Subscribed for
-  // the connector's whole life (passive — the bridge still owns start/stop).
-  service.subscribe(wake)
+  // The machine's coarse subscribe drives snapshot invalidation. Held for the
+  // connector's life and released by destroy() (passive — the bridge still owns
+  // start/stop).
+  const offWake = service.subscribe(wake)
 
   // Reactions (declared state-change → prop-callback) live exactly as long as the
   // machine runs: wired on every start(), torn down on stop(). Hooking the
   // machine's own lifecycle (not the connector's construction) means a restart —
   // notably React StrictMode's mount→unmount→mount — cleanly re-establishes them.
   let reactionOffs: Array<() => void> = []
-  service.onStart(() => {
+  const offStart = service.onStart(() => {
     reactionOffs = (connect.reactions ?? []).map(([selector, callback]) => {
       const sel = service.select(() => selector(service))
       return sel.subscribe(value => callback(value, props))
     })
   })
-  service.onStop(() => {
+  const offStop = service.onStop(() => {
     for (const off of reactionOffs) off()
     reactionOffs = []
   })
@@ -102,6 +103,14 @@ export function connector<
       if (shallowEqual(props, next)) return
       props = next
       wake()
+    },
+    destroy() {
+      offWake()
+      offStart()
+      offStop()
+      for (const off of reactionOffs) off()
+      reactionOffs = []
+      listeners.clear()
     },
   }
 }

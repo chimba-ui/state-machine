@@ -166,4 +166,30 @@ describe('after — timed transitions', () => {
     expect(m.state).toBe('c')
     expect(log).toEqual(['chained', 'entered-c'])
   })
+
+  it('re-entering the timed state restarts its timer (the prior entry’s does not carry over)', () => {
+    // a (100ms → done) ⇄ park. Leave `a` at 60ms, come back: the clock for the
+    // auto-advance restarts from the re-entry, so the original 100ms deadline is
+    // dead. Pins that a state's `after` is scoped to its CURRENT entry.
+    const m = machine<'a' | 'park' | 'done', object, { type: 'leave' | 'back' }>({
+      initial: 'a',
+      context: {},
+      states: {
+        a: { after: { 100: { target: 'done' } }, on: { leave: { target: 'park' } } },
+        park: { on: { back: { target: 'a' } } },
+        done: {},
+      },
+    })
+    m.start()
+    vi.advanceTimersByTime(60) // 60ms into the first entry's timer
+    m.send({ type: 'leave' }) // exit a → timer cancelled
+    expect(m.state).toBe('park')
+    vi.advanceTimersByTime(50) // 60+50=110 > 100, but that timer is gone
+    expect(m.state).toBe('park') // the dead timer never fired
+    m.send({ type: 'back' }) // re-enter a → fresh 100ms timer
+    vi.advanceTimersByTime(60)
+    expect(m.state).toBe('a') // not yet (only 60ms into the NEW timer)
+    vi.advanceTimersByTime(40)
+    expect(m.state).toBe('done') // fresh timer completes at 100ms
+  })
 })

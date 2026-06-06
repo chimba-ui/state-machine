@@ -1,18 +1,11 @@
 /**
- * The single public factory. `machine(config)` builds a stopped service that
- * composes every concern — context, state, queued transitions, guards, actions,
- * effects, computed, the subscription surface — into one running instance. It is
- * BUILT but not running: `.start()` boots its effects, `.stop()` runs their
- * cleanups. Reads are plain getters; observe via subscribe (coarse) / select
- * (value-deduped).
- *
  * Implemented as a class so the engine logic lives on the prototype (one shared
  * copy) and each instance holds only data — the per-machine footprint is flat in
  * field/state count (no per-field reactive cell, no per-instance closure tree).
- * The reactivity kernel is a tiny coarse bus: a write (`setContext` / state
- * change) bumps `version` and notifies every listener; `select` re-evaluates +
- * value-compares so it fires only on a real change (O(changed) at the listener),
- * and `computed` memoizes against `version`. No external reactivity dependency.
+ * The reactivity kernel is a tiny coarse bus: a write (context or state change)
+ * bumps `version` and notifies every listener; `select` re-evaluates + value-compares
+ * so it fires only on a real change (O(changed) at the listener), and `computed`
+ * memoizes against `version`.
  */
 import { isOneOf } from './actions'
 import { MACHINE_INIT } from './constants'
@@ -32,10 +25,7 @@ import type {
 
 const isDev = process.env.NODE_ENV !== 'production'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Any = any
-
-class MachineImpl<
+class MachineClass<
   State extends string,
   Context extends object,
   Event extends { type: string },
@@ -49,12 +39,24 @@ class MachineImpl<
   // (recompute only when something changed since its last read) without per-field
   // dependency tracking.
   version = 0
-  // The coarse notification bus: listeners under subscribe + select.
+  // The coarse notification bus: listeners under subscribe + select. Mutated only
+  // through busAdd/busDelete so `busSnapshot` (the array we iterate in bump) is
+  // re-derived only when membership changes — steady-state notifies allocate
+  // nothing, while still iterating a stable copy (a listener may add/remove
+  // during notify; the change applies to the NEXT notify, not the current pass).
   bus = new Set<() => void>()
+  busSnapshot: Array<() => void> = []
+  busDirty = false
   queue: Event[] = []
-  draining = false
+  flushing = false
   running = false
-  activeCleanups: Array<() => void> = []
+  // Bumped on every state ENTRY. An `after` timer captures the generation it was
+  // scheduled in; if the machine exits and re-enters the same state before a
+  // deferred timer dispatches, the generation no longer matches and the stale
+  // timer is ignored — closing the exit-and-re-enter TOCTOU window that a plain
+  // `stateValue === scheduledIn` check would miss.
+  entryCounter = 0
+  stateCleanups: Array<() => void> = []
   watcherCleanups: Array<() => void> = []
   // lazily created — a machine with no reactions/connector pays nothing
   startListeners: Set<() => void> | null = null
@@ -97,6 +99,26 @@ class MachineImpl<
         let ctxSnapshot: Record<string, unknown> = {}
         let computedSnapshot: Record<string, unknown> = {}
 
+        // The two tracking proxies are built ONCE per computed (not per recompute).
+        // Their targets read `this.ctx` / `this.computed` LIVE through the trap, so
+        // they stay correct even after copy-on-write reassigns `this.ctx`. Each
+        // `get` records the key into the CURRENT read-set, which the recompute
+        // swaps in before calling `def`.
+        let ctxRead: Set<string> | null = null
+        let computedRead: Set<string> | null = null
+        const trackedCtx = new Proxy({} as Record<string, unknown>, {
+          get: (_t, p: string) => {
+            ctxRead?.add(p)
+            return (this.ctx as Record<string, unknown>)[p]
+          },
+        }) as Context
+        const trackedComputed = new Proxy({} as Record<string, unknown>, {
+          get: (_t, p: string) => {
+            computedRead?.add(p)
+            return (this.computed as Record<string, unknown>)[p]
+          },
+        }) as Computed
+
         const stale = (): boolean => {
           for (const dk of ctxDeps) {
             if (!Object.is(ctxSnapshot[dk], (this.ctx as Record<string, unknown>)[dk])) return true
@@ -114,27 +136,22 @@ class MachineImpl<
           enumerable: true,
           get: () => {
             if (computedOnce && !stale()) return cachedValue
-            // recompute under tracking proxies that record which keys are read
-            const ctxRead = new Set<string>()
-            const computedRead = new Set<string>()
-            const trackedCtx = new Proxy(this.ctx as Record<string, unknown>, {
-              get: (t, p: string) => {
-                ctxRead.add(p)
-                return t[p]
-              },
-            })
-            const trackedComputed = new Proxy(this.computed as Record<string, unknown>, {
-              get: (t, p: string) => {
-                computedRead.add(p)
-                return t[p]
-              },
-            })
-            cachedValue = def({
-              context: trackedCtx as Context,
-              computed: trackedComputed as Computed,
-            }) as Computed[keyof Computed]
-            ctxDeps = [...ctxRead]
-            computedDeps = [...computedRead]
+            // swap in fresh read-sets, recompute under the (reused) proxies
+            const cr = new Set<string>()
+            const compr = new Set<string>()
+            ctxRead = cr
+            computedRead = compr
+            try {
+              cachedValue = def({
+                context: trackedCtx,
+                computed: trackedComputed,
+              }) as Computed[keyof Computed]
+            } finally {
+              ctxRead = null
+              computedRead = null
+            }
+            ctxDeps = [...cr]
+            computedDeps = [...compr]
             ctxSnapshot = {}
             for (const dk of ctxDeps) ctxSnapshot[dk] = (this.ctx as Record<string, unknown>)[dk]
             computedSnapshot = {}
@@ -151,7 +168,7 @@ class MachineImpl<
     this.setContext = patch => {
       let changed = false
       for (const key in patch) {
-        if (!Object.is((this.ctx as Any)[key], (patch as Any)[key])) {
+        if (!Object.is(this.ctx[key], patch[key])) {
           changed = true
           break
         }
@@ -169,10 +186,27 @@ class MachineImpl<
   }
 
   // ---- kernel notify ----
+  // Bus membership goes through these so the iteration snapshot can be cached.
+  private busAdd(listener: () => void): void {
+    this.bus.add(listener)
+    this.busDirty = true
+  }
+  private busDelete(listener: () => void): void {
+    this.bus.delete(listener)
+    this.busDirty = true
+  }
+
   private bump(): void {
     this.version++
-    // copy guard: a listener may unsubscribe (or subscribe) during iteration
-    for (const l of [...this.bus]) l()
+    // Iterate a STABLE snapshot, not the live Set: a listener may add/remove
+    // during notify, and those changes must apply to the next notify (not be
+    // visited/skipped mid-pass). The snapshot is re-derived only when membership
+    // changed since the last notify, so steady-state notifies allocate nothing.
+    if (this.busDirty) {
+      this.busSnapshot = [...this.bus]
+      this.busDirty = false
+    }
+    for (const l of this.busSnapshot) l()
   }
 
   // ---- reads ----
@@ -229,7 +263,7 @@ class MachineImpl<
   private runAction(action: ActionArg<Context, Event, Computed>, event: Event): void {
     if (isOneOf(action)) {
       const params = this.guardParams(event)
-      const branch = action.branches.find((b: Any) =>
+      const branch = action.branches.find(b =>
         b.guard ? this.resolveGuard(b.guard, params) : true,
       )
       if (branch) this.runActions(branch.actions, event)
@@ -281,8 +315,8 @@ class MachineImpl<
   // Queued: a re-entrant send (from an action) waits until the current drain ends.
   private doSend(event: Event): void {
     this.queue.push(event)
-    if (this.draining) return
-    this.draining = true
+    if (this.flushing) return
+    this.flushing = true
     try {
       while (this.queue.length) {
         const e = this.queue.shift()!
@@ -291,7 +325,7 @@ class MachineImpl<
         if (t) this.applyTransition(t, e)
       }
     } finally {
-      this.draining = false
+      this.flushing = false
     }
   }
 
@@ -311,15 +345,19 @@ class MachineImpl<
   // A fired timer applies the first `after` transition whose guard passes — only
   // if still in the scheduling state and still running. If a drain is in flight,
   // defer to a microtask so it runs after the current transition completes.
-  private dispatchAfter(scheduledIn: State, key: string, event: Event): void {
-    if (!this.running || this.stateValue !== scheduledIn) return
-    if (this.draining) {
-      queueMicrotask(() => this.dispatchAfter(scheduledIn, key, event))
+  private dispatchAfter(scheduledIn: State, key: string, event: Event, generation: number): void {
+    // Ignore a stale timer: not running, moved to a different state, OR exited and
+    // re-entered the same state since scheduling (generation changed).
+    if (!this.running || this.stateValue !== scheduledIn || this.entryCounter !== generation) {
+      return
+    }
+    if (this.flushing) {
+      queueMicrotask(() => this.dispatchAfter(scheduledIn, key, event, generation))
       return
     }
     const t = this.resolve(this.config.states[scheduledIn].after?.[key], event)
     if (!t) return
-    this.draining = true
+    this.flushing = true
     try {
       this.applyTransition(t, event)
       while (this.queue.length) {
@@ -331,18 +369,21 @@ class MachineImpl<
         if (nx) this.applyTransition(nx, e)
       }
     } finally {
-      this.draining = false
+      this.flushing = false
     }
   }
 
   // ---- effects: schedule `after` timers, then run state effects; stash cleanups ----
   private startEffects(state: State, event: Event): void {
+    // Each entry is a new generation — a timer scheduled now is bound to it, so a
+    // later exit+re-enter invalidates a still-pending (deferred) dispatch.
+    const generation = ++this.entryCounter
     const after = this.config.states[state].after
     if (after) {
       for (const key in after) {
         const ms = this.resolveDelay(key, event)
-        const id = setTimeout(() => this.dispatchAfter(state, key, event), ms)
-        this.activeCleanups.push(() => clearTimeout(id))
+        const id = setTimeout(() => this.dispatchAfter(state, key, event, generation), ms)
+        this.stateCleanups.push(() => clearTimeout(id))
       }
     }
     const effects = this.config.states[state].effects
@@ -363,12 +404,12 @@ class MachineImpl<
         send: this.send,
         computed: this.computed,
       })
-      if (typeof cleanup === 'function') this.activeCleanups.push(cleanup)
+      if (typeof cleanup === 'function') this.stateCleanups.push(cleanup)
     }
   }
   private stopEffects(): void {
-    for (const cleanup of this.activeCleanups) cleanup()
-    this.activeCleanups.length = 0
+    for (const cleanup of this.stateCleanups) cleanup()
+    this.stateCleanups.length = 0
   }
 
   // ---- watch: machine-global data reaction. A bus listener re-reads the field
@@ -392,8 +433,8 @@ class MachineImpl<
         prev = next
         this.runActions(actions, { type: MACHINE_INIT } as Event)
       }
-      this.bus.add(listener)
-      this.watcherCleanups.push(() => this.bus.delete(listener))
+      this.busAdd(listener)
+      this.watcherCleanups.push(() => this.busDelete(listener))
     }
   }
   private stopWatchers(): void {
@@ -429,15 +470,16 @@ class MachineImpl<
 
   // ---- subscription: coarse (any change) ----
   subscribe = (listener: () => void): (() => void) => {
-    this.bus.add(listener)
-    return () => this.bus.delete(listener)
+    this.busAdd(listener)
+    return () => this.busDelete(listener)
   }
 
   // A Selection re-evaluates its selector on every bus notify and fires its
   // listener only when the selected value changes (Object.is default / equals).
   // `value` is a plain eval. No fire on subscribe.
   private makeSelection<Value>(selector: () => Value): Selection<Value> {
-    const bus = this.bus
+    const add = this.busAdd.bind(this)
+    const remove = this.busDelete.bind(this)
     return {
       get value() {
         return selector()
@@ -450,8 +492,8 @@ class MachineImpl<
           prev = next
           listener(next)
         }
-        bus.add(l)
-        return () => bus.delete(l)
+        add(l)
+        return () => remove(l)
       },
     }
   }
@@ -480,5 +522,5 @@ export function machine<
 >(
   config: TransitionConfig<State, Context, Event, Computed>,
 ): Machine<State, Context, Event, Computed> {
-  return new MachineImpl(config) as unknown as Machine<State, Context, Event, Computed>
+  return new MachineClass(config) as unknown as Machine<State, Context, Event, Computed>
 }

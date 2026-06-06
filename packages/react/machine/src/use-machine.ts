@@ -63,6 +63,13 @@ export function useMachine<
   // Lifecycle: boot on mount, tear down on unmount. The connector wired its
   // reactions to the machine's start/stop, so start()/stop() is all the bridge
   // needs — reactions follow automatically, StrictMode remount included.
+  //
+  // We deliberately do NOT call connection.destroy() here: the connector shares
+  // this hook's lifetime with the machine (both live in the useMemo above), so
+  // they're GC'd together — and destroy() is one-way, which would break the
+  // StrictMode mount→unmount→mount cycle (the memo survives the remount, so a
+  // destroyed connector would be reused detached). destroy() exists for callers
+  // that build a connector standalone, outside this shared-lifetime pattern.
   useEffect(() => {
     service.start()
     return () => service.stop()

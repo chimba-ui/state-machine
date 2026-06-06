@@ -33,24 +33,29 @@ export function useSelector<
   selector: () => T,
   isEqual?: EqualityFn<T>,
 ): T {
-  // Always evaluate the LATEST selector / equality, without making them deps of
-  // the Selection (which would rebuild + re-subscribe on every render, since a
-  // leaf typically passes a fresh closure each time).
+  // Keep the LATEST selector in a ref so a leaf passing a fresh closure each
+  // render (e.g. one closing over a changing `value` prop) always evaluates its
+  // current form, WITHOUT rebuilding the Selection or re-subscribing. Only the
+  // selector needs this — `isEqual` is read once at subscribe time, not per
+  // change, so it can be closed over directly (one fewer ref + per-render write
+  // per leaf, which adds up across thousands of leaves on mount).
   const selectorRef = useRef(selector)
   selectorRef.current = selector
-  const isEqualRef = useRef(isEqual)
-  isEqualRef.current = isEqual
 
   // One Selection over a stable wrapper that reads the current selector. Built
   // once per machine; auto-tracks whatever the selector reads, value-deduped.
-  // `sel.value` re-reads the wrapper, so it always reflects the LATEST selector
-  // (e.g. after a `value` prop change) — getSnapshot stays correct without
-  // rebuilding the Selection or re-subscribing.
   const selectorMemo = useMemo(() => machine.select(() => selectorRef.current()), [machine])
 
   return useSyncExternalStore(
-    onStoreChange => selectorMemo.subscribe(() => onStoreChange(), isEqualRef.current),
-    () => selectorMemo.value,
-    () => selectorMemo.value,
+    onStoreChange => selectorMemo.subscribe(() => onStoreChange(), isEqual),
+    // getSnapshot evaluates the selector DIRECTLY rather than reading
+    // selectorMemo.value. `.value` lazily builds a preact computed on first
+    // read, and React calls getSnapshot during every leaf's mount render — so
+    // routing through `.value` would allocate a computed node per leaf at mount.
+    // The snapshot read doesn't need tracking (only `subscribe` does), so a
+    // plain eval is correct and skips that per-leaf allocation. The Selection's
+    // reactive node is still built lazily if anyone reads `.value` elsewhere.
+    () => selectorRef.current(),
+    () => selectorRef.current(),
   )
 }

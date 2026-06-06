@@ -225,8 +225,7 @@ The core stays pure throughout.
 | `and` / `or` / `not`                 | guard combinators                                                                                                                                         |
 | `oneOf([...])`                       | conditional action branch                                                                                                                                 |
 | `MACHINE_INIT`                       | the synthetic event fired when effects/watchers boot on `start()`                                                                                         |
-| `createContext` / `createState`      | the underlying building blocks (advanced)                                                                                                                 |
-| Types                                | `Machine`, `MachineConfig`, `TransitionConfig`, `Guard`, `Action`, `Effect`, `Delay`, `Selection`, `Connect`, `Store`, `EventBindings`, `AttrBindings`, … |
+| Types                                | `Machine`, `MachineConfig`, `TransitionConfig`, `Guard`, `Action`, `Effect`, `Delay`, `Selection`, `Connect`, `Store`, `StateNode`, `EventBindings`, `AttrBindings`, … |
 
 ---
 

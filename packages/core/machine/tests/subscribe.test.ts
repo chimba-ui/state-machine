@@ -307,3 +307,52 @@ describe('select.context / .computed / .state — named scopes', () => {
     expect(fn).toHaveBeenLastCalledWith(4)
   })
 })
+
+// The bus iterates a stable snapshot, so a listener that mutates the listener set
+// mid-notify affects the NEXT notify, not the in-flight pass.
+describe('reentrancy — subscribing/unsubscribing during a notify', () => {
+  const counter = () =>
+    machine<'idle', { n: number }, { type: 'inc' }>({
+      initial: 'idle',
+      context: { n: 0 },
+      states: {
+        idle: {
+          on: { inc: { actions: [({ context, setContext }) => setContext({ n: context.n + 1 })] } },
+        },
+      },
+    })
+
+  it('a listener added during a notify does NOT fire on that same change', () => {
+    const m = counter()
+    const late = vi.fn()
+    let added = false
+    m.subscribe(() => {
+      if (!added) {
+        added = true
+        m.subscribe(late) // subscribe mid-notify
+      }
+    })
+    m.send({ type: 'inc' }) // first change: adds `late`, but `late` must not fire now
+    expect(late).not.toHaveBeenCalled()
+    m.send({ type: 'inc' }) // next change: `late` is in the snapshot → fires
+    expect(late).toHaveBeenCalledTimes(1)
+  })
+
+  it('a listener can unsubscribe another mid-notify without skipping the pass', () => {
+    const m = counter()
+    const calls: string[] = []
+    let offB = () => {}
+    m.subscribe(() => {
+      calls.push('a')
+      offB() // remove B during the notify
+    })
+    offB = m.subscribe(() => calls.push('b'))
+    m.send({ type: 'inc' })
+    // both A and B were in the snapshot when this notify started, so both ran;
+    // B is gone for the NEXT notify.
+    expect(calls).toEqual(['a', 'b'])
+    calls.length = 0
+    m.send({ type: 'inc' })
+    expect(calls).toEqual(['a']) // B unsubscribed
+  })
+})

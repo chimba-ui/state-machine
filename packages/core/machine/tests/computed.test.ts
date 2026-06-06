@@ -315,3 +315,49 @@ describe('surfaced on the machine', () => {
     expect(m.computed.greet).toBe('Hi, Ada Lovelace')
   })
 })
+
+// Read-key dependency tracking records exactly the keys a computed read on its
+// last run. With a conditional read, the untaken branch's field isn't a dep — so
+// changing it alone keeps the computed cached. Correct as long as the PREDICATE
+// field is read every run (it is), which re-tracks deps when the branch flips.
+describe('conditional (dynamic) dependencies', () => {
+  type Ctx = { useDiscount: boolean; price: number; discount: number }
+
+  const make = () => {
+    let runs = 0
+    const m = machine<'idle', Ctx, { type: 'set'; patch: Partial<Ctx> }, { total: number }>({
+      initial: 'idle',
+      context: { useDiscount: false, price: 100, discount: 10 },
+      computed: {
+        total: ({ context }) => {
+          runs++
+          return context.useDiscount ? context.price - context.discount : context.price
+        },
+      },
+      states: {
+        idle: { on: { set: { actions: [({ event, setContext }) => setContext(event.patch)] } } },
+      },
+    })
+    return { m, runs: () => runs }
+  }
+
+  it('the untaken branch field is not a dependency (stays cached)', () => {
+    const { m, runs } = make()
+    expect(m.computed.total).toBe(100) // discount path NOT read
+    expect(runs()).toBe(1)
+    m.send({ type: 'set', patch: { discount: 50 } }) // discount unused on this branch
+    expect(m.computed.total).toBe(100) // still cached — no recompute
+    expect(runs()).toBe(1)
+  })
+
+  it('flipping the predicate re-tracks: the newly-read field becomes a dep', () => {
+    const { m, runs } = make()
+    expect(m.computed.total).toBe(100) // runs=1, deps: {useDiscount, price}
+    m.send({ type: 'set', patch: { useDiscount: true } }) // predicate changed → recompute
+    expect(m.computed.total).toBe(90) // 100 - 10; now reads discount too
+    expect(runs()).toBe(2)
+    m.send({ type: 'set', patch: { discount: 30 } }) // discount IS a dep now → recompute
+    expect(m.computed.total).toBe(70)
+    expect(runs()).toBe(3)
+  })
+})

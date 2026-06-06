@@ -8,7 +8,7 @@
  * on a real state change.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { createState } from '../src'
+import { createState } from '../src/state'
 
 const make = () =>
   createState('closed', {
