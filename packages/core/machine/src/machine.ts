@@ -87,17 +87,23 @@ class MachineClass<
     // and glitch-free: a dep on another computed is checked by reading that
     // computed (which lazily recomputes itself first if stale).
     this.computed = {} as Computed
+    // captured for the `state` getter inside each computed's params literal,
+    // where `this` would otherwise bind to the literal, not the machine.
+    const self = this
     if (config.computed) {
       for (const key in config.computed) {
         const k = key as keyof Computed
         const def = config.computed[k]
         let computedOnce = false
         let cachedValue: Computed[keyof Computed]
-        // recorded deps from the last run: context keys + computed keys read
+        // recorded deps from the last run: context keys + computed keys read,
+        // plus whether the def read `state` (the lifecycle is also a dependency)
         let ctxDeps: string[] = []
         let computedDeps: string[] = []
         let ctxSnapshot: Record<string, unknown> = {}
         let computedSnapshot: Record<string, unknown> = {}
+        let readState = false
+        let stateSnapshot: State | undefined
 
         // The two tracking proxies are built ONCE per computed (not per recompute).
         // Their targets read `this.ctx` / `this.computed` LIVE through the trap, so
@@ -106,6 +112,9 @@ class MachineClass<
         // swaps in before calling `def`.
         let ctxRead: Set<string> | null = null
         let computedRead: Set<string> | null = null
+        // set true during a recompute so reading `params.state` records the
+        // dependency; nulled outside so a stale-check read never records.
+        let tracking = false
         const trackedCtx = new Proxy({} as Record<string, unknown>, {
           get: (_t, p: string) => {
             ctxRead?.add(p)
@@ -120,6 +129,8 @@ class MachineClass<
         }) as Computed
 
         const stale = (): boolean => {
+          // if the def read `state`, the lifecycle is a dependency too
+          if (readState && stateSnapshot !== this.stateValue) return true
           for (const dk of ctxDeps) {
             if (!Object.is(ctxSnapshot[dk], (this.ctx as Record<string, unknown>)[dk])) return true
           }
@@ -141,17 +152,27 @@ class MachineClass<
             const compr = new Set<string>()
             ctxRead = cr
             computedRead = compr
+            readState = false
+            tracking = true
             try {
               cachedValue = def({
                 context: trackedCtx,
                 computed: trackedComputed,
+                // a getter: reading `state` records it as a dependency (during
+                // tracking) so a later transition invalidates this computed
+                get state() {
+                  if (tracking) readState = true
+                  return self.stateValue
+                },
               }) as Computed[keyof Computed]
             } finally {
               ctxRead = null
               computedRead = null
+              tracking = false
             }
             ctxDeps = [...cr]
             computedDeps = [...compr]
+            stateSnapshot = readState ? this.stateValue : undefined
             ctxSnapshot = {}
             for (const dk of ctxDeps) ctxSnapshot[dk] = (this.ctx as Record<string, unknown>)[dk]
             computedSnapshot = {}
@@ -275,7 +296,15 @@ class MachineClass<
     if (!entry) return undefined
     const list = Array.isArray(entry) ? entry : [entry]
     const params = this.guardParams(event)
-    return list.find(t => (t.guard ? this.resolveGuard(t.guard, params) : true))
+    // A bare fn entry is a guardless, targetless transition: normalize it to
+    // { actions: [fn] } so the one "first passing guard wins" loop covers all
+    // three forms. Guardless → always matches (so a bare fn is a fallback).
+    for (const el of list) {
+      const t: Transition<State, Context, Event, Computed> =
+        typeof el === 'function' ? { actions: [el] } : el
+      if (!t.guard || this.resolveGuard(t.guard, params)) return t
+    }
+    return undefined
   }
 
   // ---- actions ----

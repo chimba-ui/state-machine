@@ -361,3 +361,67 @@ describe('conditional (dynamic) dependencies', () => {
     expect(runs()).toBe(3)
   })
 })
+
+describe('from state', () => {
+  // A computed that reads the lifecycle `state` (not just context). The state
+  // is a tracked dependency: a transition recomputes it, but an unrelated
+  // context write does not.
+  const make = () => {
+    let runs = 0
+    const m = machine<
+      'idle' | 'busy' | 'done',
+      { note: string },
+      { type: 'go' } | { type: 'finish' } | { type: 'setNote'; note: string },
+      { isBusy: boolean; label: string }
+    >({
+      initial: 'idle',
+      context: { note: '' },
+      computed: {
+        isBusy: ({ state }) => state === 'busy',
+        label: ({ state }) => {
+          runs++
+          return `state=${state}`
+        },
+      },
+      states: {
+        idle: { on: { go: { target: 'busy' } } },
+        busy: { on: { finish: { target: 'done' } } },
+        done: {},
+      },
+      on: {
+        setNote: { actions: [({ setContext, event }) => setContext({ note: event.note })] },
+      },
+    })
+    m.start()
+    return { m, runs: () => runs }
+  }
+
+  it('reads the current state', () => {
+    const { m } = make()
+    expect(m.computed.isBusy).toBe(false) // idle
+    expect(m.computed.label).toBe('state=idle')
+  })
+
+  it('a transition invalidates a state-reading computed', () => {
+    const { m } = make()
+    expect(m.computed.isBusy).toBe(false)
+    m.send({ type: 'go' }) // → busy
+    expect(m.computed.isBusy).toBe(true)
+    expect(m.computed.label).toBe('state=busy')
+    m.send({ type: 'finish' }) // → done
+    expect(m.computed.isBusy).toBe(false)
+    expect(m.computed.label).toBe('state=done')
+  })
+
+  it('an unrelated context write does NOT recompute a state-only computed', () => {
+    const { m, runs } = make()
+    expect(m.computed.label).toBe('state=idle') // runs=1
+    expect(runs()).toBe(1)
+    m.send({ type: 'setNote', note: 'hi' }) // context changed, state did not
+    expect(m.computed.label).toBe('state=idle') // cached — no recompute
+    expect(runs()).toBe(1)
+    m.send({ type: 'go' }) // state changed → recompute
+    expect(m.computed.label).toBe('state=busy')
+    expect(runs()).toBe(2)
+  })
+})

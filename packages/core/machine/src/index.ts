@@ -23,8 +23,9 @@ export type { StateNode } from './types'
 export { and, or, not } from './guards'
 export type { Guard, GuardArg, GuardParams } from './types'
 
-// Actions: oneOf + types.
+// Actions: oneOf + act (context-write shorthand) + types.
 export { oneOf } from './actions'
+export { act } from './act'
 export type { Action, ActionArg, ActionParams, OneOf, OneOfBranch } from './types'
 
 // Effects + types.

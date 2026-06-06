@@ -79,6 +79,19 @@ export interface Transition<
   actions?: Array<ActionArg<Context, Event, Computed, Send>>
 }
 
+/**
+ * A transition entry, in any of three forms:
+ *   - a {@link Transition} object        — "go (+ optionally do)"
+ *   - a bare {@link Action} function      — "just do this" (a guardless,
+ *     targetless transition — the terse form for context-only handlers, where
+ *     a `{ actions: [fn] }` wrapper with no `target` would be pure noise)
+ *   - an array of either                  — fallthrough: the first element whose
+ *     guard passes wins; a bare fn is guardless, so it always matches (use it
+ *     last, as the fallback). Mirrors the rule for a guardless object.
+ *
+ * The runtime normalizes a bare fn to `{ actions: [fn] }` (see `resolve`), so
+ * all three forms run through the same "first passing guard wins" loop.
+ */
 export type TransitionEntry<
   State extends string,
   Context extends object,
@@ -87,7 +100,10 @@ export type TransitionEntry<
   Send = Event,
 > =
   | Transition<State, Context, Event, Computed, Send>
-  | Array<Transition<State, Context, Event, Computed, Send>>
+  | Action<Context, Event, Computed, Send>
+  | Array<
+      Transition<State, Context, Event, Computed, Send> | Action<Context, Event, Computed, Send>
+    >
 
 // -----------------------------------------------------------------------------
 // Actions
@@ -180,15 +196,20 @@ export type EffectArg<
 // Computed
 // -----------------------------------------------------------------------------
 
-/** A single computed definition: derives a value from context (and computeds). */
-export type ComputedDef<Context, Computed = Record<string, never>, Value = unknown> = (params: {
-  context: Context
-  computed: Computed
-}) => Value
+/** A single computed definition: derives a value from context, the current
+ * `state`, and other computeds. Reading `state` makes the lifecycle a tracked
+ * dependency, so a transition re-evaluates the computed (same memoization as a
+ * context-key read). */
+export type ComputedDef<
+  State extends string,
+  Context,
+  Computed = Record<string, never>,
+  Value = unknown,
+> = (params: { context: Context; state: State; computed: Computed }) => Value
 
 /** The map of computed definitions, keyed to the Computed value shape. */
-export type ComputedDefs<Context, Computed> = {
-  [K in keyof Computed]: ComputedDef<Context, Computed, Computed[K]>
+export type ComputedDefs<State extends string, Context, Computed> = {
+  [K in keyof Computed]: ComputedDef<State, Context, Computed, Computed[K]>
 }
 
 // -----------------------------------------------------------------------------
@@ -273,7 +294,7 @@ export interface TransitionConfig<
   on?: EventMap<State, Context, Event, Computed>
   /** Derived state. Each def becomes a lazy, memoized computed signal read via
    * the `computed` bag in guard/action/effect params (and on the machine). */
-  computed?: ComputedDefs<Context, Computed>
+  computed?: ComputedDefs<State, Context, Computed>
   /** Data-reactions. Each key is a context (or computed) field; its actions run
    * whenever that field changes — in ANY state, while the machine runs. Started
    * on start(), cleaned up on stop(). The action's `event` is the MACHINE_INIT
