@@ -249,6 +249,25 @@ class MachineClass<
     }
     return fn(params)
   }
+  // Look up the `on` entry for a live event: per-state first, falling back to
+  // any-state. `EventMap` is keyed to the narrow event-type literals, so the
+  // entry it yields for key `K` narrows `event` to that variant at AUTHORING
+  // time — but at RUNTIME we index with the broad `event.type`, so we read it
+  // back through the union `TransitionEntry` (`resolve` re-narrows by matching
+  // the actual event). The single place that crosses the narrow→broad boundary.
+  private lookupOn(
+    stateValue: State,
+    type: Event['type'],
+  ): TransitionEntry<State, Context, Event, Computed> | undefined {
+    const onState = this.config.states[stateValue].on as
+      | Record<string, TransitionEntry<State, Context, Event, Computed>>
+      | undefined
+    const onAny = this.config.on as
+      | Record<string, TransitionEntry<State, Context, Event, Computed>>
+      | undefined
+    return onState?.[type] ?? onAny?.[type]
+  }
+
   private resolve(
     entry: TransitionEntry<State, Context, Event, Computed> | undefined,
     event: Event,
@@ -320,8 +339,7 @@ class MachineClass<
     try {
       while (this.queue.length) {
         const e = this.queue.shift()!
-        const entry = this.config.states[this.stateValue].on?.[e.type] ?? this.config.on?.[e.type]
-        const t = this.resolve(entry, e)
+        const t = this.resolve(this.lookupOn(this.stateValue, e.type), e)
         if (t) this.applyTransition(t, e)
       }
     } finally {
@@ -362,10 +380,7 @@ class MachineClass<
       this.applyTransition(t, event)
       while (this.queue.length) {
         const e = this.queue.shift()!
-        const nx = this.resolve(
-          this.config.states[this.stateValue].on?.[e.type] ?? this.config.on?.[e.type],
-          e,
-        )
+        const nx = this.resolve(this.lookupOn(this.stateValue, e.type), e)
         if (nx) this.applyTransition(nx, e)
       }
     } finally {

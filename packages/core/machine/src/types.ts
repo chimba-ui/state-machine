@@ -60,12 +60,15 @@ export type GuardArg<Context extends object, Event, Computed = Record<string, ne
 // Transitions
 // -----------------------------------------------------------------------------
 
-/** A single transition: optional target, optional guard, optional actions. */
+/** A single transition: optional target, optional guard, optional actions.
+ * `Event` is the (possibly narrowed) incoming event; `Send` is the full event
+ * union an action may dispatch (defaults to `Event`). */
 export interface Transition<
   State extends string,
   Context extends object,
   Event,
   Computed = Record<string, never>,
+  Send = Event,
 > {
   // NoInfer: `target` is checked against the State union (defined by the states
   // keys) rather than contributing to inferring it — so a bad target errors at
@@ -73,41 +76,71 @@ export interface Transition<
   target?: NoInfer<State>
   guard?: GuardArg<Context, Event, Computed>
   /** Actions to run, in order. */
-  actions?: Array<ActionArg<Context, Event, Computed>>
+  actions?: Array<ActionArg<Context, Event, Computed, Send>>
 }
 
-export type TransitionEntry<State extends string, Context extends object, Event, Computed> =
-  | Transition<State, Context, Event, Computed>
-  | Array<Transition<State, Context, Event, Computed>>
+export type TransitionEntry<
+  State extends string,
+  Context extends object,
+  Event,
+  Computed,
+  Send = Event,
+> =
+  | Transition<State, Context, Event, Computed, Send>
+  | Array<Transition<State, Context, Event, Computed, Send>>
 
 // -----------------------------------------------------------------------------
 // Actions
 // -----------------------------------------------------------------------------
 
-/** Everything an action can read/use. */
-export interface ActionParams<Context extends object, Event, Computed = Record<string, never>> {
+/**
+ * Everything an action can read/use. `Event` is the (possibly narrowed)
+ * incoming event the action reads; `Send` is the FULL event union you may
+ * dispatch — under a per-event `on.K` entry, `event` narrows to that variant
+ * while `send` still accepts any event. `Send` defaults to `Event` so a
+ * direct/unnarrowed use is unchanged.
+ */
+export interface ActionParams<
+  Context extends object,
+  Event,
+  Computed = Record<string, never>,
+  Send = Event,
+> {
   context: Context
   setContext: (patch: Partial<Context>) => void
   event: Event
-  send: (event: Event) => void
+  send: (event: Send) => void
   computed: Computed
 }
 
 /** An inline action: a side-effect over the params. */
-export type Action<Context extends object, Event, Computed = Record<string, never>> = (
-  params: ActionParams<Context, Event, Computed>,
-) => void
+export type Action<
+  Context extends object,
+  Event,
+  Computed = Record<string, never>,
+  Send = Event,
+> = (params: ActionParams<Context, Event, Computed, Send>) => void
 
 /** One branch of a oneOf: optional guard + the actions to run if it wins. */
-export interface OneOfBranch<Context extends object, Event, Computed = Record<string, never>> {
+export interface OneOfBranch<
+  Context extends object,
+  Event,
+  Computed = Record<string, never>,
+  Send = Event,
+> {
   guard?: GuardArg<Context, Event, Computed>
-  actions: Array<ActionArg<Context, Event, Computed>>
+  actions: Array<ActionArg<Context, Event, Computed, Send>>
 }
 
 /** The oneOf sentinel — the runtime detects it in an actions list and expands. */
-export interface OneOf<Context extends object, Event, Computed = Record<string, never>> {
+export interface OneOf<
+  Context extends object,
+  Event,
+  Computed = Record<string, never>,
+  Send = Event,
+> {
   readonly __oneOf: true
-  readonly branches: Array<OneOfBranch<Context, Event, Computed>>
+  readonly branches: Array<OneOfBranch<Context, Event, Computed, Send>>
 }
 
 /**
@@ -115,25 +148,33 @@ export interface OneOf<Context extends object, Event, Computed = Record<string, 
  * (resolved against implementations.actions), or a `oneOf(...)` conditional
  * branch. Missing name → throw in dev, warn in prod. A list runs in order.
  */
-export type ActionArg<Context extends object, Event, Computed = Record<string, never>> =
-  | Action<Context, Event, Computed>
-  | string
-  | OneOf<Context, Event, Computed>
+export type ActionArg<
+  Context extends object,
+  Event,
+  Computed = Record<string, never>,
+  Send = Event,
+> = Action<Context, Event, Computed, Send> | string | OneOf<Context, Event, Computed, Send>
 
 // -----------------------------------------------------------------------------
 // Effects
 // -----------------------------------------------------------------------------
 
 /** An inline effect: runs on enter, optionally returns a cleanup run on exit. */
-export type Effect<Context extends object, Event, Computed = Record<string, never>> = (
-  params: ActionParams<Context, Event, Computed>,
-) => void | (() => void)
+export type Effect<
+  Context extends object,
+  Event,
+  Computed = Record<string, never>,
+  Send = Event,
+> = (params: ActionParams<Context, Event, Computed, Send>) => void | (() => void)
 
 /** An effect arg: an inline effect or a registered name (resolved against
  * implementations.effects). Missing name → throw in dev, warn in prod. */
-export type EffectArg<Context extends object, Event, Computed = Record<string, never>> =
-  | Effect<Context, Event, Computed>
-  | string
+export type EffectArg<
+  Context extends object,
+  Event,
+  Computed = Record<string, never>,
+  Send = Event,
+> = Effect<Context, Event, Computed, Send> | string
 
 // -----------------------------------------------------------------------------
 // Computed
@@ -176,6 +217,30 @@ export interface Implementations<Context extends object, Event, Computed = Recor
   delays?: Record<string, Delay<Context, Event, Computed>>
 }
 
+/**
+ * The `on` map keyed to the event union: each key is an `Event['type']`, and
+ * its entry's incoming `event` narrows to that exact variant
+ * (`Extract<Event, { type: K }>`) — so an action under `on.set` reads
+ * `event.value` without a manual cast, and a key that isn't a real event type
+ * errors. `send` keeps the FULL `Event` union (passed as the trailing `Send`
+ * arg), because an action routinely dispatches OTHER events. Partial: a state
+ * handles only the events it cares about.
+ */
+export type EventMap<
+  State extends string,
+  Context extends object,
+  Event extends { type: string },
+  Computed,
+> = {
+  [K in Event['type']]?: TransitionEntry<
+    State,
+    Context,
+    Extract<Event, { type: K }>,
+    Computed,
+    Event
+  >
+}
+
 export interface TransitionConfig<
   State extends string,
   Context extends object,
@@ -190,7 +255,7 @@ export interface TransitionConfig<
   states: Record<
     State,
     StateNode & {
-      on?: Record<string, TransitionEntry<State, Context, Event, Computed>>
+      on?: EventMap<State, Context, Event, Computed>
       /** Actions run when this state is entered (after the switch). */
       entry?: Array<ActionArg<Context, Event, Computed>>
       /** Actions run when this state is exited (before the switch). */
@@ -205,7 +270,7 @@ export interface TransitionConfig<
     }
   >
   /** Any-state events. Per-state `on` takes precedence over this. */
-  on?: Record<string, TransitionEntry<State, Context, Event, Computed>>
+  on?: EventMap<State, Context, Event, Computed>
   /** Derived state. Each def becomes a lazy, memoized computed signal read via
    * the `computed` bag in guard/action/effect params (and on the machine). */
   computed?: ComputedDefs<Context, Computed>
