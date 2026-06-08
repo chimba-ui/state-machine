@@ -1,6 +1,6 @@
 /**
- * A tiny reactive store — for cross-instance singleton state (e.g. "only one
- * tooltip open at a time") that lives outside any single machine.
+ * A tiny store — for cross-instance singleton state (e.g. "only one tooltip open
+ * at a time") that lives outside any single machine.
  *
  * Plain value + a listener Set. `get()` reads it; `set()` shallow-merges a patch
  * (or an updater) and notifies on a real change; `subscribe(fn)` fires on every

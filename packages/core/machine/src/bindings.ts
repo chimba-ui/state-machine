@@ -87,12 +87,22 @@ export interface AttrBindings {
   describedBy?: string
   /** "this element's label is over there" (ARIA labelledby). */
   labelledBy?: string
+  /** "this element controls that one" (ARIA controls) — e.g. a trigger naming
+   * the menu surface it toggles. */
+  controls?: string
 
   /** Boolean state (open/closed disclosure regions). */
   expanded?: boolean
   selected?: boolean
   disabled?: boolean
   hidden?: boolean
+
+  /**
+   * The kind of popup this element opens (ARIA haspopup) — `'menu'`,
+   * `'listbox'`, `'dialog'`, … or `true` for a generic popup. Substrates with
+   * no popup concept ignore it.
+   */
+  hasPopup?: 'menu' | 'listbox' | 'tree' | 'grid' | 'dialog' | boolean
 
   /**
    * Whether the element participates in keyboard focus.

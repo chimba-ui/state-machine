@@ -58,7 +58,7 @@ export { makeReaction } from './reaction'
 export { compose } from './compose'
 export type { Composition } from './compose'
 
-// A tiny signal-backed store for cross-instance singletons (wrap in a facade).
+// A tiny store (plain value + listeners) for cross-instance singletons (wrap in a facade).
 export { createStore } from './store'
 export type { Store, Listener, SetStateAction } from './store'
 

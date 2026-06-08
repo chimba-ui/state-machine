@@ -26,14 +26,21 @@ export type Patch<Context extends object, Event, Computed = Record<string, never
  * `oneOf` branch's `actions`. It only ever WRITES — `target`/`guard` live on the
  * surrounding transition, never on `act`.
  *
- * TYPES NOTE — a single `act({...})` or `act($ => ({...}))` infers `Context` from
- * its slot, but a MIXED multi-patch call (`act({...}, $ => ({...}))`) infers
- * `Context` from the FIRST arg only, so the later fn's `$` loses fields. Annotate
- * such a call — `act<Context, Event>({...}, $ => ({...}))` — or split it into two
- * `act`s in the list. (The same limitation as XState's `assign` outside `setup`.)
+ * TYPES — `Context` is `NoInfer`, so it is NOT read off the patch argument; it
+ * flows from the slot the action lands in (the `Actions<Context, …>` position in
+ * a transition / `entry` / `exit` / `oneOf`). That means a bare `act({ x: 1 })`
+ * or `act($ => ({ x: $.context.x + 1 }))` is fully typed against the surrounding
+ * config — a wrong field or value errors at the call site, with NO per-call
+ * generics, even when the config declares `computed` (the `Computed` param also
+ * comes from the slot). The `$` in a function patch is likewise slot-typed.
+ *
+ * The only case still needing an explicit annotation is a STANDALONE `act(...)`
+ * with no contextual slot (e.g. assigned to a bare `const` before being placed),
+ * where there's nothing for `Context` to flow from — write
+ * `act<Context, Event, Computed>(...)` there. Inside a config it's never needed.
  */
 export function act<Context extends object, Event, Computed = Record<string, never>, Send = Event>(
-  ...patches: Array<Patch<Context, Event, Computed, Send>>
+  ...patches: Array<Patch<NoInfer<Context>, Event, Computed, Send>>
 ): Action<Context, Event, Computed, Send> {
   return params => {
     // `params.context` is the snapshot captured when this action started, and the

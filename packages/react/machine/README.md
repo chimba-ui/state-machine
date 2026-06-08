@@ -189,14 +189,14 @@ const domProps = normalize(api.triggerProps) // { onClick, aria-describedby, rol
 
 The mapping:
 
-| Agnostic binding                                | DOM/ARIA prop                                                 |
-| ----------------------------------------------- | ------------------------------------------------------------- |
-| `onPress`                                       | `onClick`                                                     |
-| `onPointerEnter/Leave/Move/Down`, `onFocus/Blur`, `onKeyDown` | same name (already DOM-shaped)                  |
-| `describedBy` / `labelledBy`                    | `aria-describedby` / `aria-labelledby`                        |
-| `expanded` / `selected` / `disabled` / `hidden` | `aria-expanded` / `aria-selected` / `aria-disabled` / `aria-hidden` |
-| `focusable`                                     | `tabIndex` (`true → 0`, `false → -1`)                         |
-| `role` / `id`                                   | `role` / `id`                                                 |
+| Agnostic binding                                              | DOM/ARIA prop                                                       |
+| ------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `onPress`                                                     | `onClick`                                                           |
+| `onPointerEnter/Leave/Move/Down`, `onFocus/Blur`, `onKeyDown` | same name (already DOM-shaped)                                      |
+| `describedBy` / `labelledBy`                                  | `aria-describedby` / `aria-labelledby`                              |
+| `expanded` / `selected` / `disabled` / `hidden`               | `aria-expanded` / `aria-selected` / `aria-disabled` / `aria-hidden` |
+| `focusable`                                                   | `tabIndex` (`true → 0`, `false → -1`)                               |
+| `role` / `id`                                                 | `role` / `id`                                                       |
 
 `undefined` values are dropped, and any key not in the map passes through
 unchanged — so a binding the renderer already understands needs no entry.
@@ -234,13 +234,13 @@ If the consumer passes no props, the library props are returned as-is.
 
 ## API
 
-| Export                                     | What it is                                                                                  |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| `useMachine(config, connect, adapter, props)` | the bridge hook — build once + lifecycle + `useSyncExternalStore`; returns `{ api, machine }` |
-| `useSelector(machine, selector, isEqual?)` | fine-grained subscription to a derived slice (`O(readers)`)                                  |
-| `useEffects(effects, machine, props)`      | run a `ComponentEffects` list — one React effect per entry, each with a precise dep array   |
-| `normalize(bindings)`                      | agnostic bindings → DOM/ARIA props                                                          |
-| `mergeProps(consumer, library)`            | merge consumer + component props (handlers chained w/ `defaultPrevented` veto; `style`/`className` merged; else library wins) |
-| `ComponentEffect<M, P>`                    | `[ (machine, props) => cleanup, (keyof P)[] ]` — one substrate effect + its prop deps        |
-| `ComponentEffects<M, P>`                   | `ComponentEffect<M, P>[]` — a component's effect list (static module constant)              |
-| `Bindings`                                 | `Record<string, unknown>` — the loose shape `normalize` accepts                             |
+| Export                                        | What it is                                                                                                                    |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `useMachine(config, connect, adapter, props)` | the bridge hook — build once + lifecycle + `useSyncExternalStore`; returns `{ api, machine }`                                 |
+| `useSelector(machine, selector, isEqual?)`    | fine-grained subscription to a derived slice (`O(readers)`)                                                                   |
+| `useEffects(effects, machine, props)`         | run a `ComponentEffects` list — one React effect per entry, each with a precise dep array                                     |
+| `normalize(bindings)`                         | agnostic bindings → DOM/ARIA props                                                                                            |
+| `mergeProps(consumer, library)`               | merge consumer + component props (handlers chained w/ `defaultPrevented` veto; `style`/`className` merged; else library wins) |
+| `ComponentEffect<M, P>`                       | `[ (machine, props) => cleanup, (keyof P)[] ]` — one substrate effect + its prop deps                                         |
+| `ComponentEffects<M, P>`                      | `ComponentEffect<M, P>[]` — a component's effect list (static module constant)                                                |
+| `Bindings`                                    | `Record<string, unknown>` — the loose shape `normalize` accepts                                                               |

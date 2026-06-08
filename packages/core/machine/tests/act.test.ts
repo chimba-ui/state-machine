@@ -47,10 +47,10 @@ describe('act', () => {
       states: {
         idle: {
           on: {
-            // static patch, then a fn that reads the just-written n. Mixed
-            // object+fn args defeat inference (Context is inferred from the first
-            // arg only), so annotate — see act's doc comment.
-            bump: act<{ n: number; label: string }, { type: 'bump' }>({ n: 5 }, $ => ({
+            // static patch, then a fn that reads the just-written n. `Context` is
+            // NoInfer, so even this MIXED object+fn call types fully from the slot
+            // — no per-call generics needed (see act's doc comment).
+            bump: act({ n: 5 }, $ => ({
               label: `n=${$.context.n}`,
             })),
           },
@@ -83,5 +83,31 @@ describe('act', () => {
     expect(m.state).toBe('b')
     expect(m.context.hit).toBe(true)
     expect(order).toEqual(['before', 'after'])
+  })
+
+  // Compile-time: `Context` is NoInfer, so a bare `act({...})` types from the
+  // slot — even when the config declares `computed` and the patched field is a
+  // union (the case that previously forced `act<Ctx, Ev, Comp>(...)`). A wrong
+  // value must error at the call site. (Type-only; the runtime body is trivial.)
+  it('infers Context from the slot — no per-call generics, even with computed', () => {
+    type Ctx = { timing: 'instant' | 'delayed' | null }
+    type Ev = { type: 'open' }
+    type Comp = { label: string }
+
+    const m = machine<'closed' | 'open', Ctx, Ev, Comp>({
+      initial: 'closed',
+      context: { timing: null },
+      computed: { label: ({ context }) => String(context.timing) },
+      states: {
+        // bare act, no generics — fully typed against Ctx
+        closed: { on: { open: { target: 'open', actions: act({ timing: 'instant' }) } } },
+        open: {
+          // @ts-expect-error — 'nope' is not assignable to Ctx['timing']
+          on: { open: { actions: act({ timing: 'nope' }) } },
+        },
+      },
+    })
+    m.send({ type: 'open' })
+    expect(m.context.timing).toBe('instant')
   })
 })

@@ -144,11 +144,7 @@ importers:
         specifier: workspace:*
         version: link:../../../shared/utils
 
-  packages/core/machine:
-    dependencies:
-      '@preact/signals-core':
-        specifier: ^1.14.2
-        version: 1.14.2
+  packages/core/machine: {}
 
   packages/core/style-engine: {}
 
@@ -199,6 +195,9 @@ importers:
       '@render-experiment/machine-core':
         specifier: workspace:*
         version: link:../../core/machine
+      '@render-experiment/machine-react':
+        specifier: workspace:*
+        version: link:../../react/machine
       '@render-experiment/utils':
         specifier: workspace:*
         version: link:../../shared/utils
@@ -211,6 +210,9 @@ importers:
 
   packages/native/style-engine:
     dependencies:
+      react:
+        specifier: '*'
+        version: 19.2.6
       react-native:
         specifier: '*'
         version: 0.85.0(@babel/core@7.29.7)(@react-native/jest-preset@0.85.3(@babel/core@7.29.7)(react@19.2.6))(@types/react@19.2.15)(react@19.2.6)
@@ -6310,7 +6312,7 @@ snapshots:
       postcss: 8.5.15
       resolve-from: 5.0.0
     optionalDependencies:
-      expo: 56.0.8(@babel/core@7.29.7)(@expo/dom-webview@56.0.5)(react-dom@19.2.6(react@19.2.6))(react-native@0.85.0(@babel/core@7.29.7)(@react-native/jest-preset@0.85.3(@babel/core@7.29.7)(react@19.2.6))(@types/react@19.2.15)(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      expo: 56.0.8(@babel/core@7.29.7)(@expo/dom-webview@56.0.5)(react-dom@19.2.6(react@19.2.0))(react-native@0.85.0(@babel/core@7.29.7)(@react-native/jest-preset@0.85.3(@babel/core@7.29.7)(react@19.2.6))(@types/react@19.2.15)(react@19.2.0))(react@19.2.0)(typescript@6.0.3)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -7669,7 +7671,7 @@ snapshots:
       react-refresh: 0.14.2
     optionalDependencies:
       '@babel/runtime': 7.29.7
-      expo: 56.0.8(@babel/core@7.29.7)(@expo/dom-webview@56.0.5)(react-dom@19.2.6(react@19.2.6))(react-native@0.85.0(@babel/core@7.29.7)(@react-native/jest-preset@0.85.3(@babel/core@7.29.7)(react@19.2.6))(@types/react@19.2.15)(react@19.2.6))(react@19.2.6)(typescript@6.0.3)
+      expo: 56.0.8(@babel/core@7.29.7)(@expo/dom-webview@56.0.5)(react-dom@19.2.6(react@19.2.0))(react-native@0.85.0(@babel/core@7.29.7)(@react-native/jest-preset@0.85.3(@babel/core@7.29.7)(react@19.2.6))(@types/react@19.2.15)(react@19.2.0))(react@19.2.0)(typescript@6.0.3)
     transitivePeerDependencies:
       - '@babel/core'
       - supports-color
