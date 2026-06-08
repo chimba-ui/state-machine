@@ -8,7 +8,7 @@ It's pure JavaScript: it runs in any JS runtime (browser, Node, the React
 Native JS thread), but not in native platform code (e.g. Swift/Kotlin).
 
 ```ts
-import { machine } from '@render-experiment/machine-core'
+import { machine, act } from '@render-experiment/machine-core'
 
 const counter = machine({
   initial: 'active',
@@ -19,12 +19,12 @@ const counter = machine({
   states: {
     active: {
       on: {
-        // guard gates the transition; action updates context
+        // guard gates the transition; `act` writes context
         inc: {
           guard: ({ computed }) => !computed.isMax,
-          actions: [({ context, setContext }) => setContext({ count: context.count + 1 })],
+          actions: act($ => ({ count: $.context.count + 1 })),
         },
-        reset: { target: 'active', actions: [({ setContext }) => setContext({ count: 0 })] },
+        reset: { target: 'active', actions: act({ count: 0 }) },
       },
     },
   },
@@ -189,6 +189,7 @@ machine —
 | `config({ ... })`                    | author a config const with full inference + checking, no manual generics                                                                                               |
 | `withAdapter(config, adapter)`       | layer a platform's `actions` + `effects` over a config (other impls — `guards`, `delays` — carry through untouched)                                                    |
 | `connector(service, connect, props)` | live, memoized, subscribable view snapshot: `.snapshot` / `.subscribe` / `.select` / `.setProps` (prop-callbacks wire automatically)                                   |
+| `makeReaction<…>()`                  | inference helper for a connector reaction — fixes the machine generics once, infers each reaction's selector→callback `Value` (see [Reactions](#reactions--firing-prop-callbacks-without-the-machine-knowing)) |
 | `compose({ a, b })`                  | run several machines as one (orthogonal regions): bundled `start`/`stop` + `.sync()` + `.combine()`                                                                    |
 | `createStore(initial, build?)`       | a tiny reactive store (plain value + listeners) for cross-instance singleton state (outside any one machine)                                                           |
 | `and` / `or` / `not`                 | guard combinators                                                                                                                                                      |
@@ -259,7 +260,7 @@ const m = machine({
   states: {
     idle: {
       on: {
-        birthday: { actions: [({ context, setContext }) => setContext({ age: context.age + 1 })] },
+        birthday: { actions: $ => $.setContext({ age: $.context.age + 1 }) },
       },
     },
   },
@@ -677,23 +678,24 @@ and, when it changes, calls the matching prop. (Same tuple shape as a React
 `ComponentEffect` — declare each as a named const, collect them in a list.)
 
 ```ts
-// declared on connect (agnostic — no DOM, no framework):
-type TooltipReaction<V> = Reaction<
-  TooltipState,
-  TooltipContext,
-  TooltipEvent,
-  TooltipProps,
-  never,
-  V
->
+import { makeReaction } from '@render-experiment/machine-core'
 
-const onOpenChange: TooltipReaction<boolean> = [
-  m => m.matches('open') || m.matches('closing'), // selector: a fact about state
-  (open, props) => props.onOpenChange?.({ open }), // callback: → the consumer's callback
-]
+// fix the machine generics once per component; `Value` is then inferred per reaction:
+const reaction = makeReaction<TooltipState, TooltipContext, TooltipEvent, TooltipProps>()
+
+const onOpenChange = reaction(
+  m => m.matches('open') || m.matches('closing'), // selector → Value inferred as boolean
+  (open, props) => props.onOpenChange?.({ open }), // callback: open is boolean, no annotation
+)
 
 connectTooltip.reactions = [onOpenChange]
 ```
+
+`makeReaction(...)` is just an inference helper: it returns the same
+`[selector, callback]` tuple, but recovers the selector→callback `Value` link a
+bare array would lose (inline, the tuple lands in `Reaction<…, any>` and the
+callback's first arg is untyped). The raw `Reaction<…>` tuple type still works if
+you prefer to spell it out.
 
 The machine just transitions `closed → open`; it has no idea `onOpenChange`
 exists. The connector runs the selector (tuple position 0) as a value-deduped
