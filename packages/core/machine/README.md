@@ -10,34 +10,47 @@ Native JS thread), but not in native platform code (e.g. Swift/Kotlin).
 ```ts
 import { machine, act } from '@render-experiment/machine-core'
 
-const counter = machine({
-  initial: 'active',
+const toggle = machine({
+  initial: 'inactive',
   context: { count: 0 },
-  computed: {
-    isMax: ({ context }) => context.count >= 3, // derived state
-  },
   states: {
-    active: {
+    inactive: {
       on: {
-        // guard gates the transition; `act` writes context
-        inc: {
-          guard: ({ computed }) => !computed.isMax,
-          actions: act($ => ({ count: $.context.count + 1 })),
-        },
-        reset: { target: 'active', actions: act({ count: 0 }) },
+        flip: { target: 'active', actions: act($ => ({ count: $.context.count + 1 })) },
       },
+    },
+    active: {
+      on: { flip: { target: 'inactive' } },
     },
   },
 })
 
-counter.start()
-counter.send({ type: 'inc' })
-counter.context.count // 1
-counter.computed.isMax // false
-counter.subscribe(() => render()) // wake on any change
+toggle.start()
+toggle.send({ type: 'flip' })
+toggle.state // 'active'
+toggle.context.count // 1
 ```
 
----
+That machine is the whole behavior. To render it, a target adds two thin steps —
+and **the machine itself never changes**:
+
+1. **`connect()`** turns machine state into _logical_ bindings — `onPress`, `role`,
+   `describedBy`.
+2. **`normalize`** translates those to real props per platform — `onClick` +
+   `aria-*` on web, `Pressable` props on React Native.
+
+## The trade-off
+
+This is a focused engine, not a do-everything statechart. It leaves out, on
+purpose:
+
+- **Nested / parallel / hierarchical states** — flat states + composition instead.
+- **Serializable-snapshot features** — time-travel, persistence, a visual inspector.
+- **Spawned child machines / actors.**
+
+**Need those? Reach for XState.** Driving many lightweight UI machines you never
+serialize? You're not paying for capabilities you don't use. The full
+side-by-side — what's shared, what differs, and the measured numbers — is below.
 
 ## How it compares
 
@@ -71,16 +84,16 @@ machine-core keeps context as **one plain object, mutated in place
 (copy-on-write)** + a tiny notifier — no per-field reactive cell (Zag), no
 immutable snapshot per event (XState).
 
-| What's different                         | Zag                          | XState                                | machine-core                          |
-| ---------------------------------------- | ---------------------------- | ------------------------------------- | ------------------------------------- |
-| **Fine-grained selection in the engine** | ❌ host framework does it    | ⚠️ `actor.select` (coarse under)      | 🟢 **`select` (value-deduped)**       |
-| **Runs with no host framework / no DOM** | ❌ needs a framework + DOM   | ⚠️ statechart yes, fine-graining no   | 🟢 **yes**                            |
-| **Flat-ish memory in field/state count** | ❌ a reactive cell per field | 🟢 plain snapshot                     | 🟢 **plain context, copy-on-write**   |
-| Data model                               | reactive cell per field      | immutable snapshot per event          | one plain object, mutated in place    |
+| What's different                         | Zag                          | XState                                 | machine-core                          |
+| ---------------------------------------- | ---------------------------- | -------------------------------------- | ------------------------------------- |
+| **Fine-grained selection in the engine** | ❌ host framework does it    | ⚠️ `actor.select` (coarse under)       | 🟢 `select` (value-deduped)           |
+| **Runs with no host framework / no DOM** | ❌ needs a framework + DOM   | ⚠️ statechart yes, fine-graining no    | 🟢 yes                                |
+| **Flat-ish memory in field/state count** | ❌ a reactive cell per field | 🟢 plain snapshot                      | 🟢 plain context, copy-on-write       |
+| Data model                               | reactive cell per field      | immutable snapshot per event           | one plain object, mutated in place    |
 | Serializable snapshot (persist/replay)   | ❌                           | 🟢 (the actor model — its whole point) | ❌ (the cost of mutating in place)    |
-| Nested / hierarchical states             | ❌ by design                 | ✅                                    | ❌ by design (flat)                   |
-| Parallel / orthogonal regions            | ❌ by design                 | ✅ (true parallel states)             | ⚠️ `compose` (peers, no shared event) |
-| Spawned child machines / actors          | ❌ by design                 | ✅ (`invoke` / `spawn`)               | ❌ by design                          |
+| Nested / hierarchical states             | ❌ by design                 | ✅                                     | ❌ by design (flat)                   |
+| Parallel / orthogonal regions            | ❌ by design                 | ✅ (true parallel states)              | ⚠️ `compose` (peers, no shared event) |
+| Spawned child machines / actors          | ❌ by design                 | ✅ (`invoke` / `spawn`)                | ❌ by design                          |
 
 Reading the trade both ways: **XState** is built around the actor model — every
 transition allocates a serializable snapshot you can persist, replay, and inspect
@@ -117,44 +130,74 @@ XState in the synchronous loops (both sync statecharts, fair ops/sec); Zag's
 headless `send` is async (microtask-batched), so it appears only in the React
 render arena it's built for.
 
+### Benchmark
+
+#### Overview
+
+|                                 | **Agnostic Render** |  XState |        Zag |
+| ------------------------------- | ------------------: | ------: | ---------: |
+| **Events per second**           |         **3.3 M/s** | 850 K/s |      n/a ¹ |
+| **Spin up 10 000 machines**     |           **25 ms** |   65 ms |     101 ms |
+| **Memory at 64 fields/machine** |          **6.5 KB** |  9.3 KB | **132 KB** |
+| **Bundle** (min + gzip)         |          **2.2 KB** | 15.8 KB |   0.5 KB ² |
+| **Bundle** + React adapter      |          **3.0 KB** | 18.6 KB |     3.6 KB |
+| **Render 1 000 rows** (mount)   |          **5.9 ms** |  6.8 ms |     6.9 ms |
+| **Re-render after a change** ³  |          **4.4 ms** |  7.8 ms |      n/a ¹ |
+
+- ¹ Zag's `send` is async (microtask-batched), so it can't share a **synchronous** loop — neither the events/sec throughput nor the `flushSync` re-render timing. It IS measured where it runs sync: construction + memory (headless `VanillaMachine`), mount, and the re-render row-count (it wakes only 2 rows, same as the others — see the render table below).
+- ² Zag's `@zag-js/core` is config-only (the machine runtime lives in the framework adapter), so its 0.5 KB engine row isn't runnable on its own — the `+ React adapter` row (`@zag-js/react`) is the fair comparison.
+- ³ Each library using its idiomatic fine-grained path (Agnostic Render & Zag: per-instance machine + `React.memo`; XState: shared actor + `@xstate/react`'s `useSelector`).
+
+#### In depth analyzis
+
 **Throughput — events/sec (higher is better)**
 
-| Scenario                           | machine-core | XState | core ×   |
-| ---------------------------------- | -----------: | -----: | -------- |
-| Single machine, one event          |       3.32 M | 0.81 M | **4.1×** |
-| Propagate 1 of 1 000 machines      |       2.59 M | 0.53 M | **4.9×** |
-| Propagate 1 of 5 000 machines      |       1.65 M | 0.48 M | **3.5×** |
-| Fine-grain (unobserved) 1 of 5 000 |       1.66 M | 0.45 M | **3.7×** |
+| Scenario                          | machine-core | XState | core ×   |
+| --------------------------------- | -----------: | -----: | -------- |
+| Single machine, one event         |       3.33 M | 0.85 M | **3.9×** |
+| Propagate 1 of 1000 machines      |       2.61 M | 0.47 M | **5.6×** |
+| Propagate 1 of 5000 machines      |       1.68 M | 0.47 M | **3.6×** |
+| Fine-grain (unobserved) 1 of 5000 |       1.69 M | 0.42 M | **4.0×** |
 
 Throughput stays in the millions even at 5 000 machines — cost grows
 sub-linearly, not per-machine.
 
 **Construction — µs / machine, and memory — KB / machine (5 000 live; lower is better)**
 
-| Metric                  | machine-core | XState |
-| ----------------------- | -----------: | -----: |
-| Construct (×10 000)     |     **1.51** |   4.35 |
-| Memory, 2-field context |     **3.45** |   6.24 |
-| Memory, 64-field context |    **6.54** |   9.28 |
+Construction is synchronous for all three, so Zag's headless `VanillaMachine` is a
+fair contender here (and for memory):
 
-2 → 64 fields adds only ~3 KB/machine: context is one plain object, so memory
-grows with the data you store, not with a per-field cell. It's **not** perfectly
-flat — it grows with field count, just slowly and linearly.
+| Metric                   | machine-core | XState |     Zag |
+| ------------------------ | -----------: | -----: | ------: |
+| Construct (×10 000)      |     **2.52** |   6.53 |   10.11 |
+| Memory, 2-field context  |     **3.43** |   6.23 |    8.74 |
+| Memory, 64-field context |     **6.55** |   9.26 | **132** |
+
+2 → 64 fields adds only ~3 KB/machine for core: context is one plain object, so
+memory grows with the data you store, not with a per-field cell. It's **not**
+perfectly flat — it grows linearly, just slowly. **Zag is the contrast that makes
+the point**: its context is one reactive cell per field, so 64 fields balloon to
+~136 KB/machine (~21× core) — the per-field-cell cost this model avoids.
 
 **React rendering — list of 1 000 rows, 50 highlight moves.** Each library in its
-idiomatic fine-grained path (core & Zag: per-instance machine + `React.memo`;
-XState: shared actor + `@xstate/react`'s `useSelector`):
+idiomatic fine-grained path (lower is better):
 
-| Strategy                       | rows woken / move | mount (ms) | re-render wall (ms) |
-| ------------------------------ | ----------------: | ---------: | ------------------: |
-| `core` per-instance + memo     |             **2** |    **6.4** |             **4.4** |
-| `xstate` shared + `useSelector`|             **2** |        8.4 |                 8.2 |
-| `zag` per-instance + memo      |             **2** |        8.2 |                14.4 |
-| naive (whole-snapshot read)    |               980 |       10.5 |                57.6 |
+| Metric                | machine-core | XState |          Zag |
+| --------------------- | -----------: | -----: | -----------: |
+| Rows woken / move     |        **2** |      2 |            2 |
+| Mount (ms)            |      **5.9** |    6.8 |          6.9 |
+| Re-render wall (ms) ¹ |      **4.4** |    7.8 | n/a (async)² |
 
-The headline isn't "fewer re-renders" — all three properly-set-up engines wake
-only the **2** rows that changed (vs. 980 for a naive whole-snapshot read). The
-difference is per-render _cost_, where core is lowest.
+All three properly-set-up engines wake only the **2** rows that changed. The
+difference is per-render _cost_ — where core and XState are directly comparable
+(both flush synchronously); Zag's async send can't be timed under the same
+`flushSync` loop, but its **row-count is identical** (2), which is the metric
+that matters for "does it stay surgical at scale."
+
+- ¹ 50 highlight moves, median of 5.
+- ² Zag's `send` is microtask-batched, so a
+  synchronous `flushSync` re-render loop can't time it fairly (it balloons under
+  forced sync flushes) — only the row-count is reported for Zag.
 
 **When this matters: density × frequency** — many machines reacting to a
 high-frequency stream inside one frame budget. Trading terminals (thousands of
@@ -173,30 +216,30 @@ in [`ARCHITECTURE.md`](../../../ARCHITECTURE.md#the-core-rule-the-machine-never-
 the engine-level summary: every job a prop does lands at the **edge**, never the
 machine —
 
-| A prop that…            | …goes here                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------------ |
-| **configures** behavior | seeded into `context` once (and updated via `setContext`)                            |
+| A prop that…            | …goes here                                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **configures** behavior | seeded into `context` once (and updated via `setContext`)                                                        |
 | **fires a callback**    | a **reaction** on the connector (see [Reactions](#reactions--firing-prop-callbacks-without-the-machine-knowing)) |
-| **is controlled** state | resolved into the initial state before `machine()` is built                          |
+| **is controlled** state | resolved into the initial state before `machine()` is built                                                      |
 
 ---
 
 ## API at a glance
 
-| Export                               | What it is                                                                                                                                                             |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `machine(config)`                    | build a service (stopped); `.start()` / `.stop()` / `.send()` / `.state` / `.context` / `.computed` / `.subscribe` / `.select` / `.onStart` / `.onStop`                |
-| `config({ ... })`                    | author a config const with full inference + checking, no manual generics                                                                                               |
-| `withAdapter(config, adapter)`       | layer a platform's `actions` + `effects` over a config (other impls — `guards`, `delays` — carry through untouched)                                                    |
-| `connector(service, connect, props)` | live, memoized, subscribable view snapshot: `.snapshot` / `.subscribe` / `.select` / `.setProps` (prop-callbacks wire automatically)                                   |
+| Export                               | What it is                                                                                                                                                                                                     |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `machine(config)`                    | build a service (stopped); `.start()` / `.stop()` / `.send()` / `.state` / `.context` / `.computed` / `.subscribe` / `.select` / `.onStart` / `.onStop`                                                        |
+| `config({ ... })`                    | author a config const with full inference + checking, no manual generics                                                                                                                                       |
+| `withAdapter(config, adapter)`       | layer a platform's `actions` + `effects` over a config (other impls — `guards`, `delays` — carry through untouched)                                                                                            |
+| `connector(service, connect, props)` | live, memoized, subscribable view snapshot: `.snapshot` / `.subscribe` / `.select` / `.setProps` (prop-callbacks wire automatically)                                                                           |
 | `makeReaction<…>()`                  | inference helper for a connector reaction — fixes the machine generics once, infers each reaction's selector→callback `Value` (see [Reactions](#reactions--firing-prop-callbacks-without-the-machine-knowing)) |
-| `compose({ a, b })`                  | run several machines as one (orthogonal regions): bundled `start`/`stop` + `.sync()` + `.combine()`                                                                    |
-| `createStore(initial, build?)`       | a tiny reactive store (plain value + listeners) for cross-instance singleton state (outside any one machine)                                                           |
-| `and` / `or` / `not`                 | guard combinators                                                                                                                                                      |
-| `act(...patches)`                    | write-sugar: a context-writing action (one or many patches, applied in order). Slots in any `actions` / `entry` / `exit` list                                          |
-| `oneOf(...branches)`                 | conditional action: variadic `{ guard?, actions }` branches, first passing wins (guardless = fallback)                                                                  |
-| `MACHINE_INIT`                       | the synthetic event fired when effects/watchers boot on `start()`                                                                                                      |
-| Types                                | `Machine`, `MachineConfig`, `TransitionConfig`, `Guard`, `Action`, `Effect`, `Delay`, `Selection`, `Connect`, `Store`, `StateNode`, `EventBindings`, `AttrBindings`, … |
+| `compose({ a, b })`                  | run several machines as one (orthogonal regions): bundled `start`/`stop` + `.sync()` + `.combine()`                                                                                                            |
+| `createStore(initial, build?)`       | a tiny reactive store (plain value + listeners) for cross-instance singleton state (outside any one machine)                                                                                                   |
+| `and` / `or` / `not`                 | guard combinators                                                                                                                                                                                              |
+| `act(...patches)`                    | write-sugar: a context-writing action (one or many patches, applied in order). Slots in any `actions` / `entry` / `exit` list                                                                                  |
+| `oneOf(...branches)`                 | conditional action: variadic `{ guard?, actions }` branches, first passing wins (guardless = fallback)                                                                                                         |
+| `MACHINE_INIT`                       | the synthetic event fired when effects/watchers boot on `start()`                                                                                                                                              |
+| Types                                | `Machine`, `MachineConfig`, `TransitionConfig`, `Guard`, `Action`, `Effect`, `Delay`, `Selection`, `Connect`, `Store`, `StateNode`, `EventBindings`, `AttrBindings`, …                                         |
 
 ---
 
@@ -813,11 +856,11 @@ that axis is pushed sideways onto a different tool:
 - a **second lifecycle** → `compose`
 - a **grouping over states** → `tags`
 
-| You have…                                                 | Don't…                                  | Do…                                                          |
-| --------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------ |
-| A value derived from **data** (which item is highlighted) | make a state per item → N nodes         | keep the inputs in **`context`**, derive it in `computed`    |
-| A **second independent lifecycle** running at once        | multiply it into the popup states → N×M | run it as a peer with **`compose`**                          |
-| A **category over many states** ("is the list showing?")  | `matches('a') \|\| matches('b') \|\| …` | tag the states, query with **`hasTag`**                      |
+| You have…                                                 | Don't…                                  | Do…                                                       |
+| --------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------- |
+| A value derived from **data** (which item is highlighted) | make a state per item → N nodes         | keep the inputs in **`context`**, derive it in `computed` |
+| A **second independent lifecycle** running at once        | multiply it into the popup states → N×M | run it as a peer with **`compose`**                       |
+| A **category over many states** ("is the list showing?")  | `matches('a') \|\| matches('b') \|\| …` | tag the states, query with **`hasTag`**                   |
 
 ### A product of data → `computed`
 
@@ -826,10 +869,15 @@ query, the filtered list, and the active index. Those are `context` fields; the
 highlighted item is a _derived_ value, not a state per row:
 
 ```ts
-machine<'idle' | 'open', { query: string; items: Item[]; activeIndex: number }, Event, {
-  filtered: Item[]
-  highlighted: Item | null
-}>({
+machine<
+  'idle' | 'open',
+  { query: string; items: Item[]; activeIndex: number },
+  Event,
+  {
+    filtered: Item[]
+    highlighted: Item | null
+  }
+>({
   initial: 'idle',
   context: { query: '', items: ALL_ITEMS, activeIndex: -1 },
   computed: {

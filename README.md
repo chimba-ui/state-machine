@@ -32,69 +32,9 @@ adapter. So the _same_ machine runs unchanged on the DOM, React Native, or any o
 The hard case is **many machines reacting to many events inside
 one frame budget** — things like a trading terminal with live tickers, a monitoring wall, a
 canvas board, a game HUD. There the cost of each transition and the memory per
-machine, multiplied by thousands, is what decides whether you hold the frame.
-
-## The trade-off
-
-This is a focused engine, not a do-everything statechart. It leaves out, on
-purpose:
-
-- **Nested / parallel / hierarchical states** — flat states + composition instead.
-- **Serializable-snapshot features** — time-travel, persistence, a visual inspector.
-- **Spawned child machines / actors.**
-
-**Need those? Reach for XState.** Driving many lightweight UI machines you never
-serialize? You're not paying for capabilities you don't use.
-
-## Solution
-
-```ts
-import { machine, act } from '@render-experiment/machine-core'
-
-const toggle = machine<'inactive' | 'active', { count: number }, { type: 'flip' }>({
-  initial: 'inactive',
-  context: { count: 0 },
-  states: {
-    inactive: {
-      on: {
-        flip: { target: 'active', actions: act($ => ({ count: $.context.count + 1 })) },
-      },
-    },
-    active: {
-      on: { flip: { target: 'inactive' } },
-    },
-  },
-})
-
-toggle.start()
-toggle.send({ type: 'flip' })
-toggle.state // 'active'
-toggle.context.count // 1
-```
-
-That machine is the whole behavior. To render it, a target adds two thin steps —
-and **the machine itself never changes**:
-
-1. **`connect()`** turns machine state into _logical_ bindings — `onPress`, `role`,
-   `describedBy`.
-2. **`normalize`** translates those to real props per platform — `onClick` +
-   `aria-*` on web, `Pressable` props on React Native.
-
-### Benchmark
-
-|                                 | **Agnostic Render** |  XState |      Zag |
-| ------------------------------- | ------------------: | ------: | -------: |
-| **Events per second**           |         **3.3 M/s** | 810 K/s |    n/a ¹ |
-| **Spin up 10 000 machines**     |           **15 ms** |   44 ms |    n/a ¹ |
-| **Memory at 64 fields/machine** |          **6.5 KB** |  9.3 KB |    n/a ¹ |
-| **Bundle** (min + gzip)         |          **2.2 KB** | 15.8 KB | 0.5 KB ² |
-| **Bundle** + React adapter      |          **3.0 KB** | 18.6 KB |   3.6 KB |
-| **Render 1 000 rows** (mount)   |          **6.4 ms** |  8.4 ms |   8.2 ms |
-| **Re-render after a change** ³  |          **4.4 ms** |  8.2 ms |  14.4 ms |
-
-<sub>¹ Zag's headless is async (microtask-batched), so it can't share a synchronous throughput / construct / memory loop — Zag is compared where it's built to run, the React render path, not forced into a sync benchmark.
-² Zag's `@zag-js/core` is config-only (the machine runtime lives in the framework adapter), so its 0.5 KB engine row isn't runnable on its own — the `+ React adapter` row (`@zag-js/react`) is the fair comparison.
-³ Each library using its idiomatic fine-grained path (Agnostic Render & Zag: per-instance machine + `React.memo`; XState: shared actor + `@xstate/react`'s `useSelector`).
+machine, multiplied by thousands, is what decides whether you hold the frame. The
+engine is built for it — ~3–4× XState's event throughput, flat-ish memory, surgical
+re-renders; numbers + methodology in the [engine README](./packages/core/machine/README.md#performance).
 
 ## How it's built
 
