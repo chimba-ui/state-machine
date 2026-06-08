@@ -1,12 +1,5 @@
 import type { Guard, GuardArg } from './types'
 
-/**
- * Guard combinators compose guards without naming every combination. Args are
- * GuardArgs (names or inline fns), each resolved through `params.guard()` (the
- * runtime's single guard channel), so they compose arbitrarily deep and
- * short-circuit.
- */
-
 /** AND — true iff every guard passes. Zero args → true (empty intersection). */
 export function and<Context extends object, Event, Computed = Record<string, never>>(
   ...guards: Array<GuardArg<Context, Event, Computed>>
