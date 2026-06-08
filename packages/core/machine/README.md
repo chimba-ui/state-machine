@@ -487,19 +487,20 @@ actions: [
 ## Effects — side-effects _with cleanup_
 
 An effect runs when a state is **entered** and returns an optional **cleanup**
-that runs when the state is **left**. Setup and teardown share one closure — so a
-listener added on enter is removed by the exact cleanup that captured it
-(something plain `entry`/`exit` can't do without manual bookkeeping):
+that runs when the state is **left**. Setup and teardown share one closure — so
+whatever an effect starts on enter is torn down by the exact cleanup that
+captured it (something plain `entry`/`exit` can't do without manual bookkeeping):
 
 ```ts
 states: {
   open: {
+    // subscribe to a store while open; unsubscribe on exit. No platform, no props
+    // — a pure effect, so it lives right here in the config.
     effects: [
-      ({ send }) => {
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') send({ type: 'close' }) }
-        document.addEventListener('keydown', onKey)
-        return () => document.removeEventListener('keydown', onKey) // cleanup on exit
-      },
+      ({ context, send }) =>
+        store.subscribe(() => {
+          if (store.get().openId !== context.id) send({ type: 'close' })
+        }),
     ],
     on: { close: { target: 'closed' } },
   },
@@ -508,42 +509,81 @@ states: {
 ```
 
 The initial state's effects boot on `start()`; all active cleanups run on
-`stop()`.
+`stop()`. Effects can be named and resolved from `implementations.effects` (so
+they're reusable / overridable — see the adapter below) or written inline.
 
-### Effects are the per-platform seam (`withAdapter`)
+### Where does a side-effect live? — the three homes
 
-The same effect can mean different things per target. So a config names effects,
-and a platform supplies the implementation via `withAdapter`:
+Not every side-effect belongs in the config. The deciding questions are **does it
+touch the platform** (a DOM listener, a native API) and **does it need props**
+(the machine [never sees props](#the-machine-never-sees-props)). That gives three
+homes:
+
+```
+Does the effect touch the platform (DOM / native API)?
+├─ No  → a plain machine effect, implemented right in the config `effects`
+│        (e.g. a store subscription — same on every target)
+└─ Yes → Does it need props?
+         ├─ No  → a NAMED machine effect, implemented per-target via the ADAPTER
+         │        (withAdapter) — the machine owns its lifecycle, the platform
+         │        owns its body  (e.g. a focus-trap while `open`)
+         └─ Yes → a ComponentEffect in the target's effects.ts — the VIEW owns it,
+                  because the machine can't read the props it needs
+                  (e.g. Escape gated by a `closeOnEscape` prop)
+```
+
+| Home                          | Owns the lifecycle | Touches platform | Reads props |
+| ----------------------------- | ------------------ | ---------------- | ----------- |
+| config `effects: { … }`       | machine            | no               | no          |
+| **adapter** (`withAdapter`)   | machine            | yes              | no          |
+| `ComponentEffect` (target)    | the view           | yes              | yes         |
+
+The middle row is the adapter's whole reason to exist: an effect the **machine**
+schedules (scoped to a state, started on enter / cleaned up on exit) whose **body
+is platform-specific but takes no props**. A focus-trap or scroll-lock while a
+dialog is `open` is the canonical case — the _machine_ decides _when_ (it's
+behavior), the _target_ decides _how_ (web `focus()` vs. native
+`AccessibilityInfo`).
+
+### The adapter — naming an effect, binding it per platform
+
+A config **names** a platform effect; each target **supplies the body** via
+`withAdapter`, which merges the platform's `actions` + `effects` over the config's
+`implementations` (adapter wins on a name collision):
 
 ```ts
 import { withAdapter } from '@render-experiment/machine-core'
 
-// agnostic config — names effects, no platform code:
-const config = {
-  initial: 'open',
-  context: {},
-  states: { open: { effects: ['trackEscape'] } },
-}
+// agnostic config — names the effect, no platform code:
+const config = { initial: 'open', context: {}, states: { open: { effects: ['trapFocus'] } } }
 
-// a platform supplies the real implementation:
+// web target supplies the real body:
 const webAdapter = {
   effects: {
-    trackEscape: ({ send }) => {
-      const fn = (e: KeyboardEvent) => e.key === 'Escape' && send({ type: 'close' })
-      document.addEventListener('keydown', fn)
-      return () => document.removeEventListener('keydown', fn)
+    trapFocus: ({ context }) => {
+      const release = trapFocusDom(getContentEl(context.id)) // web focus-trap
+      return release // cleanup on state exit
     },
   },
 }
+// a native target would name the SAME 'trapFocus' with a different body
+// (AccessibilityInfo …) — the machine config never changes.
 
-const m = machine(withAdapter(config, webAdapter)) // adapter wins on name collision
+const m = machine(withAdapter(config, webAdapter))
 ```
 
-`withAdapter` layers a platform's `actions` + `effects` over the config — those
-two are the only platform seam. Everything else in `implementations` carries
-through untouched: `guards` stay config-only (pure logic, the same on every
-platform), and named `delays` are preserved as-is, so a config with both a named
-delay and an adapter keeps its delay intact.
+Only `actions` + `effects` are the platform seam. `guards` stay config-only (pure
+logic, identical everywhere) and named `delays` carry through untouched.
+
+> **Why are the shipped components' `adapter.ts` files empty (`{}`)?** Because
+> neither tooltip nor dropdown has an effect in the middle row: their one machine
+> effect is a store subscription (pure → config), and their platform listener
+> (Escape / Android back) is prop-gated (→ a ComponentEffect). An empty adapter
+> is the correct, common state — it's a _ready seam_, filled only when a component
+> has a platform effect that needs no props (a focus-trap, a scroll-lock). The
+> contrast with Zag: Zag puts all platform effects in one `effects` map and reads
+> the DOM through an injected `scope`; here the no-props rule splits the
+> prop-dependent ones out to the view, leaving the adapter for the prop-free rest.
 
 ---
 
