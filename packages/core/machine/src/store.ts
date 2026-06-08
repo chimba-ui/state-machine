@@ -1,26 +1,3 @@
-/**
- * A tiny store — for cross-instance singleton state (e.g. "only one tooltip open
- * at a time") that lives outside any single machine.
- *
- * Plain value + a listener Set. `get()` reads it; `set()` shallow-merges a patch
- * (or an updater) and notifies on a real change; `subscribe(fn)` fires on every
- * subsequent change (not on subscribe). Bare unsubscribe.
- *
- * The base always carries `get` / `set` / `subscribe`. Pass a second `build`
- * arg to add named domain methods on top — no facade boilerplate:
- *
- *   const tooltipStore = createStore(
- *     { openId: null as string | null },
- *     (s) => ({
- *       setOpen: (id: string | null) => s.set({ openId: id }),
- *       isOpen: (id: string) => s.get().openId === id,
- *     }),
- *   )
- *   tooltipStore.get() / .subscribe(fn) / .setOpen('a') / .isOpen('a')
- *
- * To react to a store from inside a machine, subscribe and forward to the
- * machine explicitly: `store.subscribe((s) => m.send({ type: '...', ...s }))`.
- */
 export type Listener<T> = (state: T) => void
 export type SetStateAction<T> = Partial<T> | ((state: T) => Partial<T>)
 

@@ -1,30 +1,3 @@
-/**
- * Bindings — substrate-agnostic event + attribute vocabulary for machine
- * connect() outputs.
- *
- * Every component's machine speaks this vocabulary. The connect() return
- * produces `EventBindings` (handlers bound to gestures/inputs) and
- * `AttrBindings` (attributes bound to values). Each adapter translates
- * them to its renderer's native props:
- *
- *   React DOM   : machine-react/normalize   (onPress → onClick, …)
- *   Native (RN) : machine-native/normalize  (onPress → Pressable.onPress, …)
- *   Surface     : machine-surface/normalize (future)
- *
- * A part's surface is two buckets:
- *   - handlers (EventBindings)  — input → events
- *   - attrs    (AttrBindings)   — substrate attributes (id, role, aria-*)
- *
- * Semantic state (machine state, side, …) is NOT collapsed into `data-*` here.
- * Core stays agnostic; each adapter derives whatever `data-*` it wants from the
- * machine state + the part's own fields.
- *
- * The payload types below pin the fields a handler can rely on across
- * substrates. Anything substrate-specific (clientX, nativeEvent,
- * currentTarget) lives behind the adapter and is invisible to component
- * authors.
- */
-
 // -----------------------------------------------------------------------------
 // Event payloads
 // -----------------------------------------------------------------------------

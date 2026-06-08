@@ -1,23 +1,5 @@
 import type { EqualityFn, Machine, Selection } from './types'
 
-/**
- * Composition helpers for running several independent machines as one unit —
- * the "orthogonal regions" pattern without nested states. Each machine stays a
- * plain peer (its own state, lifecycle, fine-grained `select`); `compose` adds
- * the glue:
- *
- *   const combobox = compose({ popup, submenu })
- *   combobox.start()
- *   combobox.sync(() => { if (popup.matches('closed')) submenu.send({ type: 'close' }) })
- *   const view = combobox.combine(() => ({ open: popup.matches('open'), sub: submenu.state }))
- *   combobox.stop() // stops members + disposes the sync rules and combine selections
- *
- * `sync`/`combine` register against the group, so `stop()` tears down their
- * subscriptions too — no manual disposer threading. All built on the
- * single-machine surface (start/stop/subscribe/select); the state model is
- * untouched.
- */
-
 /** Any machine, regardless of its specific generics. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMachine = Machine<any, any, any, any>

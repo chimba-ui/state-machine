@@ -1,8 +1,3 @@
-/**
- * Shared type vocabulary for the engine. Pure types (no runtime), imported by
- * every concern module. The runtime lives in the per-concern files + machine.ts.
- */
-
 // -----------------------------------------------------------------------------
 // State
 // -----------------------------------------------------------------------------

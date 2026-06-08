@@ -1,11 +1,5 @@
 import type { Action, ActionArg, ActionParams, OneOf, OneOfBranch } from './types'
 
-/**
- * `act` + `oneOf` — the two authoring helpers that live inside an `actions`
- * (or `entry` / `exit`) list. Everything structural (`target`, `guard`) stays on
- * the plain transition object; these two only ever describe what an action *does*.
- */
-
 /** A context patch, or a function of the action params that returns one. */
 export type Patch<Context extends object, Event, Computed = Record<string, never>, Send = Event> =
   | Partial<Context>
