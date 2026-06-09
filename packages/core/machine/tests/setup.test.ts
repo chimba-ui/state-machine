@@ -1,7 +1,7 @@
 /**
  * setup() — the name-checking authoring builder.
  *
- * Pins: setup<Ctx,Ev,Cm>()(registries).createMachine(config) returns a config
+ * Pins: setup<Ctx,Ev,Cm>().config(registries).createMachine(config) returns a config
  * that (a) runs identically to config() — the registries are merged into
  * implementations and names resolve at runtime; and (b) type-checks every
  * named guard / action / effect / after-delay reference against the registry
@@ -20,7 +20,7 @@ describe('setup()', () => {
     const setId = vi.fn()
     const track = vi.fn(() => () => {})
 
-    const { createMachine } = setup<Ctx, Ev>()({
+    const { createMachine } = setup<Ctx, Ev>().config({
       guards: { isOpen: ({ context }) => context.open },
       actions: { setId: ({ context }) => setId(context.id) },
       effects: { track: () => track() },
@@ -52,7 +52,7 @@ describe('setup()', () => {
   })
 
   it('checks names at compile time (the @ts-expect-error blocks are the test)', () => {
-    const { createMachine } = setup<Ctx, Ev>()({
+    const { createMachine } = setup<Ctx, Ev>().config({
       guards: { isOpen: ({ context }) => context.open },
       actions: { setId: () => {} },
       effects: { track: () => () => {} },
@@ -98,7 +98,7 @@ describe('setup()', () => {
   })
 
   it('valid names + numeric delays coexist, and inline fns still work', () => {
-    const { createMachine } = setup<Ctx, Ev>()({
+    const { createMachine } = setup<Ctx, Ev>().config({
       guards: { isOpen: ({ context }) => context.open },
     })
 

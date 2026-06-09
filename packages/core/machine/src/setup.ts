@@ -1,17 +1,9 @@
 import type { Implementations, TransitionConfig, AnyString } from './types'
 
 /**
- * `setup()` — author a config with its named impls CHECKED.
+ * `setup()` — author a config with its named impls CHECKED, as a named chain:
  *
- * A plain `config({ states, implementations })` types every `guard` / action /
- * effect / `after`-delay name as a loose string: a typo compiles and only throws
- * at runtime. The reason it can't do better is ordering — `states` and
- * `implementations` infer simultaneously in one object, so neither can constrain
- * the other's names.
- *
- * `setup` breaks that into two steps so the registries are known FIRST:
- *
- *   const { createMachine } = setup<Ctx, Ev, Computed>()({
+ *   const { createMachine } = setup<Ctx, Ev, Computed>().config({
  *     guards:  { isOpen: ({ context }) => context.open },
  *     actions: { setId:  ({ context }) => store.set(context.id) },
  *     effects: { track:  ({ send }) => store.subscribe(...) },
@@ -31,59 +23,66 @@ import type { Implementations, TransitionConfig, AnyString } from './types'
  *     },
  *   })
  *
- * A typo in any of those names is now a COMPILE error with autocomplete, not a
- * runtime throw. `createMachine` returns the same `TransitionConfig` shape `machine()`
- * consumes (with the registries merged into `implementations`), so the rest of the
- * pipeline is unchanged.
+ * Plain `config({ states, implementations })` types every name as a loose string
+ * (a typo only throws at runtime) — because `states` and `implementations` infer
+ * together in one object, neither can constrain the other's names. The chain
+ * orders the inferences so the registries are known before the states reference
+ * them, which is what makes the names checkable:
  *
- * Curried in three steps because each fixes generics the next can't infer:
- *   1. `setup<Ctx, Ev, Computed>()` — pin the machine types (they can't be inferred
- *      from a registry, so they're explicit, like `config`'s).
- *   2. `(registries)` — infer the registry object (`const`, so keys stay literal).
- *   3. `.createMachine(config)` — the config, now name-checked against step 2's keys.
+ *   1. `setup<Ctx, Ev, Computed>()` — pin the machine types. They can't be inferred
+ *      from a registry (TS does no partial type-arg inference), so they're explicit
+ *      here, like `config`'s.
+ *   2. `.config(registries)` — infer the registry object (`const`, so keys stay
+ *      literal); its callbacks are typed from step 1's Ctx/Ev.
+ *   3. `.createMachine(config)` — the config, with every guard/action/effect/delay
+ *      name now checked + autocompleted against step 2's keys.
+ *
+ * `createMachine` returns the same `TransitionConfig` shape `machine()` consumes
+ * (registries merged into `implementations`), so the rest of the pipeline is
+ * unchanged.
  */
 export function setup<
   Context extends object,
   Event extends { type: string },
   Computed = Record<string, never>,
 >() {
-  return function registries<const Registry extends Implementations<Context, Event, Computed>>(
-    impls: Registry,
-  ) {
-    type GuardName = keyof Registry['guards'] & AnyString
-    type ActionName = keyof Registry['actions'] & AnyString
-    type EffectName = keyof Registry['effects'] & AnyString
-    type DelayName = keyof Registry['delays'] & AnyString
+  return {
+    config<const Registry extends Implementations<Context, Event, Computed>>(registries: Registry) {
+      type GuardName = keyof Registry['guards'] & AnyString
+      type ActionName = keyof Registry['actions'] & AnyString
+      type EffectName = keyof Registry['effects'] & AnyString
+      type DelayName = keyof Registry['delays'] & AnyString
 
-    return {
-      /**
-       * Build the config with all four name slots checked against the registries
-       * supplied above. `initial` / `State` are inferred from `states`; the
-       * registries are merged into `implementations` so `machine()` resolves the
-       * names at runtime exactly as before.
-       */
-      createMachine<State extends string>(
-        config: Omit<
-          TransitionConfig<
+      return {
+        /**
+         * Build the config with all four name slots checked against the registries
+         * from `.config(...)`. `initial` / `State` are inferred from `states`; the
+         * registries are merged into `implementations` so `machine()` resolves the
+         * names at runtime exactly as before.
+         */
+        createMachine<State extends string>(
+          config: Omit<
+            TransitionConfig<
+              State,
+              Context,
+              Event,
+              Computed,
+              GuardName,
+              ActionName,
+              EffectName,
+              DelayName
+            >,
+            'implementations'
+          >,
+        ): TransitionConfig<State, Context, Event, Computed> {
+          return { ...config, implementations: registries } as TransitionConfig<
             State,
             Context,
             Event,
-            Computed,
-            GuardName,
-            ActionName,
-            EffectName,
-            DelayName
-          >,
-          'implementations'
-        >,
-      ): TransitionConfig<State, Context, Event, Computed> {
-        return { ...config, implementations: impls } as TransitionConfig<
-          State,
-          Context,
-          Event,
-          Computed
-        >
-      },
-    }
+            Computed
+          >
+        },
+      }
+    },
   }
 }
