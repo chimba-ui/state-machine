@@ -5,11 +5,18 @@ import type { EqualityFn, Machine } from '@render-experiment/machine-core'
  * Fine-grained, selector-based subscription for leaf components.
  *
  * The selector reads from the machine directly (`m.context.x`, `m.matches(...)`)
- * so it auto-subscribes to EXACTLY the fields it touches. The component
- * re-renders only when the selected value changes — not on every machine
- * change. Changing one machine's cell wakes only the components whose selector
- * read that cell (O(readers)) — the path that makes thousands of leaf items
- * (each subscribing to its own slice) cheap.
+ * and the component re-renders only when the selected VALUE changes — not on
+ * every machine change.
+ *
+ * Mechanism (not field-level auto-tracking): the machine's `select` is a coarse
+ * bus. Every selection re-evaluates its selector on each machine notify and
+ * value-compares the result; the component is woken only when its selected
+ * value actually changed. So the WORK done per machine change is O(selectors on
+ * that machine) — each re-evaluates — but the React RE-RENDERS are O(selectors
+ * whose value changed). For a leaf list backed by ONE machine per item (the
+ * common shape), each item has a single selector on its own machine, so a
+ * change wakes only that item. The deduping is what makes thousands of leaves
+ * cheap; it is value-based, not dependency-graph based.
  *
  *   const open = useSelector(m, () => m.matches('open'))
  *   const isHL = useSelector(m, () => m.context.highlightedValue === value)
@@ -43,7 +50,8 @@ export function useSelector<
   selectorRef.current = selector
 
   // One Selection over a stable wrapper that reads the current selector. Built
-  // once per machine; auto-tracks whatever the selector reads, value-deduped.
+  // once per machine; re-evaluated on every machine notify and value-deduped
+  // (coarse bus + value compare, not field-level dependency tracking).
   const selectorMemo = useMemo(() => machine.select(() => selectorRef.current()), [machine])
 
   return useSyncExternalStore(

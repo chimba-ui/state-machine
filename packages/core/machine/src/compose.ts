@@ -21,9 +21,11 @@ export interface Composition<Members extends Record<string, AnyMachine>> {
   sync: (reaction: () => void) => () => void
   /**
    * Derive one value-deduped Selection across the members. The selector reads
-   * from any members; their reads auto-track, so it re-runs only when a read
-   * field changes (O(changed), across regions). Read `.value` or
-   * `.subscribe(listener, equals?)`.
+   * from any members; it RE-EVALUATES whenever ANY member changes (it subscribes
+   * to each member's coarse bus) and fires its listener only when the selected
+   * VALUE changes. So the listener is O(changed value), but the re-eval pass is
+   * O(members) per change — not field-level dependency tracking. Read `.value`
+   * or `.subscribe(listener, equals?)`.
    */
   combine: <Value>(selector: () => Value) => Selection<Value>
 }
