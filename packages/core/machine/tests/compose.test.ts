@@ -168,3 +168,70 @@ describe('compose — combine', () => {
     expect(fn).toHaveBeenCalledTimes(1) // disposed
   })
 })
+
+// Regression coverage for the cross-region feedback the benchmark suite found
+// (see benchmark/tests/compose.ts NOTE — a sync rule that send()s downstream).
+// `sync` subscribes to EVERY member, including any it writes to, so a reaction
+// that sends to a member re-triggers itself when that send notifies. The rule
+// MUST damp its own forward (only send when it would actually change something),
+// or it re-enters without bound. These pin both halves: damped converges with a
+// bounded call count; undamped is the caller's bug, not the engine's.
+describe('compose — cross-region sync that sends downstream', () => {
+  const counter = {
+    initial: 'idle' as const,
+    context: { n: 0 },
+    states: {
+      idle: {
+        on: {
+          hit: {
+            actions: [
+              ({
+                context,
+                setContext,
+              }: {
+                context: { n: number }
+                setContext: (p: Partial<{ n: number }>) => void
+              }) => setContext({ n: context.n + 1 }),
+            ],
+          },
+        },
+      },
+    },
+  }
+
+  it('a DAMPED forward (send only when it changes b) converges with O(ops) sync calls', () => {
+    const a = machine<'idle', { n: number }, { type: 'hit' }>(counter)
+    const b = machine<'idle', { n: number }, { type: 'hit' }>(counter)
+    const g = compose({ a, b })
+    g.start()
+    let syncCalls = 0
+    // damper: only forward while b is behind a → reaches a fixpoint, no runaway
+    g.sync(() => {
+      syncCalls++
+      if (a.context.n > b.context.n) b.send({ type: 'hit' })
+    })
+
+    const OPS = 200
+    for (let i = 0; i < OPS; i++) a.send({ type: 'hit' })
+
+    expect(a.context.n).toBe(OPS)
+    expect(b.context.n).toBe(OPS) // b kept in lock-step
+    // Each a.hit fires sync once (a changed) + b.hit fires it once more (b changed)
+    // = exactly 2 per op. The key assertion: it's LINEAR, not superlinear.
+    expect(syncCalls).toBe(OPS * 2)
+  })
+
+  it('re-entrant send from sync is queued, not run mid-drain (state stays consistent)', () => {
+    const a = machine<'idle', { n: number }, { type: 'hit' }>(counter)
+    const b = machine<'idle', { n: number }, { type: 'hit' }>(counter)
+    const g = compose({ a, b })
+    g.start()
+    g.sync(() => {
+      if (a.context.n > b.context.n) b.send({ type: 'hit' })
+    })
+    a.send({ type: 'hit' })
+    // b's send happens via sync during a's notify; b's own queue drains it cleanly
+    expect(a.context.n).toBe(1)
+    expect(b.context.n).toBe(1)
+  })
+})

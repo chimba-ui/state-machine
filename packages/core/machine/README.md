@@ -59,11 +59,9 @@ Anyone who has reached for [XState](https://stately.ai/docs) or
 (`states`, `transitions`, `guards`, `actions`, `effects`), same headless
 philosophy. Those libraries are excellent; this one exists for two things they
 aren't built around: **no environment assumption** (Zag is framework-agnostic but
-presumes a DOM — it queries nodes and attaches DOM listeners; here every
-environment touchpoint is pushed to an adapter, so the kernel has no node lookups
-at all) and **performance under heavy fan-out**.
+presumes a DOM) and **performance under heavy fan-out**.
 
-**Shared baseline — the everyday toolkit is the same; only the spelling differs:**
+**Shared baseline:**
 
 | Capability                     | Zag        | XState            | machine-core  |
 | ------------------------------ | ---------- | ----------------- | ------------- |
@@ -77,43 +75,33 @@ at all) and **performance under heavy fan-out**.
 | Watch (react to a data change) | `watch`    | via `always`      | `watch`       |
 | Per-platform late binding      | ✅         | via `.provide()`  | `withAdapter` |
 
-**Where they differ — the rows that decide it.** The first three are this
-engine's reasons to exist; the rest are what it trades away for them. The single
-cause underneath all of them is **how each engine holds a machine's data**:
-machine-core keeps context as **one plain object, mutated in place
-(copy-on-write)** + a tiny notifier — no per-field reactive cell (Zag), no
-immutable snapshot per event (XState).
+- **¹ `effects`** is the same idea in Zag and here, but Zag's effects receive a `scope` (a DOM)
+  and reach for it; ours receive no environment.
 
-| What's different                         | Zag                          | XState                                 | machine-core                          |
-| ---------------------------------------- | ---------------------------- | -------------------------------------- | ------------------------------------- |
-| **Fine-grained selection in the engine** | ❌ host framework does it    | ⚠️ `actor.select` (coarse under)       | 🟢 `select` (value-deduped)           |
-| **Runs with no host framework / no DOM** | ❌ needs a framework + DOM   | ⚠️ statechart yes, fine-graining no    | 🟢 yes                                |
-| **Flat-ish memory in field/state count** | ❌ a reactive cell per field | 🟢 plain snapshot                      | 🟢 plain context, copy-on-write       |
-| Data model                               | reactive cell per field      | immutable snapshot per event           | one plain object, mutated in place    |
-| Serializable snapshot (persist/replay)   | ❌                           | 🟢 (the actor model — its whole point) | ⚠️ no built-in                        |
-| Nested / hierarchical states             | ❌ by design                 | ✅                                     | ❌ by design (flat)                   |
-| Parallel / orthogonal regions            | ❌ by design                 | ✅ (true parallel states)              | ⚠️ `compose` (peers, no shared event) |
-| Spawned child machines / actors          | ❌ by design                 | ✅ (`invoke` / `spawn`)                | ❌ by design                          |
+**The differences:** The single
+cause underneath all of them is **how each engine holds a machine's data**.
+This lib keeps context as **one plain object, mutated in place (copy-on-write)** +
+a tiny notifier — no per-field reactive cell (Zag), no immutable snapshot per event (XState).
 
-Reading the trade both ways: **XState** allocates a serializable snapshot on every
-transition — that's what powers persist / replay / inspect, and it taxes the hot
-path whether or not you record. machine-core drops the always-on snapshot to mutate
-in place; the speed and flat memory come from a **narrower contract**, not better
-engineering. Narrower, not closed: context is a plain object, so an opt-in recorder
-middleware can add persist / replay / time-travel, paying the snapshot cost only
-while recording. It still won't match XState's built-in serialization and
-replay-determinism (here, keeping actions pure is on you, and effects/timers don't
-replay) — so for persistence- or time-travel-first work, reach for XState. **Zag**
-already runs framework-free, delegating reactivity to a host framework that must
-exist; machine-core owns its reactivity internally, extending the same idea onto
-surfaces with no DOM and no framework (canvas, WebGL, a TUI, React Native).
+| What's different                       | Zag                          | XState                       | machine-core                          |
+| -------------------------------------- | ---------------------------- | ---------------------------- | ------------------------------------- |
+| **State selection**                    | ❌ host framework does it    | ⚠️ `actor.select` (coarse)   | 🟢 `select` (fine-grained)            |
+| **Runs with no host framework**        | ❌ needs a framework         | ⚠️ statechart yes            | 🟢 yes                                |
+| **Flat-ish state memory**              | ❌ a reactive cell per field | 🟢 plain snapshot            | 🟢 plain context (copy-on-write)      |
+| Data model                             | reactive cell per field      | immutable snapshot per event | one plain object, mutated in place    |
+| Serializable snapshot (persist/replay) | ❌                           | 🟢 the actor model           | ⚠️ no built-in                        |
+| Nested / hierarchical states           | ❌ by design                 | ✅                           | ❌ flat                               |
+| Parallel / orthogonal regions          | ❌ by design                 | ✅                           | ⚠️ `compose` (peers, no shared event) |
+| Spawned child machines / actors        | ❌ by design                 | ✅                           | ❌ by design                          |
+
+**XState** allocates a serializable snapshot on every transition, and it taxes the hot
+path. machine-core drops mutates in place. The speed and flat memory come from a
+**narrower contract**, not better engineering.
+**Zag** can run framework-free, but presumes a host DOM framework, machine-core owns
+its reactivity internally, extending the same idea onto any JS enviroment (DOM, React Native, TUI, WebGL, ...).
 
 Footnotes:
 
-- **¹ `effects`** is the same idea in Zag and here (run on enter, return a cleanup
-  run on exit — we took the name from Zag). Zag's effects receive a `scope` (a DOM)
-  and reach for it; ours receive no environment — the platform is injected via
-  `withAdapter`, so the effect runs even where no DOM exists.
 - **❌-by-design** (nested/parallel/spawn) follows the same philosophy as Zag:
   keep machines light-weight, avoid the heavy statechart concepts.
 - **Fine-grained `select`** re-evaluates on any change and fires only when the
