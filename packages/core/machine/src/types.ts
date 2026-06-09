@@ -382,7 +382,7 @@ export interface TransitionConfig<
  * Public alias for the machine config shape. Annotating a config with this
  * still requires the generics (`const c: MachineConfig<'a' | 'b', Ctx, Ev>`);
  * for type-checking + inference at the definition site with no manual generics,
- * prefer the `config(...)` helper.
+ * author it with `setup().createMachine(...)` instead.
  */
 export type MachineConfig<
   State extends string,

@@ -1,13 +1,14 @@
 /**
  * setup() — the name-checking authoring builder.
  *
- * Pins: setup<Ctx,Ev,Cm>().config(registries).createMachine(config) returns a config
- * that (a) runs identically to config() — the registries are merged into
- * implementations and names resolve at runtime; and (b) type-checks every
- * named guard / action / effect / after-delay reference against the registry
- * keys at the definition site. The @ts-expect-error blocks are part of the
- * contract: each must be a COMPILE error (an unused directive fails tsc), so the
- * suite's typecheck (`tsc -p tsconfig.jest.json`) is what enforces (b).
+ * Pins: setup<Ctx,Ev,Cm>().config(registries).createMachine(config) returns a
+ * config that (a) merges the registries into implementations so names resolve at
+ * runtime, and (b) type-checks every named guard / action / effect / after-delay
+ * reference against the registry keys at the definition site. The lightweight
+ * setup().createMachine(literal) path (no registries) also builds a valid config.
+ * The @ts-expect-error blocks are part of the contract: each must be a COMPILE
+ * error (an unused directive fails tsc), so the suite's typecheck
+ * (`tsc -p tsconfig.jest.json`) is what enforces (b).
  */
 import { describe, expect, it, vi } from 'vitest'
 import { machine, setup } from '../src'
@@ -16,7 +17,25 @@ type Ctx = { id: string; openMs: number; open: boolean }
 type Ev = { type: 'open' } | { type: 'close' } | { type: 'toggle' }
 
 describe('setup()', () => {
-  it('runs identically to config() — names resolve at runtime via merged registries', () => {
+  it('lightweight path: setup().createMachine(literal) builds a valid config, types inferred', () => {
+    const cfg = setup().createMachine({
+      initial: 'closed',
+      context: { count: 0 },
+      states: {
+        closed: { on: { open: { target: 'open' } } },
+        open: { on: { close: { target: 'closed' } } },
+      },
+    })
+    const m = machine(cfg)
+    m.start()
+    expect(m.state).toBe('closed')
+    // inferred narrow types compile:
+    const s: 'closed' | 'open' = m.state
+    const n: number = m.context.count
+    expect([s, n]).toEqual(['closed', 0])
+  })
+
+  it('runs with names resolved at runtime via merged registries', () => {
     const setId = vi.fn()
     const track = vi.fn(() => () => {})
 
