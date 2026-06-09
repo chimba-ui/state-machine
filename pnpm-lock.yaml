@@ -114,6 +114,21 @@ importers:
         specifier: ^5.32.0
         version: 5.32.0
 
+  packages/core/components/accordion:
+    dependencies:
+      '@render-experiment/accordion-shared':
+        specifier: workspace:*
+        version: link:../../../shared/components/accordion
+      '@render-experiment/machine-core':
+        specifier: workspace:*
+        version: link:../../machine
+      '@render-experiment/style-engine-core':
+        specifier: workspace:*
+        version: link:../../style-engine
+      '@render-experiment/utils':
+        specifier: workspace:*
+        version: link:../../../shared/utils
+
   packages/core/components/dialog:
     dependencies:
       '@render-experiment/dialog-shared':
@@ -159,6 +174,27 @@ importers:
   packages/core/machine: {}
 
   packages/core/style-engine: {}
+
+  packages/native/components/accordion:
+    dependencies:
+      '@render-experiment/accordion-core':
+        specifier: workspace:*
+        version: link:../../../core/components/accordion
+      '@render-experiment/machine-core':
+        specifier: workspace:*
+        version: link:../../../core/machine
+      '@render-experiment/machine-native':
+        specifier: workspace:*
+        version: link:../../machine
+      '@render-experiment/style-engine-native':
+        specifier: workspace:*
+        version: link:../../style-engine
+      react:
+        specifier: '*'
+        version: 19.2.6
+      react-native:
+        specifier: '*'
+        version: 0.85.0(@babel/core@7.29.7)(@react-native/jest-preset@0.85.3(@babel/core@7.29.7)(react@19.2.6))(@types/react@19.2.15)(react@19.2.6)
 
   packages/native/components/dialog:
     dependencies:
@@ -250,6 +286,21 @@ importers:
         specifier: '*'
         version: 0.85.0(@babel/core@7.29.7)(@react-native/jest-preset@0.85.3(@babel/core@7.29.7)(react@19.2.6))(@types/react@19.2.15)(react@19.2.6)
 
+  packages/react/components/accordion:
+    dependencies:
+      '@render-experiment/accordion-core':
+        specifier: workspace:*
+        version: link:../../../core/components/accordion
+      '@render-experiment/machine-react':
+        specifier: workspace:*
+        version: link:../../machine
+      '@render-experiment/style-engine-react':
+        specifier: workspace:*
+        version: link:../../style-engine
+      react:
+        specifier: '*'
+        version: 19.2.6
+
   packages/react/components/dialog:
     dependencies:
       '@render-experiment/dialog-core':
@@ -319,6 +370,12 @@ importers:
         specifier: '*'
         version: 19.2.6
 
+  packages/shared/components/accordion:
+    dependencies:
+      '@render-experiment/machine-core':
+        specifier: workspace:*
+        version: link:../../../core/machine
+
   packages/shared/components/dialog:
     dependencies:
       '@render-experiment/machine-core':
@@ -341,6 +398,9 @@ importers:
 
   sandbox/native:
     dependencies:
+      '@render-experiment/accordion-native':
+        specifier: workspace:*
+        version: link:../../packages/native/components/accordion
       '@render-experiment/dialog-native':
         specifier: workspace:*
         version: link:../../packages/native/components/dialog
@@ -384,6 +444,12 @@ importers:
       '@json-render/react':
         specifier: ^0.19.0
         version: 0.19.0(react@19.2.6)(zod@4.4.3)
+      '@render-experiment/accordion-core':
+        specifier: workspace:*
+        version: link:../../packages/core/components/accordion
+      '@render-experiment/accordion-react':
+        specifier: workspace:*
+        version: link:../../packages/react/components/accordion
       '@render-experiment/dialog-core':
         specifier: workspace:*
         version: link:../../packages/core/components/dialog
