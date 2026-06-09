@@ -11,6 +11,10 @@ export { MACHINE_INIT } from './constants'
 export { config } from './config'
 export type { MachineConfig, TransitionConfig, Transition, Implementations } from './types'
 
+// Builder: like config(), but checks named guard/action/effect/delay references
+// against the registries (a typo'd name is a compile error, not a runtime throw).
+export { setup } from './setup'
+
 // Per-state node shape (used when annotating a config's `states`).
 export type { StateNode } from './types'
 // NOTE: state and context have no standalone modules — they're plain fields on

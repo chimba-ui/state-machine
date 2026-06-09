@@ -39,6 +39,26 @@ export interface GuardParams<Context extends object, Event, Computed = Record<st
   guard: (g: GuardArg<Context, Event, Computed>) => boolean
 }
 
+// -----------------------------------------------------------------------------
+// Registered-name slots
+// -----------------------------------------------------------------------------
+//
+// A config references named impls by string: `guard: 'isOpen'`, `entry: ['log']`,
+// `effects: ['track']`, `after: { openDelay: … }`. By default each name slot is
+// `AnyString` (any name compiles; a typo is caught at runtime). When a config is
+// authored through `setup({...}).createMachine(...)`, the builder threads the
+// registry's keys into these params so a name is checked + autocompleted against
+// what's actually registered — a typo becomes a compile error.
+
+/**
+ * The loose default for every registered-name slot. `string & {}` — NOT bare
+ * `string` — so that when a real name union is supplied (`'isOpen' | 'isLocked'`)
+ * and the slot reads `fn | Names`, the literals stay autocompletable instead of
+ * being swallowed by a plain `string` in the union. With no names supplied it
+ * still accepts any string (back-compat).
+ */
+export type AnyString = string & {}
+
 /** An inline guard: a predicate over the params. */
 export type Guard<Context extends object, Event, Computed = Record<string, never>> = (
   params: GuardParams<Context, Event, Computed>,
@@ -46,10 +66,14 @@ export type Guard<Context extends object, Event, Computed = Record<string, never
 
 /** A guard arg in a transition: an inline predicate or a registered name
  * (resolved against implementations.guards). Missing name → throw in dev,
- * warn + false in prod. */
-export type GuardArg<Context extends object, Event, Computed = Record<string, never>> =
-  | Guard<Context, Event, Computed>
-  | string
+ * warn + false in prod. `GuardName` is the set of valid names — any string by
+ * default (unchecked), the registered guard keys under `setup()`. */
+export type GuardArg<
+  Context extends object,
+  Event,
+  Computed = Record<string, never>,
+  GuardName extends string = AnyString,
+> = Guard<Context, Event, Computed> | GuardName
 
 // -----------------------------------------------------------------------------
 // Transitions
@@ -64,14 +88,16 @@ export interface Transition<
   Event,
   Computed = Record<string, never>,
   Send = Event,
+  GuardName extends string = AnyString,
+  ActionName extends string = AnyString,
 > {
   // NoInfer: `target` is checked against the State union (defined by the states
   // keys) rather than contributing to inferring it — so a bad target errors at
   // the target and autocompletes the declared states, instead of widening State.
   target?: NoInfer<State>
-  guard?: GuardArg<Context, Event, Computed>
+  guard?: GuardArg<Context, Event, Computed, GuardName>
   /** Actions to run, in order. A single action or a list. */
-  actions?: Actions<Context, Event, Computed, Send>
+  actions?: Actions<Context, Event, Computed, Send, ActionName, GuardName>
 }
 
 /**
@@ -93,11 +119,14 @@ export type TransitionEntry<
   Event,
   Computed,
   Send = Event,
+  GuardName extends string = AnyString,
+  ActionName extends string = AnyString,
 > =
-  | Transition<State, Context, Event, Computed, Send>
+  | Transition<State, Context, Event, Computed, Send, GuardName, ActionName>
   | Action<Context, Event, Computed, Send>
   | Array<
-      Transition<State, Context, Event, Computed, Send> | Action<Context, Event, Computed, Send>
+      | Transition<State, Context, Event, Computed, Send, GuardName, ActionName>
+      | Action<Context, Event, Computed, Send>
     >
 
 // -----------------------------------------------------------------------------
@@ -139,9 +168,11 @@ export interface OneOfBranch<
   Event,
   Computed = Record<string, never>,
   Send = Event,
+  GuardName extends string = AnyString,
+  ActionName extends string = AnyString,
 > {
-  guard?: GuardArg<Context, Event, Computed>
-  actions: Actions<Context, Event, Computed, Send>
+  guard?: GuardArg<Context, Event, Computed, GuardName>
+  actions: Actions<Context, Event, Computed, Send, ActionName, GuardName>
 }
 
 /** The oneOf sentinel — the runtime detects it in an actions list and expands. */
@@ -150,9 +181,11 @@ export interface OneOf<
   Event,
   Computed = Record<string, never>,
   Send = Event,
+  GuardName extends string = AnyString,
+  ActionName extends string = AnyString,
 > {
   readonly __oneOf: true
-  readonly branches: Array<OneOfBranch<Context, Event, Computed, Send>>
+  readonly branches: Array<OneOfBranch<Context, Event, Computed, Send, GuardName, ActionName>>
 }
 
 /**
@@ -165,7 +198,12 @@ export type ActionArg<
   Event,
   Computed = Record<string, never>,
   Send = Event,
-> = Action<Context, Event, Computed, Send> | string | OneOf<Context, Event, Computed, Send>
+  ActionName extends string = AnyString,
+  GuardName extends string = AnyString,
+> =
+  | Action<Context, Event, Computed, Send>
+  | ActionName
+  | OneOf<Context, Event, Computed, Send, GuardName, ActionName>
 
 /** What an `actions` / `entry` / `exit` slot accepts: a single action or a list.
  * The runtime normalizes a single value to a one-element list, so `actions: act(...)`
@@ -175,7 +213,11 @@ export type Actions<
   Event,
   Computed = Record<string, never>,
   Send = Event,
-> = ActionArg<Context, Event, Computed, Send> | Array<ActionArg<Context, Event, Computed, Send>>
+  ActionName extends string = AnyString,
+  GuardName extends string = AnyString,
+> =
+  | ActionArg<Context, Event, Computed, Send, ActionName, GuardName>
+  | Array<ActionArg<Context, Event, Computed, Send, ActionName, GuardName>>
 
 // -----------------------------------------------------------------------------
 // Effects
@@ -196,7 +238,8 @@ export type EffectArg<
   Event,
   Computed = Record<string, never>,
   Send = Event,
-> = Effect<Context, Event, Computed, Send> | string
+  EffectName extends string = AnyString,
+> = Effect<Context, Event, Computed, Send> | EffectName
 
 // -----------------------------------------------------------------------------
 // Computed
@@ -258,13 +301,17 @@ export type EventMap<
   Context extends object,
   Event extends { type: string },
   Computed,
+  GuardName extends string = AnyString,
+  ActionName extends string = AnyString,
 > = {
   [K in Event['type']]?: TransitionEntry<
     State,
     Context,
     Extract<Event, { type: K }>,
     Computed,
-    Event
+    Event,
+    GuardName,
+    ActionName
   >
 }
 
@@ -273,6 +320,13 @@ export interface TransitionConfig<
   Context extends object,
   Event extends { type: string },
   Computed = Record<string, never>,
+  // The registered-name unions. All default to `AnyString` (any name compiles —
+  // today's behavior); `setup({...}).createMachine(...)` supplies the real
+  // registry keys so a `guard`/action/effect/delay name is checked + autocompleted.
+  GuardName extends string = AnyString,
+  ActionName extends string = AnyString,
+  EffectName extends string = AnyString,
+  DelayName extends string = AnyString,
 > {
   // NoInfer: `initial` is checked against the State union, which is inferred
   // solely from the `states` keys below (the single source of truth) — so a
@@ -282,22 +336,32 @@ export interface TransitionConfig<
   states: Record<
     State,
     StateNode & {
-      on?: EventMap<State, Context, Event, Computed>
+      on?: EventMap<State, Context, Event, Computed, GuardName, ActionName>
       /** Actions run when this state is entered (after the switch). One or a list. */
-      entry?: Actions<Context, Event, Computed>
+      entry?: Actions<Context, Event, Computed, Event, ActionName, GuardName>
       /** Actions run when this state is exited (before the switch). One or a list. */
-      exit?: Actions<Context, Event, Computed>
+      exit?: Actions<Context, Event, Computed, Event, ActionName, GuardName>
       /** Effects started on enter; their cleanups run first on exit. */
-      effects?: Array<EffectArg<Context, Event, Computed>>
+      effects?: Array<EffectArg<Context, Event, Computed, Event, EffectName>>
       /** Timed transitions. Each key is a delay — a number of ms (e.g. 200) or
        * a name resolved from implementations.delays. The transition fires after
        * the delay WHILE in this state; auto-cancelled on exit. A delay may map
        * to a transition array (guard fallthrough). */
-      after?: Record<string, TransitionEntry<State, Context, Event, Computed>>
+      after?: {
+        [K in DelayName | `${number}`]?: TransitionEntry<
+          State,
+          Context,
+          Event,
+          Computed,
+          Event,
+          GuardName,
+          ActionName
+        >
+      }
     }
   >
   /** Any-state events. Per-state `on` takes precedence over this. */
-  on?: EventMap<State, Context, Event, Computed>
+  on?: EventMap<State, Context, Event, Computed, GuardName, ActionName>
   /** Derived state. Each def becomes a lazy, memoized computed signal read via
    * the `computed` bag in guard/action/effect params (and on the machine). */
   computed?: ComputedDefs<State, Context, Computed>
@@ -306,7 +370,9 @@ export interface TransitionConfig<
    * on start(), cleaned up on stop(). The action's `event` is the MACHINE_INIT
    * marker (a data change isn't an event). */
   watch?: {
-    [K in keyof Context | keyof Computed]?: Array<ActionArg<Context, Event, Computed>>
+    [K in keyof Context | keyof Computed]?: Array<
+      ActionArg<Context, Event, Computed, Event, ActionName, GuardName>
+    >
   }
   /** Named implementations referenced by string in transitions. */
   implementations?: Implementations<Context, Event, Computed>
