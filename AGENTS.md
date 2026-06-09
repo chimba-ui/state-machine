@@ -92,6 +92,17 @@ Before creating a new file, stop and check:
 
 When in doubt, raise the edge case before writing the file.
 
+## Diagrams in docs
+
+Draw ASCII diagrams (boxes, trees, flows) with plain `|`, `-`, and `+`
+only — never Unicode box-drawing characters (`┌ ┐ └ ┘ ─ │ ├ ┼ ▼` …).
+Use `|` for verticals, `-` for horizontals, `+` for every corner and
+junction, and a plain `v` / `^` / `>` / `<` for arrowheads. The
+box-drawing glyphs render inconsistently across fonts, terminals, and
+GitHub, and are awkward to edit; the ASCII set is portable and diffs
+cleanly. This applies to every `.md` in the repo (README, ARCHITECTURE,
+SPECs, package READMEs).
+
 ## Per-package guidance
 
 If a package needs rules of its own (build quirks, codegen specifics,
