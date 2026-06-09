@@ -41,8 +41,9 @@ component-as-a-headless-machine approach. Zag is agnostic about _which framework
 renders the DOM, but it still assumes a DOM exists. Agnostic Render takes that one step
 further: it assumes _nothing_ about the environment. The machine is a pure
 behavioral kernel with no environment touchpoints, every place behavior meets the
-platform — a keydown listener, a timer, a focus — is pushed to a per-target
-adapter. So the _same_ machine runs unchanged on the DOM, React Native, or any other JS runtime.
+platform — a keydown listener, a timer, a focus — is pushed to the per-target
+layer (the view's `effects.ts`). So the _same_ machine runs unchanged on the DOM,
+React Native, or any other JS runtime.
 
 ### Fast at scale
 
@@ -55,16 +56,30 @@ re-renders; numbers + methodology in the [engine README](./packages/core/machine
 
 ## How it's built
 
-4 layers
+The machine's behavior flows out through a few thin layers until it reaches real
+elements — the left two are agnostic, the right three are per-target:
 
-- **agnostic core** — the state machine engine
-- **connector** — turns machine state into logical bindings (e.g. `onPress`, `role`,
-  `describedBy`) and keeps that view in sync with the machine state
-- **adapter** — the per-target layer that supplies platform effects (e.g. a DOM keydown
-  listener, an RN `BackHandler`) and `normalize`s the logical bindings into real props
-  (`onPress` → `onClick` / `Pressable`)
-- **render glue** — the per-target view that spreads those normalized props onto the
-  actual elements
+```
+agnostic                                                            substrate
++-----------+   +-----------+   +-----------+   +-----------+   +-----------+
+|   core    |-->| connector |-->| normalize |-->| effects   |-->|   view    |
+|  engine   |   | state ->  |   | bindings  |   | platform  |   | spreads   |
+| behavior  |   | bindings  |   | -> props  |   | (rare)    |   | on elems  |
++-----------+   +-----------+   +-----------+   +-----------+   +-----------+
+  onPress         onPress         onClick /       keydown,       <button
+               (state as props)   Pressable       BackHandler    onClick=...>
+```
+
+- **core** — the state-machine engine. Pure behavior: states, transitions,
+  context, effects. Knows nothing about a renderer.
+- **connector** — turns machine state into agnostic _bindings_ and keeps that
+  view in sync as the machine changes.
+- **normalize** — per target, translates those bindings into real props
+  (`onPress` → `onClick` on web / a `Pressable` handler on RN). Always runs.
+- **effects** — per target, the platform listener that the machine can't own
+  itself (a DOM `keydown`, an RN `BackHandler`).
+- **view** — the per-target render that spreads the normalized props onto the
+  actual elements.
 
 The full layered model, the codegen pipeline, and the "the
 machine never sees props" rule are in:

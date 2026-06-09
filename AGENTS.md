@@ -29,7 +29,7 @@ the layered model:
   DOM, no `window`, no `document`. `packages/core/*` is pure
   TypeScript. If you reach for a substrate API in `core/`, stop — the
   code belongs in a target.
-- **Adapters never reimplement state.** Targets read from the machine
+- **Targets never reimplement state.** Targets read from the machine
   via the component's connector (e.g. `connectTooltip`). They do not
   fork the state graph, mirror context, or shadow transitions. If a
   target needs new state, the state goes in `core/`.
@@ -38,10 +38,11 @@ the layered model:
   generated output, edit the agnostic source spec (in `core/` or
   `shared/`) and rerun `pnpm codegen`.
 - **Substrate quirks live in the target.** Focus traps, escape-key
-  listeners, back-button handling, RN gesture quirks — implement them
-  in `packages/<target>/components/<comp>/adapter.ts` and plug them in
-  via `withAdapter()`. The machine declares the effect by name; the
-  target supplies the impl.
+  listeners, back-button handling, RN gesture quirks are
+  prop-dependent, so they live in
+  `packages/<target>/components/<comp>/effects.ts` as `ComponentEffect`s,
+  run by the view via `useEffects`. Props-free, platform-free effects
+  belong in the core machine config's `effects` (authored via `setup()`).
 
 ## Specs are intent, not API mirrors
 
@@ -85,7 +86,7 @@ Before merging, walk this checklist:
 3. **Did `core/` change?** Verify the change is substrate-agnostic. If
    it depends on a React lifecycle, a DOM API, or an RN-only module,
    move it to `packages/<target>/machine/` or to
-   `packages/<target>/components/<comp>/adapter.ts`.
+   `packages/<target>/components/<comp>/effects.ts`.
 
 ## New files
 

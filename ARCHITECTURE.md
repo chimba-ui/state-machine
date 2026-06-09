@@ -12,36 +12,36 @@ machine, same behavior, same accessibility intent, different render.
 
 ```
 The host
-┌────────────────────────────────────────────────────────────────────┐
-│  core/                                                             │
-│  No runtime render — pure JS, runs anywhere                        │
-│  ┌─────────────────┐  ┌──────────────────────┐  ┌───────────────┐  │
-│  │ **machine**     │  │ **components**       │  │ **style-      │  │
-│  │ states, events, │  │ behavior + intent    │  │   engine**    │  │
-│  │ select          │  │                      │  │ Style specs   │  │
-│  └─────────────────┘  └──────────────────────┘  └───────────────┘  │
-└────────────────────────────────────────────────────────────────────┘
-                               │  consumed by every target
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  shared/                                                            │
-│  Cross-target styles + utilities                                    │
-│  ┌──────────────────────────────────────┐  ┌──────────────────────┐ │
-│  │ **components** (per-component styles)│  │ **utils** (position, │ │
-│  │                                      │  │  merge, …)           │ │
-│  └──────────────────────────────────────┘  └──────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-                               │  translated per target
-                               ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│  <target>/   (react, native, …)                                      │
-│  Runtime-specific render logic                                       │
-│  • connect the machine  • normalize events (onPress → onClick)       │
-│  • adapt substrate quirks (focus trap, escape listener)              │
-│  • generated/ — component API + styled elements (from the spec)      │
-└──────────────────────────────────────────────────────────────────────┘
-                               │  imported as a normal package
-                               ▼
++----------------------------------------------------------------------+
+|  core/                                                             |
+|  No runtime render — pure JS, runs anywhere                        |
+|  +-----------------+  +----------------------+  +---------------+  |
+|  | **machine**     |  | **components**       |  | **style-      |  |
+|  | states, events, |  | behavior + intent    |  |   engine**    |  |
+|  | select          |  |                      |  | Style specs   |  |
+|  +-----------------+  +----------------------+  +---------------+  |
++----------------------------------------------------------------------+
+                               |  consumed by every target
+                               v
++-----------------------------------------------------------------------+
+|  shared/                                                            |
+|  Cross-target styles + utilities                                    |
+|  +--------------------------------------+  +----------------------+ |
+|  | **components** (per-component styles)|  | **utils** (position, | |
+|  |                                      |  |  merge, …)           | |
+|  +--------------------------------------+  +----------------------+ |
++-----------------------------------------------------------------------+
+                               |  translated per target
+                               v
++------------------------------------------------------------------------+
+|  <target>/   (react, native, …)                                      |
+|  Runtime-specific render logic                                       |
+|  • connect the machine  • normalize events (onPress -> onClick)      |
+|  • prop-aware effects (focus trap, escape listener) via effects.ts   |
+|  • generated/ — component API + styled elements (from the spec)      |
++------------------------------------------------------------------------+
+                               |  imported as a normal package
+                               v
                             Consumer app
 ```
 
@@ -98,7 +98,7 @@ controlled value frame-by-frame.")
 
 This is the rule that makes one machine run byte-for-byte identically on React,
 React Native, a canvas loop, or a test — each target varies only the thin
-connector/adapter layer around it. (It's the one place this engine diverges from
+connector layer around it. (It's the one place this engine diverges from
 Zag, whose machines read props directly.)
 
 ## Project structure
@@ -110,7 +110,7 @@ Zag, whose machines read props directly.)
 | `packages/shared/utils/`               | mergeProps, composeHandlers, positioning, memo                     |
 | `packages/core/components/<comp>/`     | Per-component agnostic spec — see structure below                  |
 | `packages/<target>/machine/`           | Hook + normalize per substrate (react, native, ...)                |
-| `packages/<target>/components/<comp>/` | View, context, adapter, generated elements + api                   |
+| `packages/<target>/components/<comp>/` | View, context, effects, generated elements + api                   |
 | `scripts/build.ts`, `scripts/watch.ts` | Codegen (one-shot + watcher)                                       |
 | `sandbox/<target>/`                    | Runnable dev env                                                   |
 
@@ -118,52 +118,51 @@ Zag, whose machines read props directly.)
 
 ```
 core                                  agnostic logic — no React, no DOM, no RN
-├── machine                           plain-mutation state-machine engine (one
-│   │                                 file per concern; public surface in index)
-│   ├── machine()                     builds a stopped service from a config;
-│   │                                 .start()/.stop()/.send()/.state/.select
-│   ├── context / state               one plain-object context (mutated in
-│   │                                 place, copy-on-write) + flat states
-│   ├── guards / actions              and/or/not combinators · oneOf
-│   ├── adapter                       withAdapter() — merges substrate impls
-│   ├── connector                     connect() → live, subscribable snapshot
-│   ├── compose                       run several machines as one (orthogonal
-│   │                                 regions): start/stop + sync + combine
-│   └── bindings                      event + attr vocabulary (onPress, role, …)
-│
-├── style-engine                      agnostic Style / StyleSpec types
-│
-└── components
-    └── <component>                   per-component agnostic description
-        ├── types                     TS declaration - vocabulary (what the component IS)
-        ├── props                     defaults + raw-to-resolved
-        ├── machine                   state graph + transitions
-        ├── connect                   state + ctx → handlers + attrs
-        └── parts                     anatomy: parts list + variant types
++-- machine                           plain-mutation state-machine engine (one
+|   |                                 file per concern; public surface in index)
+|   +-- machine()                     builds a stopped service from a config;
+|   |                                 .start()/.stop()/.send()/.state/.select
+|   +-- context / state               one plain-object context (mutated in
+|   |                                 place, copy-on-write) + flat states
+|   +-- guards / actions              and/or/not combinators · oneOf
+|   +-- connector                     connect() -> live, subscribable snapshot
+|   +-- compose                       run several machines as one (orthogonal
+|   |                                 regions): start/stop + sync + combine
+|   +-- bindings                      event + attr vocabulary (onPress, role, …)
+|
++-- style-engine                      agnostic Style / StyleSpec types
+|
++-- components
+    +-- <component>                   per-component agnostic description
+        +-- types                     TS declaration - vocabulary (what the component IS)
+        +-- props                     defaults + raw-to-resolved
+        +-- machine                   state graph + transitions
+        +-- connect                   state + ctx -> handlers + attrs
+        +-- parts                     anatomy: parts list + variant types
 
 shared                                cross-target, cross-component artifacts
-├── utils                             pure helpers (composeHandlers, positioning, memo)
-│
-└── components
-    └── <component>                   shared style and logic
-        └── styles
++-- utils                             pure helpers (composeHandlers, positioning, memo)
+|
++-- components
+    +-- <component>                   shared style and logic
+        +-- styles
 
 <target>                              one substrate (react, native, …)
-├── machine                           runtime, hooks, and props translator for this target
-│   ├── use-machine                   lifecycle bridge (build + start/stop + useSyncExternalStore)
-│   ├── use-effects                   runs a component's ComponentEffect (prop-dep'd transport)
-│   ├── use-selector                  fine-grained leaf subscription (O(readers))
-│   └── normalize                     bindings → target props
-│
-└── components
-    └── <component>                   per-component substrate implementation
-        ├── render                    the actual view (dev written - recommended AI support)
-        ├── context                   component context
-        ├── adapter                   substrate impls of core declaration
-        ├── utils                     local helpers
-        └── generated
-            ├── api                   runtime function to hook into the machine API
-            └── elements              styled wrappers (based of shared/components styles)
++-- machine                           runtime, hooks, and props translator for this target
+|   +-- use-machine                   lifecycle bridge (build + start/stop + useSyncExternalStore)
+|   +-- use-effects                   runs a component's ComponentEffect (prop-dep'd transport)
+|   +-- use-selector                  fine-grained leaf subscription (O(readers))
+|   +-- normalize                     bindings -> target props
+|
++-- components
+    +-- <component>                   per-component substrate implementation
+        +-- render                    the actual view (dev written - recommended AI support)
+        +-- context                   component context
+        +-- effects                   prop-aware, platform-specific ComponentEffects (run via useEffects)
+        +-- utils                     local helpers
+        +-- generated
+            +-- api                   runtime function to hook into the machine API
+            +-- elements              styled wrappers (based of shared/components styles)
 ```
 
 Four top-level package groups, four jobs:
@@ -190,61 +189,61 @@ What happens when a consumer renders a component in their app:
 
 ```
    CONSUMER APP
-   ─────────────────────────────────────────────────────────────
-   ┌─────────────────────────────────────────────────────────┐
-   │  RENDER COMPONENT                                       │
-   │                                                         │
-   │  Reads consumer props.                                  │
-   │  Spreads handlers + attrs onto the right element.       │
-   │  Renders styled elements.                               │
-   └─────────────────────────────────────────────────────────┘
-              │                            ▲
-              │ asks for the api           │ uses generated parts
-              ▼                            │
-   ┌──────────────────────┐     ┌──────────────────────────┐
-   │  GENERATED API       │     │  GENERATED ELEMENTS      │
-   │                      │     │                          │
-   │  Wires the machine   │     │  Styled wrappers, one    │
-   │  to the substrate    │     │  per part. Built at      │
-   │  via withAdapter,    │     │  at codegen time.        │
-   │  then returns the    │     │                          │
-   │  connect output.     │     │                          │
-   └──────────────────────┘     └──────────────────────────┘
-              │
-              │ runs through
-              ▼
-   ┌──────────────────────────────────────────────────────┐
-   │  TARGET LIFECYCLE BRIDGE                             │
-   │  (target's runtime + normalize)                      │
-   │                                                      │
-   │  Runs the machine config under the substrate's       │
-   │  scheduler. Translates agnostic bindings (onPress,   │
-   │  describedBy) into the target props (onClick,        │
-   │  aria-describedby).                                  │
-   └──────────────────────────────────────────────────────┘
-              │
-              │ drives
-              ▼
-   ┌──────────────────────────────────────────────────────┐
-   │  AGNOSTIC MACHINE  (core)                            │
-   │                                                      │
-   │  State graph + transitions + named effects.          │
-   │  Receives events, mutates context, fires effects.    │
-   │  Substrate-supplied effect impls plug in via the     │
-   │  per-target adapter (DOM listener on web,            │
-   │  BackHandler on RN, etc).                            │
-   └──────────────────────────────────────────────────────┘
-              │
-              │ exposes via
-              ▼
-   ┌──────────────────────────────────────────────────────┐
-   │  CONNECT  (core)                                     │
-   │                                                      │
-   │  Takes the machine snapshot (state, context,         │
-   │  computed, send) + props, returns the logical        │
-   │  surface: per-part bindings (handlers, attrs) the    │
-   │  view spreads. Props enter HERE, not the machine.    │
-   └──────────────────────────────────────────────────────┘
+   -------------------------------------------------------------
+   +-----------------------------------------------------------+
+   |  RENDER COMPONENT                                       |
+   |                                                         |
+   |  Reads consumer props.                                  |
+   |  Spreads handlers + attrs onto the right element.       |
+   |  Renders styled elements.                               |
+   +-----------------------------------------------------------+
+              |                            ^
+              | asks for the api           | uses generated parts
+              v                            |
+   +----------------------+     +--------------------------+
+   |  GENERATED API       |     |  GENERATED ELEMENTS      |
+   |                      |     |                          |
+   |  Wires the machine   |     |  Styled wrappers, one    |
+   |  to the substrate    |     |  per part. Built at      |
+   |  and the target's    |     |  at codegen time.        |
+   |  effects.ts, then     |     |                          |
+   |  returns connect out.|     |                          |
+   +----------------------+     +--------------------------+
+              |
+              | runs through
+              v
+   +------------------------------------------------------+
+   |  TARGET LIFECYCLE BRIDGE                             |
+   |  (target's runtime + normalize)                      |
+   |                                                      |
+   |  Runs the machine config under the substrate's       |
+   |  scheduler. Translates agnostic bindings (onPress,   |
+   |  describedBy) into the target props (onClick,        |
+   |  aria-describedby).                                  |
+   +------------------------------------------------------+
+              |
+              | drives
+              v
+   +------------------------------------------------------+
+   |  AGNOSTIC MACHINE  (core)                            |
+   |                                                      |
+   |  State graph + transitions + named effects.          |
+   |  Receives events, mutates context, fires effects.    |
+   |  Its effects are prop-free and platform-free (e.g.   |
+   |  a store subscription); prop-aware, platform-        |
+   |  specific listeners live in the target's effects.ts. |
+   +------------------------------------------------------+
+              |
+              | exposes via
+              v
+   +------------------------------------------------------+
+   |  CONNECT  (core)                                     |
+   |                                                      |
+   |  Takes the machine snapshot (state, context,         |
+   |  computed, send) + props, returns the logical        |
+   |  surface: per-part bindings (handlers, attrs) the    |
+   |  view spreads. Props enter HERE, not the machine.    |
+   +------------------------------------------------------+
 ```
 
 The consumer's app calls a view; the view asks for an API; the API
@@ -268,27 +267,31 @@ listeners) living outside any one machine. Per-machine state is the engine's own
 plain-object context. (The old standalone `core/store` package is gone; the
 store now ships from the engine itself.)
 
-### Two kinds of substrate effect
+### Two homes for a side-effect
 
-A behavior that touches the platform lives in one of two places, depending on
-whether the **machine** schedules it or the **view** does:
+A behavior that runs as a side-effect lives in one of two places, depending on
+whether it needs props/platform or not:
 
-1. **Machine effect (`withAdapter`)** — an effect the machine runs on entering a
-   state, named in the config and implemented per substrate. The machine
-   declares it by _name_; each target supplies the implementation via
-   `withAdapter()` (web `addEventListener`, RN `BackHandler`, …). Use this when
-   the machine owns the lifecycle (effect scoped to a state) and the effect needs
-   no props.
+1. **Core config effect** — props-free **and** platform-free (e.g. a store
+   subscription). It's registered by name in the machine's `setup({ effects })`
+   and named on a state in `createMachine({ states })`, so it runs inside the
+   machine, scoped to that state. Use this when the machine owns the lifecycle
+   and the effect needs neither props nor the platform.
 
-2. **Component effect (`ComponentEffect`)** — a view-side, **prop-dependent**
-   listener that the machine can't own because [it never sees props](packages/core/machine/README.md#the-machine-never-sees-props).
+2. **Component effect (`ComponentEffect`)** — **prop-aware** and
+   **platform-specific** (a DOM `keydown` for Escape on web, an RN `BackHandler`).
+   The machine can't own it because [it never sees props](packages/core/machine/README.md#the-machine-never-sees-props).
    The tooltip's real Escape is this: it needs `closeOnEscape` and a prevent-able
    `onEscapeKeyDown` veto. It lives in the target's `effects.ts` as a plain
-   `(machine, props) => cleanup` + the prop names it depends on; the generated
-   `useApi` owns the `useEffect` (see the React bindings' `useEffects`). The
-   agnostic _decision_ still lives in core (`resolveEscape`); only the DOM
-   listener is per-target. On accept it `send()`s a plain event the machine
-   already understands.
+   `(machine, props) => cleanup` + the prop names it depends on; the view runs it
+   via `useEffects`. The agnostic _decision_ still lives in core
+   (`resolveEscape`); only the platform listener is per-target. On accept it
+   `send()`s a plain event the machine already understands.
+
+(There used to be a third, middle home — a prop-free but platform-specific
+machine effect plugged in via `withAdapter`. It's gone: every `adapter.ts` was
+empty, because the prop-free effects need no platform and the platform-touching
+ones need props.)
 
 ## The codegen pipeline
 
@@ -299,32 +302,32 @@ production (`pnpm build`) — there's no separate runtime path.
 
 ```
    READS
-   ────────────────────────────────────────────────────────────────
+   ----------------------------------------------------------------
    core/components/<comp>/src/                  (behavior + anatomy)
-   ├── index.ts                     names: <comp>MachineConfig, connect<Comp>, <COMP>_DEFAULTS
-   ├── types.ts                     types referenced by api.ts
-   ├── machine.ts                   imported by the generated api
-   ├── connect.ts                   imported by the generated api
-   └── parts.ts                     parts list + variant types
+   +-- index.ts                     names: <comp>MachineConfig, connect<Comp>, <COMP>_DEFAULTS
+   +-- types.ts                     types referenced by api.ts
+   +-- machine.ts                   imported by the generated api
+   +-- connect.ts                   imported by the generated api
+   +-- parts.ts                     parts list + variant types
 
    shared/components/<comp>/src/
-   └── styles.ts                    common styles for all targets
+   +-- styles.ts                    common styles for all targets
 
-                       ↓  scripts/build.ts
-                       ↓
-                       ↓  For each target:
-                       ↓    - emitApi       (template + core names)
-                       ↓    - emitElements  (translates styles → target props)
+                       v  scripts/build.ts
+                       v
+                       v  For each target:
+                       v    - emitApi       (template + core names)
+                       v    - emitElements  (translates styles -> target props)
 
    EMITS (one set per target, overwritten each run)
-   ────────────────────────────────────────────────────────────────
+   ----------------------------------------------------------------
    react/components/<comp>/src/generated/
-   ├── api.ts          ← useXxxApi (imports core + react runtime)
-   └── elements.ts     ← styled wrappers
+   +-- api.ts          <- useXxxApi (imports core + react runtime)
+   +-- elements.ts     <- styled wrappers
 
    native/components/<comp>/src/generated/
-   ├── api.ts          ← useXxxApi (imports core + native runtime)
-   └── elements.ts     ← styled wrappers
+   +-- api.ts          <- useXxxApi (imports core + native runtime)
+   +-- elements.ts     <- styled wrappers
 ```
 
 **Part name → element.** `emitElements` picks each part's element by its name:
@@ -341,8 +344,7 @@ breaks focus traps); a native text part left as a `View` loses its text color.
 | Term         | What it is                                                                                          |
 | ------------ | --------------------------------------------------------------------------------------------------- |
 | **host**     | The agnostic core — `packages/core/*`. Declares what a component is.                                |
-| **adapter**  | A substrate-specific implementation package — `packages/<target>/*`.                                |
-| **target**   | A render environment (`react`, `native`, …).                                                        |
+| **target**   | A substrate-specific implementation package and its render environment — `packages/<target>/*` (`react`, `native`, …). |
 | **machine**  | A state-graph config consumed by `machine()`; returns a startable service.                          |
 | **connect**  | A function returning the logical surface a view spreads onto elements.                              |
 | **bindings** | The substrate-agnostic event + attr vocabulary core's connect speaks.                               |
@@ -354,13 +356,13 @@ breaks focus traps); a native text part left as a `View` loses its text color.
 
 Each target gets a sandbox under `sandbox/<target>/`. The sandboxes are
 where the components actually run — a real app with the generated
-adapter consumed end-to-end.
+target packages consumed end-to-end.
 
 ```
 sandbox
-├── react        Vite + React DOM        — `pnpm dev:react`
-├── native       Expo + React Native     — `pnpm dev:native`
-└── <target>     env setup               — `pnpm dev:<target>`
++-- react        Vite + React DOM        — `pnpm dev:react`
++-- native       Expo + React Native     — `pnpm dev:native`
++-- <target>     env setup               — `pnpm dev:<target>`
 ```
 
 Each sandbox depends on its target's packages. Editing a component in `core/`

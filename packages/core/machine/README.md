@@ -73,7 +73,7 @@ presumes a DOM) and **performance under heavy fan-out**.
 | Computed / derived             | ✅         | ✅                | ✅            |
 | Timed transitions (`after`)    | ✅         | ✅                | ✅            |
 | Watch (react to a data change) | `watch`    | via `always`      | `watch`       |
-| Per-platform late binding      | ✅         | via `.provide()`  | `withAdapter` |
+| Per-platform late binding      | ✅         | via `.provide()`  | `effects.ts`  |
 
 - **¹ `effects`** is the same idea in Zag and here, but Zag's effects receive a `scope` (a DOM)
   and reach for it; ours receive no environment.
@@ -136,35 +136,10 @@ React render arena (mount + re-render row-count).
 
 **Throughput — events/sec (higher is better)**
 
-| Scenario                          | machine-core | XState | core ×   |
-| --------------------------------- | -----------: | -----: | -------- |
-| Single machine, one event         |       3.12 M | 0.87 M | **3.6×** |
-| Fine-grain (unobserved) 1 of 5000 |       1.20 M | 0.45 M | **2.7×** |
-
-Per-event cost is ~3.6× XState's, and changing a field nobody observes is ~2.7×
-(core's value-dedup suppresses the listener; XState fires its subscriber and
-diffs in it).
-
-**Fan-out — one machine, N observers, change one field (higher is better)**
-
-This is the honest scaling test: a single machine with N selections, bump one
-field. Core's `select` is a coarse bus — every selection re-evaluates on each
-notify and value-compares — so the re-eval pass is **O(N), not O(changed)**; only
-the React re-render is O(changed). XState's headless `actor.subscribe` is O(N)
-too, with a heavier per-notify constant.
-
-| Observers (N) | machine-core | XState | core ×   |
-| ------------- | -----------: | -----: | -------- |
-| 100           |        315 K |  256 K | **1.2×** |
-| 1 000         |        9.9 K | 10.8 K | 0.9× ¹   |
-| 5 000         |        6.3 K | 0.74 K | **8.5×** |
-
-Both engines degrade with N — this is **not** flat O(changed) at the engine
-level. What core buys is a far smaller constant: at 5 000 observers it's **8.5×**
-XState. (At 1 000 they're within noise of each other.)
-
-- **¹** At N=1 000 XState edges ahead by ~9%; the gap only opens up decisively at
-  larger N. Reported as-is rather than cherry-picked.
+| Scenario                          | machine-core | XState |
+| --------------------------------- | -----------: | -----: |
+| Single machine, one event         |   **3.12 M** | 0.87 M |
+| Fine-grain (unobserved) 1 of 5000 |   **1.20 M** | 0.45 M |
 
 **Construction — µs / machine, and memory — KB / machine (5 000 live; lower is better)**
 
@@ -178,10 +153,10 @@ fair contender here (and for memory):
 | Memory, 64-field context      |     **7.84** |   9.28 | **133** |
 
 2 → 64 fields adds only ~3 KB/machine for core: context is one plain object, so
-memory grows with the data you store, not with a per-field cell. It's **not**
+memory grows with the data you store, not with a per-field cell. It's not
 perfectly flat — it grows linearly, just slowly. **Zag is the contrast that makes
 the point**: its context is one reactive cell per field, so 64 fields balloon to
-~133 KB/machine (~17× core) — the per-field-cell cost this model avoids.
+~133 KB/machine (~17×) — the per-field-cell cost this model avoids.
 
 **Memory after a write (copy-on-write fired).** The numbers above are idle
 machines, which for core share the config's context object (copy-on-write hasn't
@@ -189,10 +164,10 @@ triggered). Sending one event to each — the realistic churny-app case — make
 each core machine own its context copy. The footprint barely moves, and the
 contrast with XState sharpens:
 
-| Metric (64 fields, 5 000 machines) | machine-core | XState |    Zag |
-| ---------------------------------- | -----------: | -----: | -----: |
-| Idle (never written)               |     **7.84** |   9.28 |    133 |
-| Written (1 event each, COW fired)  |     **5.84** |  12.42 |    136 |
+| Metric (64 fields, 5 000 machines) | machine-core | XState | Zag |
+| ---------------------------------- | -----------: | -----: | --: |
+| Idle (never written)               |     **7.84** |   9.28 | 133 |
+| Written (1 event each, COW fired)  |     **5.84** |  12.42 | 136 |
 
 Core stays flat (the idle/written wobble is within GC noise); **XState's snapshot
 model doubles** (6.4 → 12.4 KB) once `assign` allocates a per-machine context.
@@ -220,25 +195,6 @@ that matters for "does it stay surgical at scale."
   per-row primitive (core/XState a `useSelector` subscription; Zag a full
   `useMachine` + `React.memo` wrapper). It's "cost of this library's row", not a
   shared primitive — the row-count and re-render wall are the comparable metrics.
-
-**Engine internals (core-only, events/sec).** These have no cross-engine
-counterpart (XState has no first-class lazy `computed`; the rest are engine hot
-paths) — they're here to characterize the runtime's own cost, not to compare:
-
-| Path                                          | events/sec | note                                    |
-| --------------------------------------------- | ---------: | --------------------------------------- |
-| `computed` — cached read (no change)          |     17.0 M | memo hit; ~11× a recompute              |
-| `computed` — recompute (read field changed)   |      1.5 M | full re-run under tracking proxies      |
-| `computed` — 4-deep chain (root → tip)        |      0.5 M | resolves the whole chain, glitch-free   |
-| `computed` — fine-grain (unread field changed)|      2.9 M | read-key tracking → memo hit, no re-run |
-| Guard fallthrough — 2 / 8 / 32 candidates     | 3.4 / 3.0 / 2.1 M | linear in candidate count        |
-| State-change churn (exit + entry every event) |      2.7 M | ~13% over a context-only mutate         |
-| Effect boot + cleanup every transition        |      2.7 M | `startEffects`/`stopEffects` per move   |
-| Subscriber set — stable vs churning ⁴         | 2.9 M vs 2.3 M | bus-snapshot rebuild costs ~21%    |
-
-- **⁴** "Churning" subscribes + unsubscribes around each event, so the bus
-  iteration snapshot is rebuilt every notify — the mount/unmount shape of a
-  virtualized list. A stable subscriber set reuses the snapshot.
 
 **When this matters: density × frequency** — many machines reacting to a
 high-frequency stream inside one frame budget. Trading terminals (thousands of
@@ -270,8 +226,8 @@ machine —
 | Export                               | What it is                                                                                                                                                                                                     |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `machine(config)`                    | build a service (stopped); `.start()` / `.stop()` / `.send()` / `.state` / `.context` / `.computed` / `.subscribe` / `.select` / `.onStart` / `.onStop`                                                        |
-| `config({ ... })`                    | author a config const with full inference + checking, no manual generics                                                                                                                                       |
-| `withAdapter(config, adapter)`       | layer a platform's `actions` + `effects` over a config (other impls — `guards`, `delays` — carry through untouched)                                                                                            |
+| `setup().createMachine(config)`      | author a config from a literal — infers `State` / `Context` / `Event`, no type args; named guards/actions/effects/delays stay loose strings (lightweight path)                                                  |
+| `setup<Ctx,Ev>().config(registries).createMachine(config)` | author a config with every guard/action/effect/delay **name** compile-checked + autocompleted against the registry keys — a typo is a compile error (checked path)                                |
 | `connector(service, connect, props)` | live, memoized, subscribable view snapshot: `.snapshot` / `.subscribe` / `.select` / `.setProps` (prop-callbacks wire automatically)                                                                           |
 | `makeReaction<…>()`                  | inference helper for a connector reaction — fixes the machine generics once, infers each reaction's selector→callback `Value` (see [Reactions](#reactions--firing-prop-callbacks-without-the-machine-knowing)) |
 | `compose({ a, b })`                  | run several machines as one (orthogonal regions): bundled `start`/`stop` + `.sync()` + `.combine()`                                                                                                            |
@@ -317,16 +273,27 @@ const offStop = m.onStop(() => {
 })
 ```
 
-> **Tip: author configs with `config(...)`.** Writing a config as a bare object
-> gives weaker type-checking than passing it through the `config()` identity
-> helper, which applies the full `TransitionConfig` constraint at the definition
-> site — a typo in `initial`, an invalid `target`, or a wrong param shape all
-> error _there_, with no manual generics:
+> **Tip: author configs with `setup()`.** Writing a config as a bare object gives
+> weaker type-checking than authoring it through `setup()`, which applies the full
+> `TransitionConfig` constraint at the definition site. Two paths off one call:
 >
 > ```ts
-> import { config, machine } from '@render-experiment/machine-core'
+> import { setup, machine } from '@render-experiment/machine-core'
 >
-> const cfg = config({ initial: 'closed', context: {}, states: { closed: {} } })
+> // lightweight — infers State / Context / Event from the literal, names loose:
+> const cfg = setup().createMachine({ initial: 'closed', context: {}, states: { closed: {} } })
+>
+> // checked — name a registry, then every guard/action/effect/delay reference in
+> // the config is compile-checked + autocompleted against its keys (typo = error):
+> const { createMachine } = setup<Ctx, Ev>().config({
+>   guards: { isOpen: ({ context }) => context.open },
+> })
+> const checked = createMachine({
+>   initial: 'closed',
+>   context: { open: false },
+>   states: { closed: { on: { toggle: { target: 'open', guard: 'isOpen' } } }, open: {} },
+> })
+>
 > const m = machine(cfg)
 > ```
 
@@ -551,80 +518,38 @@ states: {
 
 The initial state's effects boot on `start()`; all active cleanups run on
 `stop()`. Effects can be named and resolved from `implementations.effects` (so
-they're reusable / overridable — see the adapter below) or written inline.
+they're reusable / overridable) or written inline.
 
-### Where does a side-effect live? — the three homes
+### Where does a side-effect live? — the two homes
 
-Not every side-effect belongs in the config. The deciding questions are **does it
+Not every side-effect belongs in the config. The deciding question is **does it
 touch the platform** (a DOM listener, a native API) and **does it need props**
-(the machine [never sees props](#the-machine-never-sees-props)). That gives three
+(the machine [never sees props](#the-machine-never-sees-props)). That gives two
 homes:
 
 ```
-Does the effect touch the platform (DOM / native API)?
-├─ No  → a plain machine effect, implemented right in the config `effects`
-│        (e.g. a store subscription — same on every target)
-└─ Yes → Does it need props?
-         ├─ No  → a NAMED machine effect, implemented per-target via the ADAPTER
-         │        (withAdapter) — the machine owns its lifecycle, the platform
-         │        owns its body  (e.g. a focus-trap while `open`)
-         └─ Yes → a ComponentEffect in the target's effects.ts — the VIEW owns it,
-                  because the machine can't read the props it needs
-                  (e.g. Escape gated by a `closeOnEscape` prop)
+Is the effect props-free AND platform-free?
+|
++-- Yes -> a plain machine effect, in the config `effects`
+|          (e.g. a store subscription -- same on every target,
+|           runs in the machine scoped to a state)
+|
++-- No  -> a ComponentEffect in the target's effects.ts -- the VIEW owns it
+           (prop-aware and/or platform-specific: a DOM keydown for Escape,
+            RN BackHandler; run by the view via `useEffects`)
 ```
 
-| Home                        | Owns the lifecycle | Touches platform | Reads props |
-| --------------------------- | ------------------ | ---------------- | ----------- |
-| config `effects: { … }`     | machine            | no               | no          |
-| **adapter** (`withAdapter`) | machine            | yes              | no          |
-| `ComponentEffect` (target)  | the view           | yes              | yes         |
+| Home                       | Owns the lifecycle | Touches platform | Reads props |
+| -------------------------- | ------------------ | ---------------- | ----------- |
+| config `effects: { … }`    | machine            | no               | no          |
+| `ComponentEffect` (target) | the view           | yes              | yes/no      |
 
-The middle row is the adapter's whole reason to exist: an effect the **machine**
-schedules (scoped to a state, started on enter / cleaned up on exit) whose **body
-is platform-specific but takes no props**. A focus-trap or scroll-lock while a
-dialog is `open` is the canonical case — the _machine_ decides _when_ (it's
-behavior), the _target_ decides _how_ (web `focus()` vs. native
-`AccessibilityInfo`).
-
-### The adapter — naming an effect, binding it per platform
-
-A config **names** a platform effect; each target **supplies the body** via
-`withAdapter`, which merges the platform's `actions` + `effects` over the config's
-`implementations` (adapter wins on a name collision):
-
-```ts
-import { withAdapter } from '@render-experiment/machine-core'
-
-// agnostic config — names the effect, no platform code:
-const config = { initial: 'open', context: {}, states: { open: { effects: ['trapFocus'] } } }
-
-// web target supplies the real body:
-const webAdapter = {
-  effects: {
-    trapFocus: ({ context }) => {
-      const release = trapFocusDom(getContentEl(context.id)) // web focus-trap
-      return release // cleanup on state exit
-    },
-  },
-}
-// a native target would name the SAME 'trapFocus' with a different body
-// (AccessibilityInfo …) — the machine config never changes.
-
-const m = machine(withAdapter(config, webAdapter))
-```
-
-Only `actions` + `effects` are the platform seam. `guards` stay config-only (pure
-logic, identical everywhere) and named `delays` carry through untouched.
-
-> **Why are the shipped components' `adapter.ts` files empty (`{}`)?** Because
-> neither tooltip nor dropdown has an effect in the middle row: their one machine
-> effect is a store subscription (pure → config), and their platform listener
-> (Escape / Android back) is prop-gated (→ a ComponentEffect). An empty adapter
-> is the correct, common state — it's a _ready seam_, filled only when a component
-> has a platform effect that needs no props (a focus-trap, a scroll-lock). The
-> contrast with Zag: Zag puts all platform effects in one `effects` map and reads
-> the DOM through an injected `scope`; here the no-props rule splits the
-> prop-dependent ones out to the view, leaving the adapter for the prop-free rest.
+A config effect is props-free and platform-free, so it's identical on every
+target — a store subscription is the canonical case. Anything that touches the
+platform (a DOM `keydown` for Escape, the RN `BackHandler`) or reads a prop
+(`closeOnEscape`) lives in the target's `effects.ts` as a `ComponentEffect`, run
+by the view via `useEffects`. The machine never sees it; the effect just `send()`s
+a plain event the machine already handles.
 
 ---
 
@@ -1067,40 +992,31 @@ const off = tooltipStore.subscribe(s => m.send({ type: 'activeChanged', openId: 
 ## Putting it together
 
 ```ts
-import { config, machine, withAdapter, connector } from '@render-experiment/machine-core'
+import { setup, machine, connector } from '@render-experiment/machine-core'
 
-// 1. describe behavior (agnostic) — config() type-checks the literal in place
-const disclosureConfig = config({
+// 1. describe behavior (agnostic) — setup() type-checks the literal in place.
+//    Pure, props-free, platform-free, so it's the lightweight path.
+const disclosureConfig = setup().createMachine({
   initial: 'closed',
   context: {},
   states: {
     closed: { on: { open: { target: 'open' } } },
-    open: {
-      effects: ['trackEscape'],
-      on: { close: { target: 'closed' } },
-    },
+    open: { on: { close: { target: 'closed' } } },
   },
 })
 
-// 2. supply the platform
-const webAdapter = {
-  effects: {
-    trackEscape: ({ send }) => {
-      const fn = (e: KeyboardEvent) => e.key === 'Escape' && send({ type: 'close' })
-      document.addEventListener('keydown', fn)
-      return () => document.removeEventListener('keydown', fn)
-    },
-  },
-}
+// A platform listener — closing on the Escape key — would NOT live here:
+// it touches the DOM (and is usually prop-gated), so it's a `ComponentEffect`
+// in the target's effects.ts, which `send({ type: 'close' })`s the event above.
 
-// 3. map to a view api
+// 2. map to a view api
 const connect = ({ state, send }) => ({
   isOpen: state === 'open',
   triggerProps: { onPress: () => send({ type: 'open' }) },
 })
 
-// 4. run it
-const m = machine(withAdapter(disclosureConfig, webAdapter))
+// 3. run it
+const m = machine(disclosureConfig)
 m.start()
 const view = connector(m, connect, {})
 view.subscribe(render)
@@ -1117,7 +1033,7 @@ its full section.
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Building blocks**              |                                                                                                                                                                            |
 | **machine**                      | The built service from `machine(config)` — exposes `start`/`stop`/`send`/`state`/`context`/`select`. [→](#lifecycle)                                                       |
-| **config**                       | The plain object describing behavior (states, context, transitions). Author it with `config()` for in-place type-checking. [→](#lifecycle)                                 |
+| **setup**                        | The authoring entry point — `setup().createMachine(literal)` (lightweight, names loose) or `setup<Ctx,Ev>().config(registries).createMachine(config)` (names compile-checked). [→](#lifecycle)                                 |
 | **state**                        | One of the flat, named situations the machine can be in (it's in exactly one at a time). [→](#states--transitions)                                                         |
 | **transition**                   | An `on` entry: where an event takes the machine — optional `target`, `guard`, `actions`. [→](#states--transitions)                                                         |
 | **event**                        | The `{ type, … }` object you `send()` to drive a transition. [→](#states--transitions)                                                                                     |
@@ -1140,7 +1056,6 @@ its full section.
 | **computed**                     | A lazy, memoized value derived from context (or other computeds); recomputes only when a read input changes. [→](#computed--derived-data)                                  |
 | **Effects & the platform seam**  |                                                                                                                                                                            |
 | **effect**                       | A side-effect with cleanup, scoped to a state: runs on enter, its returned cleanup runs on exit. [→](#effects--side-effects-with-cleanup)                                  |
-| **adapter**                      | A per-target binding that supplies the body of a named, platform-touching, prop-free effect. [→](#the-adapter--naming-an-effect-binding-it-per-platform)                   |
 | **implementations**              | The named registry on a config — `guards` / `actions` / `effects` / `delays` referenced by string. [→](#guards--gating-a-transition)                                       |
 | **The view boundary**            |                                                                                                                                                                            |
 | **connect**                      | A pure function mapping a machine snapshot → the view-facing api (handlers + attributes). [→](#connector--the-view-boundary)                                               |
@@ -1171,5 +1086,5 @@ its full section.
 | **MACHINE_INIT**                 | The synthetic event fired when effects/watchers boot on `start()`. [→](#api-at-a-glance)                                                                                   |
 | **Cross-cutting concepts**       |                                                                                                                                                                            |
 | **the machine never sees props** | The defining rule: a machine is pure behavior; props live only at the edge. [→](#the-machine-never-sees-props)                                                             |
-| **the edge**                     | Where props/platform meet the machine — the connector (props, reactions) + adapter (platform). [→](#the-machine-never-sees-props)                                          |
+| **the edge**                     | Where props/platform meet the machine — the connector (props, reactions) + the target's effects.ts (platform listeners). [→](#the-machine-never-sees-props)                                          |
 | **copy-on-write (COW)**          | The context memory model: share the config's object until the first write, then copy. [→](#how-it-compares)                                                                |
