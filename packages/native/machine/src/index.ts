@@ -1,11 +1,10 @@
-// The lifecycle bridge, effects runner, and selector hook are React-renderer
-// concerns — identical on RN (same React renderer) — so they're imported
-// straight from machine-react rather than duplicated here. Only the
-// substrate-specific translation (normalize → RN props, RN-aware mergeProps)
+// The lifecycle bridge (which also runs the component effects) and the selector
+// hook are React-renderer concerns — identical on RN (same React renderer) — so
+// they're imported straight from machine-react rather than duplicated here. Only
+// the substrate-specific translation (normalize → RN props, RN-aware mergeProps)
 // lives in this package.
 export {
   useMachine,
-  useEffects,
   useSelector,
   type ComponentEffect,
   type ComponentEffects,
