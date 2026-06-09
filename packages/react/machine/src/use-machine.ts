@@ -2,24 +2,26 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import {
   connector,
   machine,
-  withAdapter,
-  type Adapter,
   type Connect,
   type TransitionConfig,
 } from '@render-experiment/machine-core'
 
 /**
  * The one generic React bridge. Every component's generated api.ts calls this
- * with the agnostic pieces — a config factory, the connect, the per-target
- * adapter — plus the resolved props:
+ * with the agnostic pieces — a config factory and the connect — plus the
+ * resolved props:
  *
- *   useMachine(tooltipMachineConfig, connectTooltip, tooltipAdapter, props)
+ *   useMachine(tooltipMachineConfig, connectTooltip, props)
  *
- * It: builds the machine from props (with the adapter merged in), wraps it in a
- * connector, starts on mount / stops on unmount (the connector's reactions
- * follow the machine's lifecycle automatically), keeps props fresh via setProps,
- * and drives React via useSyncExternalStore over the connector's stable
- * snapshot. Returns the connect() api + the running machine.
+ * It: builds the machine from props, wraps it in a connector, starts on mount /
+ * stops on unmount (the connector's reactions follow the machine's lifecycle
+ * automatically), keeps props fresh via setProps, and drives React via
+ * useSyncExternalStore over the connector's stable snapshot. Returns the
+ * connect() api + the running machine.
+ *
+ * Platform effects (a DOM keydown, an RN BackHandler) are NOT merged into the
+ * config here — they're prop-dependent, so each component declares them in its
+ * effects.ts and the generated useApi runs them via useEffects.
  *
  * The machine is built ONCE (from the first render's props); later prop changes
  * flow through setProps — recreating would lose state.
@@ -34,14 +36,13 @@ export function useMachine<
 >(
   createConfig: (props: Props) => TransitionConfig<State, Context, Event, Computed>,
   connect: Connect<State, Context, Event, Props, Api, Computed>,
-  adapter: Adapter<Context, Event, Computed>,
   props: Props,
 ): { api: Api; machine: ReturnType<typeof machine<State, Context, Event, Computed>> } {
   // Build machine + connector once. The first render's props seed context +
-  // initial state; the adapter supplies platform effects.
+  // initial state.
   const { service, connection } = useMemo(
     () => {
-      const service = machine(withAdapter(createConfig(props), adapter))
+      const service = machine(createConfig(props))
       const connection = connector(service, connect, props)
       return { service, connection }
     },

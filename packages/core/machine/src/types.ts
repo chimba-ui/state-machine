@@ -281,7 +281,7 @@ export interface Implementations<Context extends object, Event, Computed = Recor
   guards?: Record<string, Guard<Context, Event, Computed>>
   /** Reusable named actions. Referenced by name in an `actions` list. */
   actions?: Record<string, Action<Context, Event, Computed>>
-  /** Reusable named effects. The adapter (withAdapter) overrides these. */
+  /** Reusable named effects, referenced by name in a state's `effects`. */
   effects?: Record<string, Effect<Context, Event, Computed>>
   /** Reusable named delays. Referenced by name as an `after` key. */
   delays?: Record<string, Delay<Context, Event, Computed>>
@@ -390,16 +390,6 @@ export type MachineConfig<
   Event extends { type: string },
   Computed = Record<string, never>,
 > = TransitionConfig<State, Context, Event, Computed>
-
-/**
- * Platform implementations swapped per target. Only actions + effects — the
- * things that touch the platform. On a name collision the adapter wins: the
- * config's named impl is the default, the platform overrides.
- */
-export type Adapter<Context extends object, Event, Computed = Record<string, never>> = Pick<
-  Implementations<Context, Event, Computed>,
-  'actions' | 'effects'
->
 
 // -----------------------------------------------------------------------------
 // Subscription surface

@@ -36,10 +36,6 @@ export type { Action, ActionArg, ActionParams, OneOf } from './types'
 // Effects + types.
 export type { Effect, EffectArg } from './types'
 
-// Per-platform adapter seam.
-export { withAdapter } from './adapter'
-export type { Adapter } from './types'
-
 // Timed transitions.
 export type { Delay } from './types'
 
