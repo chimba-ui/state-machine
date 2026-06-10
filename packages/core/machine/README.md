@@ -635,8 +635,12 @@ const m = machine({
 
 The declarative form of "subscribe to a field and run something." Watchers start
 on `start()`, clean up on `stop()`, and fire only when the watched field's value
-actually changes (not on setup). Use `watch` for side-effecting reactions; for a
-_derived value_, reach for `computed` instead.
+actually changes (not on setup). Watch actions obey the same
+**run-to-completion** rule as events: they're queued and run after the
+transition that changed the field fully settles (never mid-transition), so they
+always observe the whole write, and a watcher writing context can't re-enter the
+transition in flight. Use `watch` for side-effecting reactions; for a _derived
+value_, reach for `computed` instead.
 
 ---
 

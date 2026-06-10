@@ -11,3 +11,12 @@ export const MACHINE_INIT = 'machine.init' as const
  * that resolves a name so the rule lives in one place.
  */
 export const isDev = process.env.NODE_ENV !== 'production'
+
+/**
+ * Dev-only runaway guard for one queue drain. A single send legitimately chains
+ * a handful of queued events / deferred watcher runs; thousands means a
+ * feedback loop (e.g. a watcher whose action keeps changing the field it
+ * watches, or actions sending in a cycle). Far above any real chain, so a hit
+ * is always a bug.
+ */
+export const MAX_DRAIN = 10_000

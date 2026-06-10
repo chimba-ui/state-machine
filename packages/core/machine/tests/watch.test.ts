@@ -133,6 +133,59 @@ describe('watch — data-reactions', () => {
     expect(seen).toEqual([2])
   })
 
+  it('watcher actions run AFTER the transition settles (run-to-completion)', () => {
+    const seen: Array<{ a: number; b: number }> = []
+    const m = machine<'idle', { a: number; b: number }, { type: 'go' }>({
+      initial: 'idle',
+      context: { a: 0, b: 0 },
+      watch: { a: [$ => seen.push({ a: $.context.a, b: $.context.b })] },
+      states: {
+        idle: {
+          on: {
+            go: {
+              actions: [
+                $ => $.setContext({ a: 1 }), // the watcher detects this write…
+                $ => $.setContext({ b: 1 }), // …but must also see this later one
+              ],
+            },
+          },
+        },
+      },
+    })
+    m.start()
+    m.send({ type: 'go' })
+    // one run, after the FULL action list — never mid-transition with b still 0
+    expect(seen).toEqual([{ a: 1, b: 1 }])
+  })
+
+  it('a watcher writing its own field converges (clamp shape), no re-entrancy', () => {
+    const m = machine<'idle', { n: number }, { type: 'set'; value: number }>({
+      initial: 'idle',
+      context: { n: 0 },
+      // clamp: a self-write that settles once the value stops changing
+      watch: { n: [$ => ($.context.n > 10 ? $.setContext({ n: 10 }) : undefined)] },
+      states: {
+        idle: { on: { set: $ => $.setContext({ n: $.event.value }) } },
+      },
+    })
+    m.start()
+    m.send({ type: 'set', value: 50 })
+    expect(m.context.n).toBe(10) // clamped; the follow-up pass sees 10 → stable
+  })
+
+  it('throws in dev on a non-converging watcher feedback loop', () => {
+    const m = machine<'idle', { n: number }, { type: 'bump' }>({
+      initial: 'idle',
+      context: { n: 0 },
+      watch: { n: [$ => $.setContext({ n: $.context.n + 1 })] }, // never settles
+      states: {
+        idle: { on: { bump: $ => $.setContext({ n: $.context.n + 1 }) } },
+      },
+    })
+    m.start()
+    expect(() => m.send({ type: 'bump' })).toThrow(/feedback loop/)
+  })
+
   it('multiple watched fields each react independently', () => {
     const seen: string[] = []
     const m = machine<'idle', { a: number; b: number }, { type: 'ba' | 'bb' }>({

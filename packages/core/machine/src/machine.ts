@@ -9,7 +9,7 @@
  */
 import { type ActionHost, runActions } from './actions'
 import { installComputed } from './computed'
-import { isDev, MACHINE_INIT } from './constants'
+import { isDev, MACHINE_INIT, MAX_DRAIN } from './constants'
 import { makeGuardParams } from './guards'
 import { lookupOn, resolve } from './transitions'
 import type {
@@ -61,7 +61,10 @@ class MachineClass<
   bus = new Set<() => void>()
   busSnapshot: Array<() => void> = []
   busDirty = false
-  queue: Event[] = []
+  // The run-to-completion queue. Holds events to dispatch AND deferred jobs (a
+  // watcher's action run) — both wait for the in-flight transition to finish.
+  // Discriminated by typeof: an event is an object, a job is a function.
+  queue: Array<Event | (() => void)> = []
   flushing = false
   running = false
   // Bumped on every state ENTRY. An `after` timer captures the generation it was
@@ -216,21 +219,42 @@ class MachineClass<
       if (this.running) this.startEffects(next, event)
     }
   }
-  // Queued: a re-entrant send (from an action) waits until the current drain ends.
-  private doSend(event: Event): void {
-    this.queue.push(event)
+  // ---- queue: run-to-completion ----
+  // Push an item and drain, unless a drain is already in flight — a re-entrant
+  // enqueue (a send from an action, a watcher detecting a mid-transition write)
+  // waits until the current transition fully finishes.
+  private enqueue(item: Event | (() => void)): void {
+    this.queue.push(item)
     if (this.flushing) return
     this.flushing = true
     try {
-      while (this.queue.length) {
-        const e = this.queue.shift()!
-        const entry = lookupOn(this.config, this.stateValue, e.type)
-        const t = resolve(entry, this.resolverFor(e))
-        if (t) this.applyTransition(t, e)
-      }
+      this.drainQueue()
     } finally {
       this.flushing = false
     }
+  }
+  // Drain until empty, FIFO. The caller owns the `flushing` flag. An event
+  // resolves + applies a transition; a job (deferred watcher run) just runs.
+  private drainQueue(): void {
+    let ticks = 0
+    while (this.queue.length) {
+      if (isDev && ++ticks > MAX_DRAIN) {
+        throw new Error(
+          `[machine] one drain exceeded ${MAX_DRAIN} steps — feedback loop ` +
+            '(e.g. a watcher writing the field it watches, or actions sending in a cycle)',
+        )
+      }
+      const item = this.queue.shift()!
+      if (typeof item === 'function') {
+        item()
+        continue
+      }
+      const t = resolve(lookupOn(this.config, this.stateValue, item.type), this.resolverFor(item))
+      if (t) this.applyTransition(t, item)
+    }
+  }
+  private doSend(event: Event): void {
+    this.enqueue(event)
   }
 
   // ---- delays / after ----
@@ -264,11 +288,7 @@ class MachineClass<
     this.flushing = true
     try {
       this.applyTransition(t, event)
-      while (this.queue.length) {
-        const e = this.queue.shift()!
-        const nx = resolve(lookupOn(this.config, this.stateValue, e.type), this.resolverFor(e))
-        if (nx) this.applyTransition(nx, e)
-      }
+      this.drainQueue()
     } finally {
       this.flushing = false
     }
@@ -323,7 +343,9 @@ class MachineClass<
   }
 
   // ---- watch: machine-global data reaction. A bus listener re-reads the field
-  // and runs actions on a real change (no fire on setup). Cleanups live in their
+  // and, on a real change (no fire on setup), queues the actions through the
+  // run-to-completion queue — they run AFTER the transition that changed the
+  // field settles, like an event sent from an action. Cleanups live in their
   // OWN list — watchers span the whole run, not a single state. ----
   private readField(key: string): unknown {
     return key in this.ctx
@@ -341,7 +363,14 @@ class MachineClass<
         const next = this.readField(key)
         if (Object.is(prev, next)) return
         prev = next
-        this.runActions(actions, { type: MACHINE_INIT } as Event)
+        // Defer, don't run: this listener fires inside bump() — mid-transition,
+        // inside the notify pass. Running actions here would be re-entrant
+        // (other listeners observe a half-applied transition; a watcher writing
+        // context recurses into a nested bump, unbounded). The `running` check
+        // re-runs at job time: a stop() mid-drain drops a pending watcher run.
+        this.enqueue(() => {
+          if (this.running) this.runActions(actions, { type: MACHINE_INIT } as Event)
+        })
       }
       this.busAdd(listener)
       this.watcherCleanups.push(() => this.busDelete(listener))
