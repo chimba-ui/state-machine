@@ -56,8 +56,9 @@ class MachineClass<
   // The coarse notification bus: listeners under subscribe + select. Mutated only
   // through busAdd/busDelete so `busSnapshot` (the array we iterate in bump) is
   // re-derived only when membership changes — steady-state notifies allocate
-  // nothing, while still iterating a stable copy (a listener may add/remove
-  // during notify; the change applies to the NEXT notify, not the current pass).
+  // nothing, while still iterating a stable copy (a listener ADDED during notify
+  // first fires on the next pass; one REMOVED during notify is skipped
+  // immediately — see bump).
   bus = new Set<() => void>()
   busSnapshot: Array<() => void> = []
   busDirty = false
@@ -156,15 +157,17 @@ class MachineClass<
 
   private bump(): void {
     this.version++
-    // Iterate a STABLE snapshot, not the live Set: a listener may add/remove
-    // during notify, and those changes must apply to the next notify (not be
-    // visited/skipped mid-pass). The snapshot is re-derived only when membership
-    // changed since the last notify, so steady-state notifies allocate nothing.
+    // Iterate a STABLE snapshot, not the live Set, so a listener added during
+    // notify first fires on the NEXT pass. The snapshot is re-derived only when
+    // membership changed since the last notify — steady-state notifies allocate
+    // nothing. The live-membership check skips listeners REMOVED mid-pass:
+    // unsubscribe takes effect immediately, because firing a removed listener
+    // (e.g. a reaction whose teardown just ran) breaks the unsubscribe contract.
     if (this.busDirty) {
       this.busSnapshot = [...this.bus]
       this.busDirty = false
     }
-    for (const l of this.busSnapshot) l()
+    for (const l of this.busSnapshot) if (this.bus.has(l)) l()
   }
 
   // ---- reads ----

@@ -308,8 +308,9 @@ describe('select.context / .computed / .state — named scopes', () => {
   })
 })
 
-// The bus iterates a stable snapshot, so a listener that mutates the listener set
-// mid-notify affects the NEXT notify, not the in-flight pass.
+// The bus iterates a stable snapshot with a live-membership check: a listener
+// ADDED mid-notify first fires on the next pass; a listener REMOVED mid-notify
+// is skipped immediately (unsubscribe takes effect at once).
 describe('reentrancy — subscribing/unsubscribing during a notify', () => {
   const counter = () =>
     machine<'idle', { n: number }, { type: 'inc' }>({
@@ -338,7 +339,7 @@ describe('reentrancy — subscribing/unsubscribing during a notify', () => {
     expect(late).toHaveBeenCalledTimes(1)
   })
 
-  it('a listener can unsubscribe another mid-notify without skipping the pass', () => {
+  it('a listener unsubscribed mid-notify does NOT fire in that same pass', () => {
     const m = counter()
     const calls: string[] = []
     let offB = () => {}
@@ -348,11 +349,12 @@ describe('reentrancy — subscribing/unsubscribing during a notify', () => {
     })
     offB = m.subscribe(() => calls.push('b'))
     m.send({ type: 'inc' })
-    // both A and B were in the snapshot when this notify started, so both ran;
-    // B is gone for the NEXT notify.
-    expect(calls).toEqual(['a', 'b'])
+    // B was in the snapshot when the pass started, but its unsubscribe takes
+    // effect immediately — a removed listener (a torn-down reaction, an
+    // unmounted subscriber) must never fire again.
+    expect(calls).toEqual(['a'])
     calls.length = 0
     m.send({ type: 'inc' })
-    expect(calls).toEqual(['a']) // B unsubscribed
+    expect(calls).toEqual(['a'])
   })
 })
