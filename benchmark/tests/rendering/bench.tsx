@@ -84,7 +84,7 @@ const zagHighlightMachine: any = createZagMachine({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context({ prop, bindable }: any) {
     return {
-      on: bindable<boolean>(() => ({ value: prop('active'), defaultValue: false })),
+      on: bindable(() => ({ value: prop('active'), defaultValue: false })),
     }
   },
   initialState() {
@@ -99,9 +99,10 @@ const zagHighlightMachine: any = createZagMachine({
 // — directly parallel to core's `selector` arena — and avoids the
 // effect→send→re-render double-pass a per-instance useMachine+prop would incur.
 const xstateListMachine = createXMachine({
+  types: {} as { context: { highlighted: number }; events: { type: 'move'; to: number } },
   context: { highlighted: 0 },
   on: {
-    move: { actions: assign({ highlighted: ({ event }) => (event as { to: number }).to }) },
+    move: { actions: assign({ highlighted: ({ event }) => event.to }) },
   },
 })
 
@@ -141,7 +142,9 @@ function CoreInstanceRow({ m }: { m: ReturnType<typeof makeCoreHighlightMachine>
 // `active` PROP changed (the 2) — the idiomatic React+Zag pattern. Without memo,
 // a parent list re-render would re-run every row, measuring the harness not Zag.
 const ZagInstanceRow = React.memo(function ZagInstanceRow({ active }: { active: boolean }) {
-  const service = useZagMachine(zagHighlightMachine, { active })
+  // zagHighlightMachine is `any`, so the service's context is loosely typed
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = useZagMachine(zagHighlightMachine, { active }) as any
   renderCounts['zag/instance']++
   return <div data-hl={service.context.get('on') ? '1' : '0'} />
 })

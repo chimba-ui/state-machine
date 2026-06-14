@@ -101,7 +101,7 @@ function zagConfig(fields: number): any {
     context({ bindable }: any) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ctx: any = {}
-      for (let i = 0; i < fields; i++) ctx[`f${i}`] = bindable<number>(() => ({ defaultValue: 0 }))
+      for (let i = 0; i < fields; i++) ctx[`f${i}`] = bindable(() => ({ defaultValue: 0 }))
       return ctx
     },
     initialState() {

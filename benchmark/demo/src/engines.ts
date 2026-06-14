@@ -79,15 +79,24 @@ export function makeChimbaEngine(size: number, seed: (i: number) => number): Cel
 type XCtx = { raw: number; bucket: number; out: number }
 type XEv = { type: 'set'; v: number }
 
+// one guarded candidate per bucket (guard fallthrough), built dynamically.
+// XState can't infer XEv through Array.from, so this transition list is typed
+// loosely and fed in via `on.set`; the runtime behavior (guard by bucket, assign
+// raw/bucket/out from the event) is exactly the intent.
+const xSetTransitions = Array.from({ length: BRANCHES }, (_, b) => ({
+  guard: ({ event }: { event: XEv }) => event.v % BRANCHES === b,
+  actions: assign(({ event }: { event: XEv }) => ({
+    raw: event.v,
+    bucket: b,
+    out: derive(event.v),
+  })),
+}))
+
 const xCell = createXMachine({
   types: {} as { context: XCtx; events: XEv; input: { raw: number } },
   context: ({ input }) => ({ raw: input.raw, bucket: 0, out: derive(input.raw) }),
-  on: {
-    set: Array.from({ length: BRANCHES }, (_, b) => ({
-      guard: ({ event }) => event.v % BRANCHES === b,
-      actions: assign(({ event }) => ({ raw: event.v, bucket: b, out: derive(event.v) })),
-    })),
-  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  on: { set: xSetTransitions as any },
 })
 
 export function makeXStateEngine(size: number, seed: (i: number) => number): CellEngine {
@@ -116,8 +125,8 @@ const zagCell: any = createZagMachine({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context({ bindable }: any) {
     return {
-      raw: bindable<number>(() => ({ defaultValue: 0 })),
-      out: bindable<number>(() => ({ defaultValue: 0 })),
+      raw: bindable(() => ({ defaultValue: 0 })),
+      out: bindable(() => ({ defaultValue: 0 })),
     }
   },
   initialState() {

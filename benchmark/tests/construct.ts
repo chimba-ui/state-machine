@@ -78,8 +78,8 @@ const zagDef: any = createZagMachine({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context({ bindable }: any) {
     return {
-      value: bindable<number>(() => ({ defaultValue: 0 })),
-      other: bindable<number>(() => ({ defaultValue: 0 })),
+      value: bindable(() => ({ defaultValue: 0 })),
+      other: bindable(() => ({ defaultValue: 0 })),
     }
   },
   initialState() {
