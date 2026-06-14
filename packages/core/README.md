@@ -119,8 +119,8 @@ React render arena (mount + re-render row-count).
 
 #### Overview
 
-|                                 | **Agnostic Render** |  XState |        Zag |
-| ------------------------------- | ------------------: | ------: | ---------: |
+|                                 | **Chimba UI** |  XState |        Zag |
+| ------------------------------- | ------------: | ------: | ---------: |
 | **Events per second**           |         **3.0 M/s** | 850 K/s |      n/a ¹ |
 | **Spin up 10 000 machines**     |               30 ms |   24 ms |      98 ms |
 | **Memory at 64 fields/machine** |              4.7 KB |  4.1 KB | **134 KB** |
@@ -136,7 +136,7 @@ _flatness_, not a headline win.
 
 - ¹ Zag's `send` is async (microtask-batched), so it can't share a **synchronous** loop — neither the events/sec throughput nor the `flushSync` re-render timing. It IS measured where it runs sync: construction + memory (headless `VanillaMachine`), mount, and the re-render row-count (it wakes only 2 rows, same as the others — see the render table below).
 - ² Zag's `@zag-js/core` is config-only (the machine runtime lives in the framework adapter), so its 0.5 KB engine row isn't runnable on its own — the `+ React adapter` row (`@zag-js/react`) is the fair comparison.
-- ³ Each library using its idiomatic fine-grained path (Agnostic Render & Zag: per-instance machine + `React.memo`; XState: shared actor + `@xstate/react`'s `useSelector`).
+- ³ Each library using its idiomatic fine-grained path (Chimba UI & Zag: per-instance machine + `React.memo`; XState: shared actor + `@xstate/react`'s `useSelector`).
 
 #### In depth analyzis
 

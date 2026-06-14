@@ -1,9 +1,9 @@
-# Agnostic Render
+# Chimba UI
 
 **Define a behavior once. Render it anywhere.**
 
 A UI component is really two things tangled together: _behavior_ and _render_.
-Agnostic Render splits them. You describe behavior as a plain TypeScript
+Chimba UI splits them. You describe behavior as a plain TypeScript
 **state machine** that knows nothing about the environment and a thin per-substrate
 layer plugs it into a runtime.
 
@@ -38,7 +38,7 @@ transitions, same accessibility intent. Only the render differs.
 
 This project was inspired by [Zag](https://zagjs.com/), which pioneered the
 component-as-a-headless-machine approach. Zag is agnostic about _which framework_
-renders the DOM, but it still assumes a DOM exists. Agnostic Render takes that one step
+renders the DOM, but it still assumes a DOM exists. Chimba UI takes that one step
 further: it assumes _nothing_ about the environment. The machine is a pure
 behavioral kernel with no environment touchpoints, every place behavior meets the
 platform — a keydown listener, a timer, a focus — is pushed to the per-target
@@ -89,7 +89,7 @@ The full layered model and the "the machine never sees props" rule are in:
 
 ## Inspiration & prior art
 
-Agnostic Render stands on the shoulders of the amazing libs:
+Chimba UI stands on the shoulders of the amazing libs:
 
 - **[XState](https://stately.ai/docs)** — for the disciplined statechart model:
   queued run-to-completion transitions, guards, entry/exit, the rigor of treating
