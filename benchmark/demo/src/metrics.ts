@@ -7,7 +7,7 @@ export type PanelId = 'raw' | 'chimba' | 'xstate' | 'zag'
 export const PANELS: { id: PanelId; label: string; blurb: string; isEngine: boolean }[] = [
   {
     id: 'raw',
-    label: 'Raw JS (control)',
+    label: 'Vanilla (control)',
     blurb: 'no engine · the same guard walk + derive as plain JS',
     isEngine: false,
   },

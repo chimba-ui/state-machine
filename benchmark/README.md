@@ -265,10 +265,30 @@ Zag mounts and wakes the same **2** rows, but its re-render wall is **n/a ᵃ** 
 microtask-batched `send` can't be timed under a synchronous `flushSync` loop, so
 only its row-count is comparable.
 
----
+## Where this actually matters
 
-> This file is the single source of truth for benchmark tables. The engine
-> [README → Performance](../packages/core/README.md#performance) carries only a
-> short prose claim + a link here — when you refresh numbers, update this file,
-> and only touch the engine README's one-line claim if a headline ratio actually
-> shifted.
+The loads here (and in the demo) are deliberately extreme to force the engines to
+diverge. That only reflects real software when a single view holds **thousands of
+independently-stateful, live-updating cells in one frame budget**. That's not a
+hypothetical — these are whole product categories:
+
+| Real workload                       | Example products                              | Where the count comes from                                                   | Live cells |
+| ----------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------- | ---------: |
+| **Full L2 order book / DOM ladder** | Bookmap, Sierra Chart, ATAS                   | 500–2,000 price levels per book × several books, each level a live cell      |     3k–15k |
+| **Options chain / vol surface**     | thinkorswim, Tastytrade, OptionStrat          | hundreds of strikes × calls+puts × 8–16 live fields (bid/ask/IV/Δ/Γ/Θ/V)     |     5k–20k |
+| **Screeners / heatmaps**            | TradingView screener, CoinMarketCap, Finviz   | 1,000–5,000 symbols × a few live fields (price, %chg, flash, sparkline)      |     3k–15k |
+| **Live-data spreadsheets**          | Excel/Sheets + market add-ins, Bloomberg BQNT | a visible sheet is 5k–20k cells, many bound to streaming feeds + recompute   |     5k–20k |
+| **Observability walls**             | Grafana, Datadog, Netdata                     | hundreds of panels × series, or a per-second host grid                       |     5k–50k |
+| **Live log / trace tails**          | Datadog Live Tail, Kibana, Sentry             | streaming rows, each a tiny stateful unit, into a long virtualized buffer    |     5k–50k |
+| **Dense collaborative canvases**    | Figma, Miro, tldraw                           | 5k–50k nodes; a `pointermove` / cursor stream fans out to all visible shapes |     5k–50k |
+| **NOC / k8s / network walls**       | k9s, Lens, traffic grids                      | thousands of pods/nodes/flows, each a live cell                              |     5k–20k |
+
+The sharpest target is a **dense live financial surface** (full order book or
+options chain): genuinely 5k–20k live cells, updating tens of thousands of times a
+second, often needed on **web _and_ native** from one codebase, where flat
+per-cell memory matters — every property the benchmark measures pays at once.
+
+> **What does _not_ need this:** a handful-of-symbols chart view, a typical SaaS
+> dashboard, a chat app — dozens to a few hundred live elements. The engine works
+> there too, but so does anything; at that scale you'd pick it for the
+> agnostic-render and bundle/memory reasons, not the throughput these tables show.
