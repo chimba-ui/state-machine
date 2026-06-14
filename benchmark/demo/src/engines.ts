@@ -39,7 +39,7 @@ type CEv = { type: 'set'; v: number }
 type CComputed = { out: number }
 
 export function makeChimbaEngine(size: number, seed: (i: number) => number): CellEngine {
-  const cells: Machine<string, CCtx, CEv, CComputed>[] = Array.from({ length: size }, (_, i) => {
+  const cells: Machine<'idle', CCtx, CEv, CComputed>[] = Array.from({ length: size }, (_, i) => {
     const m = machine<'idle', CCtx, CEv, CComputed>({
       initial: 'idle',
       context: { raw: seed(i), bucket: 0 },
@@ -76,19 +76,16 @@ export function makeChimbaEngine(size: number, seed: (i: number) => number): Cel
 
 // --- XState: one actor per cell, guarded transition + assign-derived field ----
 
+type XCtx = { raw: number; bucket: number; out: number }
+type XEv = { type: 'set'; v: number }
+
 const xCell = createXMachine({
-  context: ({ input }: { input: { raw: number } }) => ({
-    raw: input.raw,
-    bucket: 0,
-    out: derive(input.raw),
-  }),
+  types: {} as { context: XCtx; events: XEv; input: { raw: number } },
+  context: ({ input }) => ({ raw: input.raw, bucket: 0, out: derive(input.raw) }),
   on: {
     set: Array.from({ length: BRANCHES }, (_, b) => ({
-      guard: ({ event }: { event: { v: number } }) => event.v % BRANCHES === b,
-      actions: assign(({ event }) => {
-        const v = (event as { v: number }).v
-        return { raw: v, bucket: b, out: derive(v) }
-      }),
+      guard: ({ event }) => event.v % BRANCHES === b,
+      actions: assign(({ event }) => ({ raw: event.v, bucket: b, out: derive(event.v) })),
     })),
   },
 })

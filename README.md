@@ -1,4 +1,8 @@
-# Chimba UI
+<p align="center">
+  <img src="./banner.png" alt="Chimba" width="100%" />
+</p>
+
+# STATE-MACHINE
 
 **Define a behavior once. Render it anywhere.**
 

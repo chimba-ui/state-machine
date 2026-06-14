@@ -1,0 +1,18 @@
+{
+  // Typecheck the benchmark suite + the live demo. They run via tsx/vite (which
+  // don't typecheck), so this is the only thing that catches type errors here.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // paths in `extends` resolve relative to THIS file, so redeclare them
+    "paths": {
+      "@chimba-ui/state-machine": ["../packages/core/src"],
+      "@chimba-ui/react-state-machine": ["../packages/react/src"],
+      "@chimba-ui/native-state-machine": ["../packages/native/src"],
+      "@chimba-ui/shared-state-machine": ["../packages/shared/utils/src"]
+    },
+    // the benchmark touches Node globals (process, global) + DOM (jsdom, react-dom)
+    "types": ["@types/node", "@types/react", "@types/react-dom", "@types/jsdom"]
+  },
+  "include": ["."],
+  "exclude": ["**/node_modules", "**/dist"]
+}

@@ -186,7 +186,7 @@ export function makeXstateFanout(n: number): Fanout {
     on: {
       set: {
         actions: assign(({ context, event }) => ({
-          [(event as { key: string }).key]: context[(event as { key: string }).key] + 1,
+          [event.key]: context[event.key] + 1,
         })),
       },
     },
