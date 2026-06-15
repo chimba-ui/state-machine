@@ -3,6 +3,7 @@ dist
 .DS_Store
 *.log
 .vite
+*.tsbuildinfo
 
 # local-only Claude settings (never committed; keep it out of format/lint too)
 .claude/settings.local.json
