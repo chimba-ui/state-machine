@@ -76,17 +76,16 @@ export function setup<
     },
 
     config<const Registry extends Implementations<Context, Event, Computed>>(registries: Registry) {
-      type GuardName = keyof Registry['guards'] & AnyString
-      type ActionName = keyof Registry['actions'] & AnyString
-      type EffectName = keyof Registry['effects'] & AnyString
-      type DelayName = keyof Registry['delays'] & AnyString
-
       return {
         /**
          * Build the config with all four name slots checked against the registries
          * from `.config(...)`. `initial` / `State` are inferred from `states`; the
          * registries are merged into `implementations` so `machine()` resolves the
          * names at runtime exactly as before.
+         *
+         * The guard/action/effect/delay name unions are inlined (rather than local
+         * `type` aliases) so this method's inferred signature names no
+         * function-local types — required by `--isolatedDeclarations`.
          */
         createMachine<State extends string>(
           config: Omit<
@@ -95,10 +94,10 @@ export function setup<
               Context,
               Event,
               Computed,
-              GuardName,
-              ActionName,
-              EffectName,
-              DelayName
+              keyof Registry['guards'] & AnyString,
+              keyof Registry['actions'] & AnyString,
+              keyof Registry['effects'] & AnyString,
+              keyof Registry['delays'] & AnyString
             >,
             'implementations'
           >,

@@ -10,7 +10,7 @@ export const MACHINE_INIT = 'machine.init' as const
  * dev (loud, fail-fast) and warns + degrades in prod. Shared by every module
  * that resolves a name so the rule lives in one place.
  */
-export const isDev = process.env.NODE_ENV !== 'production'
+export const isDev: boolean = process.env.NODE_ENV !== 'production'
 
 /**
  * Dev-only runaway guard for one queue drain. A single send legitimately chains

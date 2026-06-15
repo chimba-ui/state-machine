@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
+  "changelog": ["@changesets/changelog-github", { "repo": "chimba-ui/state-machine" }],
+  "commit": false,
+  "fixed": [["@chimba-ui/*"]],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "origin/main",
+  "updateInternalDependencies": "patch",
+  "ignore": ["benchmark", "benchmark-demo", "website"],
+  "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
+    "onlyUpdatePeerDependentsWhenOutOfRange": true
+  }
+}
