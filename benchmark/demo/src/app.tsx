@@ -89,7 +89,7 @@ export function App() {
     }
     const ids = Object.keys(handles.current) as PanelId[]
 
-    const frame = (now: number) => {
+    const frame = async (now: number) => {
       if (!runningRef.current) return
       frames++
 
@@ -101,18 +101,30 @@ export function App() {
 
       const batch = feed.pull(curRate)
       for (const id of ids) handles.current[id]?.enqueue(batch)
+      // Drain each panel under its OWN 2ms wall-clock budget. Awaited (not fired
+      // in parallel) so an async engine's flush resolves before we read its result
+      // — each panel still captures its own t0, so the per-panel budget is intact;
+      // they just don't overlap (same total drain time as the old synchronous loop,
+      // ~panels × budget). A sync engine's drain resolves without yielding.
       for (const id of ids) {
-        const r = handles.current[id]?.drain(DRAIN_BUDGET_MS)
+        const r = await handles.current[id]?.drain(DRAIN_BUDGET_MS)
         if (r) applied[id] += r.applied
       }
+      // Stop may have been pressed during an await — bail before scheduling more.
+      if (!runningRef.current) return
 
-      if (now - lastPaint >= PAINT_EVERY_MS) {
+      // Real wall-clock time AFTER the drains (await advanced it past the frame's
+      // `now` timestamp). Paint/sample/ramp bookkeeping uses this so the windows
+      // reflect actual elapsed time, including each engine's real drain cost.
+      const t = performance.now()
+
+      if (t - lastPaint >= PAINT_EVERY_MS) {
         for (const id of ids) handles.current[id]?.paint()
-        lastPaint = now
+        lastPaint = t
       }
 
-      if (now - lastSample >= 250) {
-        const secs = (now - lastSample) / 1000
+      if (t - lastSample >= 250) {
+        const secs = (t - lastSample) / 1000
         setFps(Math.round(frames / secs))
         const next = zeroStats()
         for (const id of ids) {
@@ -131,13 +143,13 @@ export function App() {
         }
         setStats(next)
         frames = 0
-        lastSample = now
+        lastSample = t
 
         // auto-stop once ALL THREE engines have fallen behind — but give a short
         // grace so their backlogs grow to a representative size before freezing
         if (ENGINE_IDS.every(id => overflowedAt[id] !== null)) {
-          if (allBehindSince === 0) allBehindSince = now
-          else if (now - allBehindSince >= STOP_GRACE_MS) {
+          if (allBehindSince === 0) allBehindSince = t
+          else if (t - allBehindSince >= STOP_GRACE_MS) {
             runningRef.current = false
             cancelAnimationFrame(loop.current)
             setRunning(false)
@@ -247,12 +259,21 @@ export function App() {
       <p style={{ margin: '0 0 16px', fontSize: 12, opacity: 0.55, maxWidth: 1000 }}>
         <b>updates/s</b> is the headline — how much engine work each clears under the same{' '}
         {DRAIN_BUDGET_MS}ms/frame budget (higher is better). The moment a panel can't keep up it
-        latches a red <b>fell behind by N</b> flag (the backlog it had stacked up). They tip over
-        one by one. <b>Vanilla</b> is the control (no engine), so it leads; the comparison that
+        latches a red <b>fell behind by N</b> flag (the backlog it had stacked up). Watch the panels
+        diverge as the load ramps. <b>Vanilla</b> is the control (no engine); the comparison that
         matters is Chimba vs XState vs Zag.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      {/* auto-fit + minmax so the four panels wrap to fewer columns as the
+          viewport narrows (4 → 2 → 1) instead of overflowing past the edge on
+          phones/tablets. Pure CSS grid — no media query needed. */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: 12,
+        }}
+      >
         {PANELS.map(p => {
           const s = stats[p.id]
           const behind = s.overflowedAt !== null
