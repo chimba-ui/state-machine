@@ -14,7 +14,6 @@ const RAMP_STEP = 1500
 const RAMP_EVERY_MS = 1200
 const PAINT_EVERY_MS = 100 // throttle canvas paint to ~10fps (off the hot path)
 const OVERFLOW_AT = 3000 // backlog over this = decisively "falling behind"
-const STOP_GRACE_MS = 1000 // after all 3 cross, keep going briefly so the lag is visible
 
 const ENGINE_IDS: PanelId[] = ['chimba', 'xstate', 'zag'] // raw doesn't count
 
@@ -78,7 +77,6 @@ export function App() {
     let lastSample = performance.now()
     let lastPaint = performance.now()
     let frames = 0
-    let allBehindSince = 0 // timestamp when all 3 engines first crossed
     const applied: Record<PanelId, number> = { raw: 0, chimba: 0, xstate: 0, zag: 0 }
     // queued captured at first overflow, per panel (persists across samples)
     const overflowedAt: Record<PanelId, number | null> = {
@@ -145,16 +143,14 @@ export function App() {
         frames = 0
         lastSample = t
 
-        // auto-stop once ALL THREE engines have fallen behind — but give a short
-        // grace so their backlogs grow to a representative size before freezing
+        // auto-stop the instant the LAST engine falls behind — freeze everything
+        // immediately so the "fell behind by N" flags reflect the moment of
+        // divergence and don't keep growing.
         if (ENGINE_IDS.every(id => overflowedAt[id] !== null)) {
-          if (allBehindSince === 0) allBehindSince = t
-          else if (t - allBehindSince >= STOP_GRACE_MS) {
-            runningRef.current = false
-            cancelAnimationFrame(loop.current)
-            setRunning(false)
-            return
-          }
+          runningRef.current = false
+          cancelAnimationFrame(loop.current)
+          setRunning(false)
+          return
         }
       }
 
