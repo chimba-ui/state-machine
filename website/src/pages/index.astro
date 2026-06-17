@@ -582,7 +582,13 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       <div class="origin-inner">
         <div class="origin-layout">
           <!-- left: avatar -->
-          <a href="https://x.com/ivanbanov" target="_blank" rel="noreferrer" class="origin-avatar-link" aria-label="Ivan Banov on X">
+          <a
+            href="https://x.com/ivanbanov"
+            target="_blank"
+            rel="noreferrer"
+            class="origin-avatar-link"
+            aria-label="Ivan Banov on X"
+          >
             <img
               src="https://avatars.githubusercontent.com/u/2953018?v=4"
               alt="Ivan Banov"
@@ -600,11 +606,13 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
               <p class="origin-line origin-line-dim">over and over again.</p>
             </blockquote>
             <p class="origin-sub">
-              New company, new stack, new design system — but the same button, the same tooltip,
-              the same dialog. The behaviors never changed. All documented by the W3C.
-              All rebuilt from scratch, every time.
+              New company, new stack, new design system — but the same button,
+              the same tooltip, the same dialog. The behaviors never changed.
+              All documented by the W3C. All rebuilt from scratch, every time.
             </p>
-            <a href={`${base}get-started`} class="origin-cta">Read the full story →</a>
+            <a href={`${base}get-started`} class="origin-cta"
+              >Read the full story →</a
+            >
           </div>
         </div>
       </div>
@@ -617,7 +625,18 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         <div class="lab-title-col">
           <h2 class="lab-heading">The stateful<br />machines lab.</h2>
           <p class="lab-sub">
-            Different domains. Same engine. State, context, events — that's it.
+            Different domains. Same engine.<br />
+            State, context, events — that's it.
+          </p>
+          <p class="lab-sub" style="margin-top:1rem">
+            Any stateful UI — a button, a form,
+            a canvas node, a trading panel — is just
+            a machine with states and transitions.
+            The rendering layer is irrelevant.
+          </p>
+          <p class="lab-sub" style="margin-top:1rem">
+            Write the behavior once.
+            Run it anywhere JS runs.
           </p>
         </div>
 
@@ -880,7 +899,8 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
               let ch = " ";
               if (x === p.x && y === p.y)
                 ch = pacman.state === "dead" ? "💀" : PAC;
-              else if (x === g.x && y === g.y && ghost.state !== "stopped") ch = "👻";
+              else if (x === g.x && y === g.y && ghost.state !== "stopped")
+                ch = "👻";
               else if (b.cherry && x === b.cherry.x && y === b.cherry.y)
                 ch = "🍒";
               else if (MAZE[y][x] === 1) ch = "🟦";
@@ -1594,7 +1614,12 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
          ORIGIN SECTION — pure typography, no background
          ==================================================================== */
       .origin-section {
-        background: radial-gradient(120% 80% at 10% 0%, #15171c 0%, #0b0c0f 60%, #050507 100%);
+        background: radial-gradient(
+          120% 80% at 10% 0%,
+          #15171c 0%,
+          #0b0c0f 60%,
+          #050507 100%
+        );
         color: #f2fffc;
         padding: 6rem 1.5rem 5rem;
       }
@@ -1613,10 +1638,10 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         margin-top: 0.5rem;
       }
       .origin-avatar {
-        width: 72px;
-        height: 72px;
+        width: 100px;
+        height: 100px;
         border-radius: 50%;
-        border: 2px solid rgba(242,255,252,0.15);
+        border: 2px solid #fff;
         display: block;
         transition: border-color 0.2s;
       }
@@ -1628,11 +1653,11 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       }
       /* big decorative opening quote */
       .origin-content::before {
-        content: '\201C';
+        content: "\201C";
         position: absolute;
         top: -2rem;
         left: -0.25rem;
-        font-family: Georgia, 'Times New Roman', serif;
+        font-family: Georgia, "Times New Roman", serif;
         font-size: 9rem;
         line-height: 1;
         color: var(--color-accent);
@@ -1653,13 +1678,17 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         margin: 0;
       }
       @media (min-width: 640px) {
-        .origin-line { font-size: 3.5rem; }
+        .origin-line {
+          font-size: 3.5rem;
+        }
       }
-      .origin-line-dim { color: var(--color-accent); }
+      .origin-line-dim {
+        color: var(--color-accent);
+      }
       .origin-sub {
         font-size: 1rem;
         line-height: 1.75;
-        color: rgba(242,255,252,0.5);
+        color: rgba(242, 255, 252, 0.5);
         max-width: 38rem;
         margin: 0 0 2rem;
       }
@@ -1670,7 +1699,9 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         text-decoration: none;
         transition: opacity 0.15s;
       }
-      .origin-cta:hover { opacity: 0.7; }
+      .origin-cta:hover {
+        opacity: 0.7;
+      }
 
       /* play / pause icon controls on the dark cassette deck: dim grey by
          default, bright + chip-highlighted for the ACTIVE one. data-paused on
@@ -2134,8 +2165,6 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
          LAB SECTION — dark full-width strip with two live demos
          ==================================================================== */
       .lab-section {
-        background: radial-gradient(120% 80% at 10% 0%, #15171c 0%, #0b0c0f 60%, #050507 100%);
-        color: #f2fffc;
         padding: 5rem 1.5rem 5.5rem;
       }
       .lab-inner {
@@ -2168,7 +2197,6 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         font-weight: 800;
         line-height: 1.06;
         letter-spacing: -0.02em;
-        color: #fff;
       }
       @media (min-width: 1800px) {
         .lab-heading {
@@ -2177,7 +2205,6 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       }
       .lab-sub {
         margin-top: 1.25rem;
-        color: rgba(242, 255, 252, 0.5);
         font-size: 1rem;
         line-height: 1.65;
         max-width: 26ch;
@@ -2191,6 +2218,13 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        background: radial-gradient(
+          120% 80% at 10% 0%,
+          #15171c 0%,
+          #0b0c0f 60%,
+          #050507 100%
+        );
+        color: #f2fffc;
       }
       .lab-demo-header {
         display: flex;
