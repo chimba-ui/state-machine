@@ -1,0 +1,37 @@
+name: Setup CI
+description: Checkout-time setup shared by every CI job (git, pnpm, node, install)
+
+inputs:
+  NPM_TOKEN:
+    description: npm auth token (only needed for jobs that publish)
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: setup git
+      shell: bash
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions[bot]@users.noreply.github.com
+
+    - name: setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.20.0
+
+    - name: setup node
+      uses: actions/setup-node@v4
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.NPM_TOKEN }}
+      with:
+        node-version-file: .nvmrc
+        registry-url: https://registry.npmjs.org/
+        scope: '@chimba-ui'
+        cache: pnpm
+
+    - name: install dependencies
+      shell: bash
+      env:
+        HUSKY: 0
+      run: pnpm install --frozen-lockfile

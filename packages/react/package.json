@@ -1,18 +1,47 @@
 {
   "name": "@chimba-ui/react-state-machine",
   "version": "0.0.0",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chimba-ui/state-machine.git",
+    "directory": "packages/react"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
-  "dependencies": {
-    "@chimba-ui/shared-state-machine": "workspace:*",
-    "@chimba-ui/state-machine": "workspace:*"
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
   },
   "peerDependencies": {
+    "@chimba-ui/shared-state-machine": "workspace:^",
+    "@chimba-ui/state-machine": "workspace:^",
     "react": "*"
   }
 }

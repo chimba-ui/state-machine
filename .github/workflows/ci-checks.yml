@@ -1,0 +1,71 @@
+name: CI checks
+
+# The full CI suite as parallel jobs. Runs directly on every PR, and is also
+# reused by publish.yml as a gate before releasing (workflow_call).
+on:
+  pull_request:
+    branches: ['**']
+  workflow_call:
+
+# Fork PRs run without secrets; these checks don't need any.
+permissions:
+  contents: read
+
+# One run per PR (or per ref): a new push cancels the in-progress run for the
+# same PR so force-pushes don't pile up. github.ref is unique per PR
+# (refs/pull/<n>/merge), so PRs never cancel each other.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ci-setup
+      - run: pnpm build
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ci-setup
+      - run: pnpm test:ci
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ci-setup
+      - run: pnpm typecheck
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ci-setup
+      - run: pnpm lint
+
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ci-setup
+      - run: pnpm format:check
+
+  versioning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so changeset can diff against the base branch.
+          fetch-depth: 0
+      - uses: ./.github/actions/ci-setup
+      - run: pnpm changeset status --since=origin/main
