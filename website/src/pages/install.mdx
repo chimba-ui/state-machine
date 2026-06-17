@@ -6,9 +6,27 @@ description: Add Chimba UI to your project.
 
 # Install
 
+## Install
+
 ```bash
 pnpm add @chimba-ui/state-machine
 ```
 
-> TODO: per-target install notes (Vanilla / React / React Native) and peer
-> requirements.
+## Your first machine
+
+```ts
+import { createStore } from '@chimba-ui/state-machine'
+
+const toggle = createStore({
+  initial: 'off',
+  states: {
+    off: { on: { TOGGLE: 'on' } },
+    on: { on: { TOGGLE: 'off' } },
+  },
+})
+
+toggle.send('TOGGLE')
+console.log(toggle.state) // 'on'
+```
+
+No renderer. No framework. Just a state machine that does exactly what it says. Plug it into React, React Native, or a canvas engine, the behavior stays identical.
