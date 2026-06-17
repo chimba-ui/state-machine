@@ -30,8 +30,8 @@ const toggle = machine({
 
 toggle.start()
 toggle.send({ type: 'flip' })
-toggle.state    // 'active'
-toggle.context  // { count: 1 }
+toggle.state // 'active'
+toggle.context // { count: 1 }
 ```
 
 Returns a **service** — built but not running. Call `.start()` to boot effects and watchers, `.stop()` to tear them down. `.send()` dispatches events; `.state` and `.context` are always readable.
@@ -48,7 +48,7 @@ const config = setup().createMachine({
   context: { open: false },
   states: {
     closed: { on: { toggle: { target: 'open' } } },
-    open:   { on: { toggle: { target: 'closed' } } },
+    open: { on: { toggle: { target: 'closed' } } },
   },
 })
 ```
@@ -61,7 +61,7 @@ Name a registry of guards / actions / effects / delays. Every reference in the c
 import { setup } from '@chimba-ui/state-machine'
 
 type Ctx = { open: boolean; locked: boolean }
-type Ev  = { type: 'toggle' }
+type Ev = { type: 'toggle' }
 
 const { createMachine } = setup<Ctx, Ev>().config({
   guards: {

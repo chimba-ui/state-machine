@@ -11,29 +11,31 @@ description: Turn machine state into a live view API.
 ```ts
 import { machine, connector } from '@chimba-ui/state-machine'
 
-const m = machine({ /* ... */ })
+const m = machine({
+  /* ... */
+})
 
 const connect = ({ state, send }) => ({
-  isOpen:       state === 'open',
+  isOpen: state === 'open',
   triggerProps: { onPress: () => send({ type: 'toggle' }) },
 })
 
 const c = connector(m, connect, /* initial props */ {})
 
-c.snapshot          // memoized view API — stable identity until something changes
+c.snapshot // memoized view API — stable identity until something changes
 c.subscribe(render) // coarse — wake the view on any change
-c.select            // forwarded fine-grained path
-c.setProps(props)   // push new props in — shallow-dedup'd
+c.select // forwarded fine-grained path
+c.setProps(props) // push new props in — shallow-dedup'd
 ```
 
 ## The machine never sees props
 
 A machine here is pure behavior — it has no `props` argument. Every job a prop does lands at the **edge**, never the machine:
 
-| A prop that… | …goes here |
-| --- | --- |
-| **configures** behavior | seeded into `context` once (updated via `setContext`) |
-| **fires a callback** | a [reaction](/api/reactions) on the connector |
+| A prop that…            | …goes here                                              |
+| ----------------------- | ------------------------------------------------------- |
+| **configures** behavior | seeded into `context` once (updated via `setContext`)   |
+| **fires a callback**    | a [reaction](/api/reactions) on the connector           |
 | **is controlled** state | resolved into initial state before `machine()` is built |
 
 This is what keeps the same machine running byte-for-byte identically on every target.
@@ -44,10 +46,10 @@ This is what keeps the same machine running byte-for-byte identically on every t
 
 ```ts
 const connect = ({ state, context, send, matches }) => ({
-  isOpen:       matches('open'),
-  value:        context.value,
+  isOpen: matches('open'),
+  value: context.value,
   triggerProps: { onPress: () => send({ type: 'toggle' }) },
-  panelProps:   { role: 'region', hidden: !matches('open') },
+  panelProps: { role: 'region', hidden: !matches('open') },
 })
 ```
 

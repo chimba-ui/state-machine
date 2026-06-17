@@ -11,13 +11,17 @@ When a component has two independent axes of state — say a popup that's open/c
 ```ts
 import { machine, compose } from '@chimba-ui/state-machine'
 
-const popup   = machine({ /* closed / open */ })
-const submenu = machine({ /* none / shown */ })
+const popup = machine({
+  /* closed / open */
+})
+const submenu = machine({
+  /* none / shown */
+})
 
 const combobox = compose({ popup, submenu })
 
-combobox.start()  // starts every member
-combobox.stop()   // stops all + disposes sync and combine
+combobox.start() // starts every member
+combobox.stop() // stops all + disposes sync and combine
 
 // members stay independent — drive and read each directly
 popup.send({ type: 'focus' })
@@ -41,10 +45,10 @@ Derive one value across members. Re-evaluates on any member change; fires only w
 ```ts
 const view = combobox.combine(() => ({
   open: popup.matches('open'),
-  sub:  submenu.state,
+  sub: submenu.state,
 }))
 
-view.value  // { open: true, sub: 'shown' }
+view.value // { open: true, sub: 'shown' }
 view.subscribe(render)
 ```
 

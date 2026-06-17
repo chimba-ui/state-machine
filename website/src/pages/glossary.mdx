@@ -10,89 +10,89 @@ Every term and concept in `@chimba-ui/state-machine`, with a one-line meaning an
 
 ## Building blocks
 
-| Term | Meaning |
-| --- | --- |
-| **machine** | The built service from `machine(config)` — exposes `start`/`stop`/`send`/`state`/`context`/`select`. [→](/api/setup) |
-| **setup** | The authoring entry point — `setup().createMachine(literal)` (lightweight) or `setup<Ctx,Ev>().config(registries).createMachine(config)` (names compile-checked). [→](/api/setup) |
-| **state** | One of the flat, named situations the machine can be in (exactly one at a time). [→](/api/states) |
-| **transition** | An `on` entry: where an event takes the machine — optional `target`, `guard`, `actions`. [→](/api/states) |
-| **event** | The `{ type, … }` object you `send()` to drive a transition. [→](/api/states) |
-| **context** | The machine's data: one plain object, read directly (`m.context.x`), written via `setContext`. [→](/api/context) |
-| **setContext** | The single, batched entry point for writing context (shallow-equal deduped). [→](/api/context) |
-| **send** | Dispatch an event to the machine; events run to completion. [→](/api/states) |
+| Term           | Meaning                                                                                                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **machine**    | The built service from `machine(config)` — exposes `start`/`stop`/`send`/`state`/`context`/`select`. [→](/api/setup)                                                              |
+| **setup**      | The authoring entry point — `setup().createMachine(literal)` (lightweight) or `setup<Ctx,Ev>().config(registries).createMachine(config)` (names compile-checked). [→](/api/setup) |
+| **state**      | One of the flat, named situations the machine can be in (exactly one at a time). [→](/api/states)                                                                                 |
+| **transition** | An `on` entry: where an event takes the machine — optional `target`, `guard`, `actions`. [→](/api/states)                                                                         |
+| **event**      | The `{ type, … }` object you `send()` to drive a transition. [→](/api/states)                                                                                                     |
+| **context**    | The machine's data: one plain object, read directly (`m.context.x`), written via `setContext`. [→](/api/context)                                                                  |
+| **setContext** | The single, batched entry point for writing context (shallow-equal deduped). [→](/api/context)                                                                                    |
+| **send**       | Dispatch an event to the machine; events run to completion. [→](/api/states)                                                                                                      |
 
 ## Transitions & actions
 
-| Term | Meaning |
-| --- | --- |
-| **guard** | A predicate that gates a transition — return `false` and it doesn't fire. [→](/api/guards) |
-| **and / or / not** | Guard combinators for composing named guards. [→](/api/guards) |
-| **fallthrough** | An array of transitions for one event; the first whose guard passes wins. [→](/api/guards) |
-| **action** | A fire-and-forget side-effect run on a transition, in order — gets `{context, setContext, event, send, computed}`. [→](/api/actions) |
-| **act** | Write-sugar returning a context-writing action — `act({ field: value })` instead of the `setContext` wrapper. [→](/api/actions) |
-| **oneOf** | Conditional action: variadic `{ guard?, actions }` branches, first passing wins (the action analog of fallthrough). [→](/api/actions) |
-| **entry / exit** | Actions run when a state is entered / left (any path in or out). [→](/api/actions) |
-| **run-to-completion** | Events queue: a `send()` inside an action waits until the current transition finishes — no re-entrancy. [→](/api/states) |
+| Term                  | Meaning                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **guard**             | A predicate that gates a transition — return `false` and it doesn't fire. [→](/api/guards)                                            |
+| **and / or / not**    | Guard combinators for composing named guards. [→](/api/guards)                                                                        |
+| **fallthrough**       | An array of transitions for one event; the first whose guard passes wins. [→](/api/guards)                                            |
+| **action**            | A fire-and-forget side-effect run on a transition, in order — gets `{context, setContext, event, send, computed}`. [→](/api/actions)  |
+| **act**               | Write-sugar returning a context-writing action — `act({ field: value })` instead of the `setContext` wrapper. [→](/api/actions)       |
+| **oneOf**             | Conditional action: variadic `{ guard?, actions }` branches, first passing wins (the action analog of fallthrough). [→](/api/actions) |
+| **entry / exit**      | Actions run when a state is entered / left (any path in or out). [→](/api/actions)                                                    |
+| **run-to-completion** | Events queue: a `send()` inside an action waits until the current transition finishes — no re-entrancy. [→](/api/states)              |
 
 ## Time, data & derivation
 
-| Term | Meaning |
-| --- | --- |
-| **after** | A timed transition — fires after a delay while in a state; auto-cancelled on exit. [→](/api/timers) |
-| **delay** | An `after` key: a number of ms, or a named delay from `implementations.delays` (can read context). [→](/api/timers) |
-| **watch** | Run actions whenever a context/computed field changes — in any state, for the machine's lifetime. [→](/api/watch) |
+| Term         | Meaning                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| **after**    | A timed transition — fires after a delay while in a state; auto-cancelled on exit. [→](/api/timers)                             |
+| **delay**    | An `after` key: a number of ms, or a named delay from `implementations.delays` (can read context). [→](/api/timers)             |
+| **watch**    | Run actions whenever a context/computed field changes — in any state, for the machine's lifetime. [→](/api/watch)               |
 | **computed** | A lazy, memoized value derived from context (or other computeds); recomputes only when a read input changes. [→](/api/computed) |
 
 ## Effects & the platform seam
 
-| Term | Meaning |
-| --- | --- |
-| **effect** | A side-effect with cleanup, scoped to a state: runs on enter, its returned cleanup runs on exit. [→](/api/effects) |
+| Term                | Meaning                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **effect**          | A side-effect with cleanup, scoped to a state: runs on enter, its returned cleanup runs on exit. [→](/api/effects)                           |
 | **ComponentEffect** | A platform-specific effect declared outside the machine — touches the DOM or reads props, calls `send()` into the machine. [→](/api/effects) |
-| **implementations** | The named registry on a config — `guards` / `actions` / `effects` / `delays` referenced by string. [→](/api/guards) |
+| **implementations** | The named registry on a config — `guards` / `actions` / `effects` / `delays` referenced by string. [→](/api/guards)                          |
 
 ## The view boundary
 
-| Term | Meaning |
-| --- | --- |
-| **connect** | A pure function mapping a machine snapshot → the view-facing api (handlers + attributes). [→](/api/connector) |
-| **connector** | Keeps `connect` live: memoizes the snapshot, makes props a reactive input, wires reactions. [→](/api/connector) |
-| **snapshot** | The memoized view api the connector serves — stable identity until the machine or props change. [→](/api/connector) |
-| **setProps** | Push new props into the connector (a reactive input; shallow-dedup'd). [→](/api/connector) |
-| **reaction** | A `[selector, callback]` tuple that fires a prop-callback from _outside_ the machine on a value change. [→](/api/reactions) |
-| **makeReaction** | Inference helper for a reaction tuple — recovers the selector→callback `Value` type link. [→](/api/reactions) |
-| **bindings** | The agnostic event/attr vocabulary `connect` speaks — `onPress`, `role`, `describedBy`. [→](/api/connector) |
-| **normalize** | The per-target step translating bindings → real props (`onPress` → `onClick`; `aria-*` on web). [→](/api/connector) |
-| **the machine never sees props** | The defining rule: a machine is pure behavior; props live only at the edge. [→](/api/connector) |
-| **the edge** | Where props/platform meet the machine — the connector (reactions) + the target's `ComponentEffect` (platform listeners). [→](/api/effects) |
+| Term                             | Meaning                                                                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **connect**                      | A pure function mapping a machine snapshot → the view-facing api (handlers + attributes). [→](/api/connector)                              |
+| **connector**                    | Keeps `connect` live: memoizes the snapshot, makes props a reactive input, wires reactions. [→](/api/connector)                            |
+| **snapshot**                     | The memoized view api the connector serves — stable identity until the machine or props change. [→](/api/connector)                        |
+| **setProps**                     | Push new props into the connector (a reactive input; shallow-dedup'd). [→](/api/connector)                                                 |
+| **reaction**                     | A `[selector, callback]` tuple that fires a prop-callback from _outside_ the machine on a value change. [→](/api/reactions)                |
+| **makeReaction**                 | Inference helper for a reaction tuple — recovers the selector→callback `Value` type link. [→](/api/reactions)                              |
+| **bindings**                     | The agnostic event/attr vocabulary `connect` speaks — `onPress`, `role`, `describedBy`. [→](/api/connector)                                |
+| **normalize**                    | The per-target step translating bindings → real props (`onPress` → `onClick`; `aria-*` on web). [→](/api/connector)                        |
+| **the machine never sees props** | The defining rule: a machine is pure behavior; props live only at the edge. [→](/api/connector)                                            |
+| **the edge**                     | Where props/platform meet the machine — the connector (reactions) + the target's `ComponentEffect` (platform listeners). [→](/api/effects) |
 
 ## Observing changes
 
-| Term | Meaning |
-| --- | --- |
+| Term          | Meaning                                                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | **subscribe** | Coarse observation — fires on _any_ state/context change (what a `useSyncExternalStore` bridge uses). [→](/api/subscriptions) |
-| **select** | Fine-grained observation — narrows to a slice, fires only when _that value_ changes. [→](/api/subscriptions) |
-| **selection** | What `select(...)` returns: a value-deduped view with `.value` + `.subscribe`. [→](/api/subscriptions) |
+| **select**    | Fine-grained observation — narrows to a slice, fires only when _that value_ changes. [→](/api/subscriptions)                  |
+| **selection** | What `select(...)` returns: a value-deduped view with `.value` + `.subscribe`. [→](/api/subscriptions)                        |
 
 ## Composition & scale
 
-| Term | Meaning |
-| --- | --- |
-| **compose** | Run several peer machines as one unit (orthogonal regions) — the answer to "nested/parallel" without nesting. [→](/api/compose) |
-| **composition** | What `compose(...)` returns: bundled `start`/`stop` plus `sync` + `combine`. [→](/api/compose) |
-| **sync** | A coarse cross-region rule on a composition — runs when any member changes. [→](/api/compose) |
-| **combine** | A value-deduped selection derived across composition members. [→](/api/compose) |
-| **tags** | Labels on states so consumers query a _category_ (`hasTag('visible')`) instead of a name. [→](/api/states) |
-| **hasTag** | Check whether the current state carries a tag. [→](/api/states) |
-| **matches** | Exact-state check — `m.matches('open')`. [→](/api/states) |
-| **createStore** | A tiny reactive cell (value + listeners) for singleton state _outside_ any one machine. [→](/api/create-store) |
-| **store** | What `createStore(...)` returns: `get` / `set` / `subscribe` (+ optional domain methods). [→](/api/create-store) |
+| Term            | Meaning                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **compose**     | Run several peer machines as one unit (orthogonal regions) — the answer to "nested/parallel" without nesting. [→](/api/compose) |
+| **composition** | What `compose(...)` returns: bundled `start`/`stop` plus `sync` + `combine`. [→](/api/compose)                                  |
+| **sync**        | A coarse cross-region rule on a composition — runs when any member changes. [→](/api/compose)                                   |
+| **combine**     | A value-deduped selection derived across composition members. [→](/api/compose)                                                 |
+| **tags**        | Labels on states so consumers query a _category_ (`hasTag('visible')`) instead of a name. [→](/api/states)                      |
+| **hasTag**      | Check whether the current state carries a tag. [→](/api/states)                                                                 |
+| **matches**     | Exact-state check — `m.matches('open')`. [→](/api/states)                                                                       |
+| **createStore** | A tiny reactive cell (value + listeners) for singleton state _outside_ any one machine. [→](/api/create-store)                  |
+| **store**       | What `createStore(...)` returns: `get` / `set` / `subscribe` (+ optional domain methods). [→](/api/create-store)                |
 
 ## Lifecycle
 
-| Term | Meaning |
-| --- | --- |
-| **start / stop** | Boot / tear down the machine — effects, watchers, and reactions begin / clean up. [→](/api/setup) |
-| **onStart / onStop** | Hang start/stop-scoped work off the machine's lifecycle (how the connector wires reactions). [→](/api/setup) |
-| **MACHINE_INIT** | The synthetic event fired when effects/watchers boot on `start()`. [→](/api/setup) |
+| Term                  | Meaning                                                                                                                                |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **start / stop**      | Boot / tear down the machine — effects, watchers, and reactions begin / clean up. [→](/api/setup)                                      |
+| **onStart / onStop**  | Hang start/stop-scoped work off the machine's lifecycle (how the connector wires reactions). [→](/api/setup)                           |
+| **MACHINE_INIT**      | The synthetic event fired when effects/watchers boot on `start()`. [→](/api/setup)                                                     |
 | **context ownership** | One plain object per machine, copied from the config at construction, mutated in place — its identity never changes. [→](/api/context) |

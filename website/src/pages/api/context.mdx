@@ -18,16 +18,16 @@ const m = machine({
     idle: {
       on: {
         birthday: { actions: $ => $.setContext({ age: $.context.age + 1 }) },
-        rename:   { actions: $ => $.setContext({ name: $.event.name }) },
+        rename: { actions: $ => $.setContext({ name: $.event.name }) },
       },
     },
   },
 })
 
 m.start()
-m.context.name  // 'Ada'
+m.context.name // 'Ada'
 m.send({ type: 'birthday' })
-m.context.age   // 37
+m.context.age // 37
 ```
 
 ## Memory model

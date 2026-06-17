@@ -15,15 +15,15 @@ const light = machine({
   initial: 'green',
   context: {},
   states: {
-    green:  { on: { next: { target: 'yellow' } } },
+    green: { on: { next: { target: 'yellow' } } },
     yellow: { on: { next: { target: 'red' } } },
-    red:    { on: { next: { target: 'green' } } },
+    red: { on: { next: { target: 'green' } } },
   },
 })
 
 light.start()
 light.send({ type: 'next' })
-light.state  // 'yellow'
+light.state // 'yellow'
 ```
 
 ## Any-state events
@@ -34,7 +34,7 @@ Put an event in the top-level `on` to handle it from any state. A per-state `on`
 machine({
   initial: 'a',
   context: {},
-  on: { reset: { target: 'a' } },  // works from any state
+  on: { reset: { target: 'a' } }, // works from any state
   states: {
     a: {},
     b: {},
@@ -52,15 +52,15 @@ const m = machine({
   initial: 'closed',
   context: {},
   states: {
-    closed:  {},
+    closed: {},
     opening: { tags: ['visible'] },
-    open:    { tags: ['visible'] },
+    open: { tags: ['visible'] },
   },
 })
 
 m.start()
-m.hasTag('visible')  // true while in 'opening' or 'open'
-m.matches('open')    // exact-state check
+m.hasTag('visible') // true while in 'opening' or 'open'
+m.matches('open') // exact-state check
 ```
 
 ## Run-to-completion

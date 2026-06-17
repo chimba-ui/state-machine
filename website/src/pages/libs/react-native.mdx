@@ -26,22 +26,21 @@ The RN `normalize` translates the same agnostic bindings to React Native's prop 
 
 ```tsx
 import { normalize } from '@chimba-ui/native-state-machine'
-
-<Pressable {...normalize(api.triggerProps)} />
+;<Pressable {...normalize(api.triggerProps)} />
 ```
 
-| Binding | React Native prop |
-| --- | --- |
-| `onPress` | `onPress` |
-| `onPointerDown` | `onPressIn` |
-| `onFocus` / `onBlur` | `onFocus` / `onBlur` |
-| `onPointerEnter/Leave/Move` | **dropped** — no RN analog; use focus or long-press instead |
-| `onKeyDown` | **dropped** — no RN analog |
-| `describedBy` / `labelledBy` | `accessibilityLabelledBy` |
-| `role` | `accessibilityRole` |
-| `id` | `nativeID` |
-| `expanded` / `selected` / `disabled` / `hidden` | `accessibilityState.expanded/selected/disabled/hidden` |
-| `focusable` | `focusable` |
+| Binding                                         | React Native prop                                           |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| `onPress`                                       | `onPress`                                                   |
+| `onPointerDown`                                 | `onPressIn`                                                 |
+| `onFocus` / `onBlur`                            | `onFocus` / `onBlur`                                        |
+| `onPointerEnter/Leave/Move`                     | **dropped** — no RN analog; use focus or long-press instead |
+| `onKeyDown`                                     | **dropped** — no RN analog                                  |
+| `describedBy` / `labelledBy`                    | `accessibilityLabelledBy`                                   |
+| `role`                                          | `accessibilityRole`                                         |
+| `id`                                            | `nativeID`                                                  |
+| `expanded` / `selected` / `disabled` / `hidden` | `accessibilityState.expanded/selected/disabled/hidden`      |
+| `focusable`                                     | `focusable`                                                 |
 
 Bindings with no RN equivalent are silently dropped rather than passed as invalid props.
 
@@ -51,8 +50,7 @@ RN-aware merge: handlers are chained, `style` is merged as a `[consumerStyle, li
 
 ```tsx
 import { mergeProps, normalize } from '@chimba-ui/native-state-machine'
-
-<Pressable {...mergeProps(props, normalize(api.triggerProps))} />
+;<Pressable {...mergeProps(props, normalize(api.triggerProps))} />
 ```
 
 ## `ComponentEffect` on React Native
@@ -71,7 +69,7 @@ const onBackButton: Effect = [
     if (!props.closeOnBackButton) return
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
       machine.send({ type: 'close' })
-      return true  // prevent default back navigation
+      return true // prevent default back navigation
     })
     return () => handler.remove()
   },
@@ -97,12 +95,12 @@ export const connectDisclosure = ({ state, send }) => ({ ... })
 // web — Disclosure.tsx
 import { useMachine, normalize } from '@chimba-ui/react-state-machine'
 import { createDisclosureConfig, connectDisclosure } from '../shared/disclosure'
-import { disclosureEffects } from './effects'  // DOM keydown listener
+import { disclosureEffects } from './effects' // DOM keydown listener
 
 // native — Disclosure.native.tsx
 import { useMachine, normalize } from '@chimba-ui/native-state-machine'
 import { createDisclosureConfig, connectDisclosure } from '../shared/disclosure'
-import { disclosureEffects } from './effects'  // BackHandler
+import { disclosureEffects } from './effects' // BackHandler
 ```
 
 The machine never changes. Only `normalize` and the `ComponentEffect` list differ between targets.

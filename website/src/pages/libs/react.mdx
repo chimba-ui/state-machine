@@ -28,9 +28,9 @@ type Props = {
 
 function Disclosure(props: Props) {
   const { api } = useMachine(
-    createDisclosureConfig,  // (props) => MachineConfig — seeds context once
-    connectDisclosure,       // pure connect(): snapshot → view api
-    disclosureEffects,       // ComponentEffect[] — DOM listeners, gated by props
+    createDisclosureConfig, // (props) => MachineConfig — seeds context once
+    connectDisclosure, // pure connect(): snapshot → view api
+    disclosureEffects, // ComponentEffect[] — DOM listeners, gated by props
     props,
   )
 
@@ -54,16 +54,16 @@ normalize(api.triggerProps)
 // { onClick, aria-describedby, role, tabIndex, ... }
 ```
 
-| Binding | DOM prop |
-| --- | --- |
-| `onPress` | `onClick` |
-| `onPointerEnter/Leave/Move/Down` | same name |
-| `onFocus` / `onBlur` / `onKeyDown` | same name |
-| `describedBy` | `aria-describedby` |
-| `labelledBy` | `aria-labelledby` |
+| Binding                                         | DOM prop                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------- |
+| `onPress`                                       | `onClick`                                                           |
+| `onPointerEnter/Leave/Move/Down`                | same name                                                           |
+| `onFocus` / `onBlur` / `onKeyDown`              | same name                                                           |
+| `describedBy`                                   | `aria-describedby`                                                  |
+| `labelledBy`                                    | `aria-labelledby`                                                   |
 | `expanded` / `selected` / `disabled` / `hidden` | `aria-expanded` / `aria-selected` / `aria-disabled` / `aria-hidden` |
-| `focusable` | `tabIndex` (`true → 0`, `false → -1`) |
-| `role` / `id` | `role` / `id` |
+| `focusable`                                     | `tabIndex` (`true → 0`, `false → -1`)                               |
+| `role` / `id`                                   | `role` / `id`                                                       |
 
 `undefined` values are dropped. Unknown keys pass through unchanged.
 
@@ -88,10 +88,7 @@ For a leaf component that should only re-render when one slice of the machine ch
 import { useSelector } from '@chimba-ui/react-state-machine'
 
 function Row({ machine, value }) {
-  const isHighlighted = useSelector(
-    machine,
-    () => machine.context.highlightedValue === value,
-  )
+  const isHighlighted = useSelector(machine, () => machine.context.highlightedValue === value)
 
   return <div data-highlighted={isHighlighted}>{value}</div>
 }
@@ -126,7 +123,7 @@ const onEscapeKey: Effect = [
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   },
-  ['closeOnEscape'],  // re-run only when this prop changes
+  ['closeOnEscape'], // re-run only when this prop changes
 ]
 
 // Must be a static module constant — useMachine runs one hook per entry,

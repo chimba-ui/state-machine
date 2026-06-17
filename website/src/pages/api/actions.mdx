@@ -18,10 +18,7 @@ const m = machine({
     idle: {
       on: {
         save: {
-          actions: [
-            $ => $.setContext({ saved: true }),
-            $ => console.log('saved!'),
-          ],
+          actions: [$ => $.setContext({ saved: true }), $ => console.log('saved!')],
         },
       },
     },
@@ -66,9 +63,9 @@ import { oneOf } from '@chimba-ui/state-machine'
 
 actions: [
   oneOf(
-    { guard: 'isMobile',  actions: 'lockScroll' },
+    { guard: 'isMobile', actions: 'lockScroll' },
     { guard: 'isDesktop', actions: 'dimBackground' },
-    { actions: 'noop' },  // guardless = fallback
+    { actions: 'noop' }, // guardless = fallback
   ),
 ]
 ```

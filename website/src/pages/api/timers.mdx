@@ -15,13 +15,13 @@ const tooltip = machine({
   initial: 'closed',
   context: { openMs: 400 },
   states: {
-    closed:  { on: { hover: { target: 'opening' } } },
+    closed: { on: { hover: { target: 'opening' } } },
     opening: { after: { openDelay: { target: 'open' } } },
-    open:    { after: { 2000: { target: 'closed' } } },  // auto-dismiss after 2s
+    open: { after: { 2000: { target: 'closed' } } }, // auto-dismiss after 2s
   },
   implementations: {
     delays: {
-      openDelay: ({ context }) => context.openMs,  // dynamic — reads context
+      openDelay: ({ context }) => context.openMs, // dynamic — reads context
     },
   },
 })

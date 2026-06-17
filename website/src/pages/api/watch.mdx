@@ -15,7 +15,7 @@ const m = machine({
   initial: 'idle',
   context: { query: '' },
   watch: {
-    query: ['runSearch'],  // whenever `query` changes → run runSearch
+    query: ['runSearch'], // whenever `query` changes → run runSearch
   },
   states: { idle: {} },
   implementations: {
@@ -34,11 +34,11 @@ Watch actions obey the same run-to-completion rule as events: they're queued and
 
 ## Watch vs. computed
 
-| | `watch` | `computed` |
-| --- | --- | --- |
-| Use for | side-effects (send, log, sync) | derived values (filter, count, sum) |
-| Runs when | field changes | read, if input changed |
-| Returns | nothing | a value |
+|           | `watch`                        | `computed`                          |
+| --------- | ------------------------------ | ----------------------------------- |
+| Use for   | side-effects (send, log, sync) | derived values (filter, count, sum) |
+| Runs when | field changes                  | read, if input changed              |
+| Returns   | nothing                        | a value                             |
 
 Use `watch` when you want to **do** something in response to a field changing. Use `computed` when you want to **derive** a value from fields.
 

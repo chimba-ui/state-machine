@@ -15,15 +15,15 @@ const m = machine({
   initial: 'idle',
   context: { items: ['a', 'b', 'c'] },
   computed: {
-    count:   ({ context }) => context.items.length,
-    isEmpty: ({ computed }) => computed.count === 0,  // derives from another computed
+    count: ({ context }) => context.items.length,
+    isEmpty: ({ computed }) => computed.count === 0, // derives from another computed
   },
   states: { idle: {} },
 })
 
 m.start()
-m.computed.count    // 3
-m.computed.isEmpty  // false
+m.computed.count // 3
+m.computed.isEmpty // false
 ```
 
 ## Where computeds are available
@@ -52,7 +52,7 @@ const m = machine({
   initial: 'idle',
   context: { query: '', items: ALL_ITEMS, activeIndex: -1 },
   computed: {
-    filtered:    $ => $.context.items.filter(i => i.label.includes($.context.query)),
+    filtered: $ => $.context.items.filter(i => i.label.includes($.context.query)),
     highlighted: $ => $.computed.filtered[$.context.activeIndex] ?? null,
   },
   states: { idle: {} },

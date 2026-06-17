@@ -63,7 +63,7 @@ const { createMachine: createCursorConfig } = setup<CursorCtx, CursorEv, CursorC
       if (event.type !== 'PICK_TARGET') return
       setContext({ x0: context.x, y0: context.y, x1: event.x, y1: event.y, progress: 0 })
     }) satisfies Action<CursorCtx, CursorEv, CursorComputed>,
-    stepProgress: (({ context, event, computed, setContext }) => {
+    stepProgress: (({ context, event, setContext }) => {
       if (event.type !== 'TICK') return
       const dt = Math.min(event.dt, 50) // cap at 50ms so tab-wake doesn't jump
       const progress = Math.min(1, context.progress + context.speed * dt)

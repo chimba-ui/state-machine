@@ -11,14 +11,16 @@ Because [the machine never sees props](/api/connector#the-machine-never-sees-pro
 ```ts
 import { machine, connector, makeReaction } from '@chimba-ui/state-machine'
 
-const m = machine({ /* ... */ })
+const m = machine({
+  /* ... */
+})
 
 // fix the machine generics once; Value is inferred per reaction
 const reaction = makeReaction<State, Context, Event, Props>()
 
 const onOpenChange = reaction(
-  m => m.matches('open'),                       // selector → Value is boolean
-  (open, props) => props.onOpenChange?.({ open }),  // callback — open is boolean
+  m => m.matches('open'), // selector → Value is boolean
+  (open, props) => props.onOpenChange?.({ open }), // callback — open is boolean
 )
 
 const c = connector(m, connect, props)
@@ -42,9 +44,7 @@ Reactions are **wired automatically** off the machine's own lifecycle (`onStart`
 
 ```ts
 // without makeReaction — `open` is `any`
-c.reactions = [
-  [m => m.matches('open'), (open, props) => props.onOpenChange?.({ open })],
-]
+c.reactions = [[m => m.matches('open'), (open, props) => props.onOpenChange?.({ open })]]
 
 // with makeReaction — `open` is `boolean`
 const reaction = makeReaction<State, Context, Event, Props>()
@@ -56,9 +56,9 @@ const onOpenChange = reaction(
 
 ## Reactions vs. target effects
 
-| | Reaction | Target effect |
-| --- | --- | --- |
-| Lives in | connector | target's `effects.ts` |
-| Touches platform | no | yes |
-| Runs on | every target | specific target only |
-| Use for | prop-callbacks (`onOpenChange`) | DOM listeners, RN `BackHandler` |
+|                  | Reaction                        | Target effect                   |
+| ---------------- | ------------------------------- | ------------------------------- |
+| Lives in         | connector                       | target's `effects.ts`           |
+| Touches platform | no                              | yes                             |
+| Runs on          | every target                    | specific target only            |
+| Use for          | prop-callbacks (`onOpenChange`) | DOM listeners, RN `BackHandler` |

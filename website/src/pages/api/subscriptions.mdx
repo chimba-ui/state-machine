@@ -14,7 +14,7 @@ Fires on any state or context change. The standard bridge for `useSyncExternalSt
 
 ```ts
 const off = m.subscribe(() => rerender())
-off()  // unsubscribe
+off() // unsubscribe
 ```
 
 ## `select` — fine-grained
@@ -32,14 +32,14 @@ For a derived or composite slice, pass a selector function:
 
 ```ts
 const view = m.select(() => ({
-  open:  m.matches('open'),
+  open: m.matches('open'),
   count: m.context.count,
 }))
 
 // optional equality — skip re-renders when neither field changed
 view.subscribe(render, (a, b) => a.open === b.open && a.count === b.count)
 
-view.value  // read the current value without subscribing
+view.value // read the current value without subscribing
 ```
 
 ## Selection identity
@@ -50,6 +50,6 @@ A `select` re-evaluates on any machine change but only calls its listeners when 
 // React bridge pattern
 const snapshot = useSyncExternalStore(
   cb => m.select.context('count').subscribe(cb),
-  ()  => m.context.count,
+  () => m.context.count,
 )
 ```

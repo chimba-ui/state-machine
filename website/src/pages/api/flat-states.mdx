@@ -10,11 +10,11 @@ States here are **flat** — no nesting, no parallel regions inside a single mac
 
 It doesn't have to. The explosion only happens if you fold independent axes onto the single state axis. A flat state should encode exactly **one** axis of control flow. Everything that would multiply it belongs elsewhere:
 
-| You have… | Don't… | Do… |
-| --- | --- | --- |
-| A value derived from **data** | make a state per item → N nodes | keep inputs in `context`, derive in [`computed`](/api/computed) |
-| A **second independent lifecycle** | multiply into the first machine's states → N×M | run it as a peer with [`compose`](/api/compose) |
-| A **category over many states** | `matches('a') \|\| matches('b') \|\| …` | tag the states, query with `hasTag` |
+| You have…                          | Don't…                                         | Do…                                                             |
+| ---------------------------------- | ---------------------------------------------- | --------------------------------------------------------------- |
+| A value derived from **data**      | make a state per item → N nodes                | keep inputs in `context`, derive in [`computed`](/api/computed) |
+| A **second independent lifecycle** | multiply into the first machine's states → N×M | run it as a peer with [`compose`](/api/compose)                 |
+| A **category over many states**    | `matches('a') \|\| matches('b') \|\| …`        | tag the states, query with `hasTag`                             |
 
 ## Example: combobox
 
@@ -25,17 +25,17 @@ machine({
   initial: 'idle',
   context: { query: '', items: ALL_ITEMS, activeIndex: -1 },
   computed: {
-    filtered:    $ => $.context.items.filter(i => i.label.includes($.context.query)),
+    filtered: $ => $.context.items.filter(i => i.label.includes($.context.query)),
     highlighted: $ => $.computed.filtered[$.context.activeIndex] ?? null,
   },
   states: {
     idle: { on: { focus: { target: 'open' } } },
     open: {
       on: {
-        type:     act($ => ({ query: $.event.value, activeIndex: 0 })),
+        type: act($ => ({ query: $.event.value, activeIndex: 0 })),
         moveDown: act($ => ({ activeIndex: $.context.activeIndex + 1 })),
-        moveUp:   act($ => ({ activeIndex: $.context.activeIndex - 1 })),
-        close:    { target: 'idle' },
+        moveUp: act($ => ({ activeIndex: $.context.activeIndex - 1 })),
+        close: { target: 'idle' },
       },
     },
   },
