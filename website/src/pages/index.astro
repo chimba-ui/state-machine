@@ -1998,7 +1998,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         .lab-inner {
           grid-template-columns: 1fr 1.4fr 1.4fr;
           gap: 3rem;
-          align-items: stretch;
+          align-items: start;
         }
       }
 
@@ -2079,8 +2079,6 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       .lab-demo-body {
         padding: 1.25rem;
         flex: 1;
-        display: flex;
-        flex-direction: column;
       }
       #demo-whiteboard .lab-demo-body {
         padding: 0;
@@ -2340,8 +2338,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       .wb-canvas {
         position: relative;
         width: 100%;
-        flex: 1;
-        min-height: 280px;
+        height: 295px;
         background:
           radial-gradient(
             ellipse 80% 60% at 60% 40%,
