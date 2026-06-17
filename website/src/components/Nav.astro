@@ -16,7 +16,7 @@ const withBase = (href: string) => `${base}${href.replace(/^\//, '')}`
 
 <aside
   id="sidebar"
-  class="fixed inset-y-0 left-0 z-40 w-72 -translate-x-full overflow-y-auto bg-[#0a0a0d] px-6 py-8 shadow-2xl transition-transform duration-200 md:static md:block md:w-56 md:translate-x-0 md:overflow-visible md:bg-transparent md:px-0 md:py-0 md:shadow-none md:border-r md:border-border md:pr-6"
+  class="fixed inset-y-0 left-0 z-40 w-[80vw] max-w-sm -translate-x-full overflow-y-auto bg-[#0a0a0d] px-6 py-8 shadow-2xl transition-transform duration-200 md:static md:block md:w-56 md:translate-x-0 md:overflow-visible md:bg-transparent md:px-0 md:py-0 md:shadow-none md:border-r md:border-border md:pr-6"
 >
   <!-- Close button (mobile only) -->
   <button
@@ -33,7 +33,7 @@ const withBase = (href: string) => `${base}${href.replace(/^\//, '')}`
   <nav>
     {nav.map((group) => (
       <section class="mb-6">
-        <h4 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
+        <h4 class="mb-2 text-xs font-bold uppercase tracking-wider text-muted">
           {group.title}
         </h4>
         <ul class="space-y-1">
@@ -43,8 +43,8 @@ const withBase = (href: string) => `${base}${href.replace(/^\//, '')}`
                 href={withBase(item.href)}
                 aria-current={here === item.href ? 'page' : undefined}
                 class:list={[
-                  'block text-sm transition-colors hover:text-fg',
-                  here === item.href ? 'font-semibold text-fg' : 'text-muted',
+                  'block text-sm transition-colors hover:text-fg max-md:hover:text-white',
+                  here === item.href ? 'font-semibold text-fg max-md:text-white' : 'text-muted',
                 ]}
               >
                 {item.title}

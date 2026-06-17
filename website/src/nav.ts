@@ -23,7 +23,7 @@ export const nav: NavGroup[] = [
     items: [
       { title: 'Setup', href: '/api/setup' },
       { title: 'Context', href: '/api/context' },
-      { title: 'States & transitions', href: '/api/states' },
+      { title: 'States & Transitions', href: '/api/states' },
       { title: 'Guards', href: '/api/guards' },
       { title: 'Actions', href: '/api/actions' },
       { title: 'Effects', href: '/api/effects' },
@@ -45,7 +45,7 @@ export const nav: NavGroup[] = [
     items: [
       { title: 'Peer machines', href: '/api/compose' },
       { title: 'Store', href: '/api/create-store' },
-      { title: 'States', href: '/api/flat-states' },
+      { title: 'Shared states', href: '/api/flat-states' },
     ],
   },
   {
