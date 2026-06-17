@@ -25,6 +25,14 @@ const withBase = (href: string) => `${base}${href.replace(/^\//, '')}`
     <title>{title} · Chimba UI</title>
     <link rel="icon" href={`${base}logo-symbol.svg`} type="image/svg+xml" />
     {description && <meta name="description" content={description} />}
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YY4MGEZ38S"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-YY4MGEZ38S');
+    </script>
   </head>
   <body>
     <Header />

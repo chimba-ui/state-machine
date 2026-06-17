@@ -6,22 +6,67 @@ description: How Chimba UI compares to XState and Zag.
 
 # Comparison
 
-How Chimba UI relates to the libraries that inspired it.
+Anyone who has reached for [XState](https://stately.ai/docs) or [Zag](https://zagjs.com/) will
+feel at home — same statechart vocabulary (`states`, `transitions`, `guards`, `actions`,
+`effects`), same headless philosophy. Those libraries are excellent; this one exists for two
+things they aren't built around: **no environment assumption** and **performance under heavy fan-out**.
 
-|                                           | Chimba UI | XState  | Zag |
-| ----------------------------------------- | --------- | ------- | --- |
-| Statechart model                          | ✅        | ✅      | ✅  |
-| Framework-agnostic render                 | ✅        | partial | ✅  |
-| **Environment-agnostic** (no DOM assumed) | ✅        | ❌      | ❌  |
-| Built for thousands of machines/frame     | ✅        | —       | —   |
+## Shared baseline
 
-- **XState** — the disciplined statechart model: queued run-to-completion
-  transitions, guards, entry/exit.
-- **Zag** — proving the headless, framework-agnostic component-as-a-machine approach.
+| Capability | Zag | XState | Chimba UI |
+| --- | --- | --- | --- |
+| States / transitions / guards | ✅ | ✅ | ✅ |
+| Guard combinators (`and`/`or`/`not`) | ✅ | ✅ | ✅ |
+| `entry` / `exit` | ✅ | ✅ | ✅ |
+| Conditional actions | `choose` | `choose` | `oneOf` |
+| Effects with cleanup | `effects` ¹ | invoked callbacks | `effects` |
+| Computed / derived state | ✅ | ✅ | ✅ |
+| Timed transitions (`after`) | ✅ | ✅ | ✅ |
+| Watch (react to a data change) | `watch` | via `always` | `watch` |
+| Per-platform late binding | ✅ | via `.provide()` | `ComponentEffect` |
 
-Chimba UI takes it one step further: the machine assumes _nothing_ about the
-environment, so the same machine runs unchanged on the DOM, React Native, or any
-other JS runtime.
+¹ Zag's effects receive a `scope` (a DOM abstraction) and reach for it. Chimba UI effects
+receive no environment — they're platform-free by design.
 
-Numbers and methodology live in the
-[benchmark README](https://github.com/chimba-ui/state-machine/blob/main/benchmark/README.md).
+## What's different
+
+The single cause underneath all the differences is **how each engine holds a machine's data**.
+
+| | Zag | XState | Chimba UI |
+| --- | --- | --- | --- |
+| Data model | reactive cell per field | immutable snapshot per event | one plain object, mutated in place |
+| Fine-grained subscriptions | ❌ host framework does it | ⚠️ `actor.select` (coarse) | ✅ `select` (value-deduped) |
+| Runs without a host framework | ❌ presumes a DOM framework | ⚠️ yes, but DOM-tied packages | ✅ any JS runtime |
+| Environment assumption | DOM | DOM | none (DOM, RN, TUI, WebGL…) |
+| The machine never sees props | ❌ `prop()` inside the machine | ❌ `.provide()` inline | ✅ props live at the edge only |
+| Serializable snapshot | ❌ state is scattered hook cells | ✅ actor model | ⚠️ no built-in (context is one object) |
+| Nested / hierarchical states | ❌ by design | ✅ | ❌ flat |
+| Parallel states | ❌ by design | ✅ | ⚠️ `compose` (peers, no shared event bus) |
+| Spawned child actors | ❌ by design | ✅ | ❌ by design |
+
+**XState** allocates a new immutable snapshot on every transition — the right trade for
+time-travel and serialization, but it taxes the hot path. Chimba UI mutates in place behind
+a value-deduping notifier, so a transition allocates nothing and an unchanged field wakes no
+observer.
+
+**Zag** pioneered the headless component-as-machine idea and can run outside React, but it
+presumes a host DOM framework and puts reactive cells (one per context field) into framework
+hooks. Chimba UI owns its reactivity internally — the same machine runs on the DOM, React
+Native, or any other JS runtime.
+
+## When to reach for each
+
+| Reach for… | When you need… |
+| --- | --- |
+| **XState** | Nested/parallel statecharts, actor model, time-travel, Stately Studio visual editor |
+| **Zag** | Ready-made headless component machines (accordion, combobox, …) for web |
+| **Chimba UI** | Many lightweight UI machines at high event frequency, or the same machine on multiple platforms (web + native) |
+
+## Performance
+
+Chimba UI is built for **density × frequency** — many machines reacting to a high-frequency
+stream inside one frame budget (trading terminals, canvas boards, monitoring walls, game HUDs).
+In practice that's **up to ~8× the event throughput** of the alternatives, flat memory as
+context grows wide, and surgical re-renders that wake only the rows that actually changed.
+
+See the [benchmark](/benchmark) for methodology and full tables.

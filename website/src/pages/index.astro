@@ -1,45 +1,86 @@
 ---
-import Header from '../components/Header.astro'
-import '../styles/global.css'
+import Header from "../components/Header.astro";
+import "../styles/global.css";
 
-const base = import.meta.env.BASE_URL
-const repo = 'https://github.com/chimba-ui/state-machine'
+const base = import.meta.env.BASE_URL;
+const repo = "https://github.com/chimba-ui/state-machine";
 
 // The three machines, written out (set:html so literal braces survive the JSX
-// parser). The data-state spans carry the LIVE machine state, which glows.
-// compose() bundles them; tick() fans the shared step to all three.
-const pacmanCode = `<span class="cmt">// pacman — eats until the ghost gets him</span>
-<span class="kw">machine</span>({
+// parser) — faithful to the real @chimba-ui/state-machine API + the pacman demo:
+// `const x = machine({...})`, `on: { EVENT: { target, actions: act(...) } }`,
+// and compose() members driven independently via .send({ type }).
+const pacmanCode = `<span class="cmt">// 🟡 pacman — eats until the ghost gets him</span>
+<span class="kw">const</span> pacman = <span class="fn">machine</span>({
   initial: <span class="str">'eating'</span>,
-  context: { x, y, dir, mouth },
+  context: { x: <span class="num">1</span>, y: <span class="num">1</span>, dir: <span class="str">'right'</span>, mouth: <span class="str">'open'</span> },
   states: {
-    <span class="st" data-machine="pacman" data-state="eating">eating</span>: { on: { step, face, die } },
-    <span class="st" data-machine="pacman" data-state="dead">dead</span>:   { on: { revive } },
+    <span class="st" data-machine="pacman" data-state="eating">eating</span>: { on: {
+      step: { actions: <span class="fn">act</span>($ => ({ x: $.event.x, y: $.event.y })) },
+      die:  { target: <span class="str">'dead'</span> },
+    } },
+    <span class="st" data-machine="pacman" data-state="dead">dead</span>: { on: { revive: { target: <span class="str">'eating'</span> } } },
   },
-})`
+})`;
 
-const ghostCode = `<span class="cmt">// ghost — chases, stops on a catch</span>
-<span class="kw">machine</span>({
+const ghostCode = `<span class="cmt">// 👻 ghost — chases on each tick, stops on a catch</span>
+<span class="kw">const</span> ghost = <span class="fn">machine</span>({
   initial: <span class="str">'roaming'</span>,
-  context: { x, y, dir },
+  context: { x: <span class="num">11</span>, y: <span class="num">10</span>, dir: <span class="str">'up'</span> },
   states: {
-    <span class="st" data-machine="ghost" data-state="roaming">roaming</span>: { on: { tick, stop } },
-    <span class="st" data-machine="ghost" data-state="stopped">stopped</span>: { on: { reset } },
+    <span class="st" data-machine="ghost" data-state="roaming">roaming</span>: { on: {
+      tick: { actions: <span class="fn">act</span>($ => chase($.context, $.event)) },
+      stop: { target: <span class="str">'stopped'</span> },
+    } },
+    <span class="st" data-machine="ghost" data-state="stopped">stopped</span>: { on: { reset: { target: <span class="str">'roaming'</span> } } },
   },
-})`
+})`;
 
-const boardCode = `<span class="cmt">// board — the shared/general info</span>
-<span class="kw">machine</span>({
+const boardCode = `<span class="cmt">// 🍒 board — dots, cherry, score</span>
+<span class="kw">const</span> board = <span class="fn">machine</span>({
   initial: <span class="str">'playing'</span>,
-  context: { dots, cherry, score },
+  context: { dots, cherry, score: <span class="num">0</span> },
   states: {
-    <span class="st" data-machine="board" data-state="playing">playing</span>: { on: { eat, caught } },
-    <span class="st" data-machine="board" data-state="caught">caught</span>:  { on: { reset } },
+    <span class="st" data-machine="board" data-state="playing">playing</span>: { on: {
+      eat:    { actions: <span class="fn">act</span>($ => scoreAt($.context, $.event)) },
+      caught: { target: <span class="str">'caught'</span> },
+    } },
+    <span class="st" data-machine="board" data-state="caught">caught</span>: { on: { reset: { target: <span class="str">'playing'</span> } } },
   },
-})`
+})`;
 
-const composeCode = `<span class="cmt">// one unit; tick() fans to all three</span>
-<span class="kw">const</span> game = <span class="fn">compose</span>({ pacman, ghost, board })`
+const composeCode = `<span class="cmt">// ⏱️ a clock machine self-drives via \`after\` — no external loop</span>
+<span class="kw">const</span> clock = <span class="fn">machine</span>({
+  initial: <span class="str">'running'</span>,
+  states: { <span class="st">running</span>: { after: { <span class="num">200</span>: { target: <span class="str">'running'</span> } } } },
+})
+
+<span class="cmt">// 🎲 compose the four; sync() fans each beat to all regions in order</span>
+<span class="kw">const</span> game = <span class="fn">compose</span>({ clock, pacman, ghost, board })
+game.<span class="fn">sync</span>(() => {
+  <span class="kw">const</span> { x, y } = step(pacman.context)
+  pacman.<span class="fn">send</span>({ type: <span class="str">'step'</span>, x, y })
+  board.<span class="fn">send</span>({ type: <span class="str">'eat'</span>, x, y })
+  ghost.<span class="fn">send</span>({ type: <span class="str">'tick'</span>, targetX: x, targetY: y })
+})
+
+game.<span class="fn">start</span>()`;
+
+// the closing quick-start — a real, minimal machine (matches the README).
+const quickStartCode = `<span class="kw">import</span> { machine, act } <span class="kw">from</span> <span class="str">'@chimba-ui/state-machine'</span>
+
+<span class="kw">const</span> toggle = <span class="fn">machine</span>({
+  initial: <span class="str">'inactive'</span>,
+  context: { count: <span class="num">0</span> },
+  states: {
+    inactive: { on: { flip: { target: <span class="str">'active'</span>, actions: <span class="fn">act</span>($ => ({ count: $.context.count + <span class="num">1</span> })) } } },
+    active:   { on: { flip: { target: <span class="str">'inactive'</span> } } },
+  },
+})
+
+toggle.<span class="fn">start</span>()
+toggle.<span class="fn">send</span>({ type: <span class="str">'flip'</span> })
+toggle.state    <span class="cmt">// 'active'</span>
+toggle.context  <span class="cmt">// { count: 1 }</span>`;
 ---
 
 <!doctype html>
@@ -55,416 +96,1009 @@ const composeCode = `<span class="cmt">// one unit; tick() fans to all three</sp
     />
   </head>
   <body>
-    <Header />
+    <Header revealOnScroll />
 
-    <main class="mx-auto max-w-5xl px-4 pb-16 sm:px-6">
-      <section class="grid grid-cols-1 items-start gap-8 pt-12 sm:pt-20 lg:grid-cols-2 lg:gap-12">
-        <!-- left: big headline -->
-        <h1 class="text-5xl font-bold leading-[1.04] tracking-tight sm:text-6xl md:text-7xl">
-          Define states once.<br />Render it anywhere.
-        </h1>
-
-        <!-- right: description + install box + note -->
-        <div class="lg:pt-2">
-          <p class="max-w-md text-lg text-fg sm:text-xl">
-            Chimba is <strong>a state machine built for performance</strong> — behavior as pure,
-            serializable data you can plug into anything that renders. Inspired by
-            <a class="text-accent hover:underline" href="https://stately.ai/docs" target="_blank" rel="noreferrer">XState</a>
-            and
-            <a class="text-accent hover:underline" href="https://zagjs.com/" target="_blank" rel="noreferrer">Zag</a>.
-          </p>
-
-          <div
-            class="mt-5 flex max-w-md items-center justify-between gap-3 rounded-lg border border-border bg-panel px-4 py-3 font-mono text-sm"
-          >
-            <code id="install-cmd">npm i @chimba-ui/state-machine</code>
-            <button
-              id="install-copy"
-              type="button"
-              aria-label="Copy install command"
-              class="shrink-0 rounded-md p-1 text-muted transition-colors hover:bg-black/5 hover:text-fg"
-            >
-              ⧉
-            </button>
+    <main
+      class="mx-auto max-w-5xl px-4 pb-16 sm:px-6 xl:max-w-6xl 2xl:max-w-[88rem] min-[1800px]:max-w-[104rem]"
+    >
+      <!-- HERO + FAST MACHINES share ONE grid so the game panel can use native
+           `position: sticky` (no JS scroll transform → no flicker). On lg it's a
+           5-col grid: copy (3/5) over the code (3/5) on the left, and the game
+           (2/5) spanning BOTH rows on the right — that tall right cell is what
+           lets the sticky game ride down past the hero and through "Fast
+           machines", releasing at the grid's end. On mobile it's one column,
+           ordered copy → game → code. -->
+      <div
+        class="grid grid-cols-1 gap-10 lg:grid-cols-5 lg:gap-x-12 lg:gap-y-0"
+      >
+        <!-- the polished DX-lib copy column (top-left) — fills the first screen -->
+        <section
+          class="order-1 flex flex-col justify-center lg:col-span-3 lg:col-start-1 lg:row-start-1"
+        >
+          <!-- brand lockup: Chimba wordmark logo + STATE-MACHINE eyebrow. -->
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <img
+              src={`${base}logo.svg`}
+              alt="Chimba"
+              class="h-7 w-auto sm:h-8"
+              width="554"
+              height="120"
+            />
+            <span class="select-none" aria-hidden="true">/</span>
+            <span class="mt-2 font-mono text-lg font-semibold uppercase">
+              State&#8209;Machine
+            </span>
           </div>
-          <p class="mt-3 max-w-md text-sm text-muted">
-            Experimental — the engine is stable and tested; the target bridges aren't
-            production-ready yet.
+
+          <!-- headline -->
+          <h1
+            class="mt-8 text-5xl font-bold leading-[1.04] tracking-tight sm:text-6xl lg:text-6xl 2xl:text-7xl min-[1800px]:text-8xl"
+          >
+            Define states once.<br />
+            <span
+              class="bg-linear-to-r from-accent to-[#22c5d3] bg-clip-text text-transparent"
+              >Render it anywhere.</span
+            >
+          </h1>
+
+          <!-- subhead -->
+          <p
+            class="mt-6 max-w-xl text-lg text-muted sm:text-xl 2xl:max-w-2xl 2xl:text-2xl"
+          >
+            <strong class="font-semibold text-fg"
+              >A state machine built for performance</strong
+            >
+            <br />
+            States as pure, serializable data you can plug into anything that renders.
+            Inspired by
+            <a
+              class="text-accent hover:underline"
+              href="https://stately.ai/docs"
+              target="_blank"
+              rel="noreferrer">XState</a
+            >
+            and
+            <a
+              class="text-accent hover:underline"
+              href="https://zagjs.com/"
+              target="_blank"
+              rel="noreferrer">Zag</a
+            >.
           </p>
 
-          <div class="mt-6 flex flex-wrap gap-3.5">
+          <!-- CTAs -->
+          <div class="mt-9 flex flex-wrap items-center gap-3.5">
             <a
-              class="rounded-xl bg-fg px-5 py-2.5 font-semibold text-bg transition-opacity hover:opacity-90"
+              class="rounded-xl bg-fg px-6 py-3 font-semibold text-bg transition-opacity hover:opacity-90"
               href={`${base}get-started`}>Get started →</a
             >
             <a
-              class="rounded-xl border border-border px-5 py-2.5 font-semibold text-fg transition-colors hover:border-fg"
+              class="rounded-xl border border-border bg-bg/60 px-6 py-3 font-semibold text-fg transition-colors hover:border-fg"
               href={repo}
               target="_blank"
               rel="noreferrer">GitHub</a
             >
           </div>
-        </div>
-      </section>
 
-      <!-- short explanation, leading into the live example -->
-      <section class="mx-auto mt-20 max-w-2xl text-center sm:mt-28">
-        <p class="text-lg text-muted">
-          One game, three machines composed — <code class="font-mono text-fg">pacman</code>,
-          <code class="font-mono text-fg">ghost</code> and <code class="font-mono text-fg">board</code> —
-          driving three renderers at the same time. Same behavior, byte-for-byte; only the render differs.
-        </p>
-      </section>
-
-      <!-- The heart-buyer: THREE machines (pacman · ghost · board) composed into
-           one game, rendered three ways at once. Live data shown above each panel;
-           the live direction glows in pacman's code. Arrow keys / WASD steer. -->
-      <section class="mt-8 sm:mt-10" aria-label="Three Chimba machines composed and rendered three ways">
-        <!-- the three machines, written out + the compose that unites them -->
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <figure class="dark-card">
-            <figcaption class="panel-head px-4 py-2.5 font-mono text-[12px]">
-              pacman.machine.ts
-            </figcaption>
-            <pre class="overflow-x-auto px-4 py-3 font-mono text-[12px] leading-relaxed"><code set:html={pacmanCode} /></pre>
-          </figure>
-          <figure class="dark-card">
-            <figcaption class="panel-head px-4 py-2.5 font-mono text-[12px]">
-              ghost.machine.ts
-            </figcaption>
-            <pre class="overflow-x-auto px-4 py-3 font-mono text-[12px] leading-relaxed"><code set:html={ghostCode} /></pre>
-          </figure>
-          <figure class="dark-card">
-            <figcaption class="panel-head px-4 py-2.5 font-mono text-[12px]">
-              board.machine.ts
-            </figcaption>
-            <pre class="overflow-x-auto px-4 py-3 font-mono text-[12px] leading-relaxed"><code set:html={boardCode} /></pre>
-          </figure>
-        </div>
-        <pre class="dark-card mt-3 overflow-x-auto px-4 py-3 font-mono text-[12px] leading-relaxed"><code set:html={composeCode} /></pre>
-
-        <!-- controls -->
-        <div class="mt-4 flex items-center justify-center">
-          <button
-            id="pac-toggle"
-            type="button"
-            class="rounded-xl border border-border bg-panel px-5 py-2 font-mono text-[13px] font-semibold text-fg transition-colors hover:border-fg"
+          <!-- install command -->
+          <div
+            class="mt-8 flex max-w-full items-center gap-3 self-start overflow-x-auto rounded-xl border border-border bg-panel/80 px-4 py-2.5 font-mono text-sm shadow-sm backdrop-blur"
           >
-            ⏸ Pause
-          </button>
-        </div>
+            <span class="select-none text-muted">$</span>
+            <code id="install-cmd" class="whitespace-nowrap text-fg"
+              >npm i @chimba-ui/state-machine</code
+            >
+            <button
+              id="install-copy"
+              type="button"
+              aria-label="Copy install command"
+              class="-mr-1 ml-1 shrink-0 rounded-md p-1.5 text-muted transition-colors hover:bg-black/5 hover:text-fg"
+            >
+              ⧉
+            </button>
+          </div>
+        </section>
 
-        <!-- live data labels: machine state ↔ representation -->
-        <div class="mt-4 grid grid-cols-1 gap-2 font-mono text-[12px] sm:grid-cols-3">
-          <div class="dark-card rounded-lg px-3 py-2">
-            <span class="text-accent">pacman</span>
-            <span id="dbg-pacman" class="text-[#9a9aa2]"> · …</span>
+        <!-- FEATURE BAND — three value props, right after the hero. Sits in the
+             left column (row 2); its dark background bleeds to the LEFT viewport
+             edge while the text stays aligned with the rest of the left content.
+             Three lined up on lg, stacked on mobile. -->
+        <section
+          class="band-left order-2 mt-12 lg:mt-24 lg:col-span-3 lg:col-start-1 lg:row-start-2"
+        >
+          <div class="band-left-bg" aria-hidden="true"></div>
+          <div class="relative py-16 sm:py-20">
+            <p class="band-eyebrow">Why Chimba</p>
+            <ul class="mt-8 flex flex-col">
+              <li class="band-item">
+                <span class="band-num">🌎</span>
+                <div class="band-body">
+                  <h3 class="band-title">Truly agnostic</h3>
+                  <p class="band-muted">
+                    No environment assumption at all — one step beyond Zag's
+                    headless idea. <a
+                      class="band-link"
+                      href={`${base}comparison`}>Compare →</a
+                    >
+                  </p>
+                </div>
+              </li>
+              <li class="band-item">
+                <span class="band-num">⚡️</span>
+                <div class="band-body">
+                  <h3 class="band-title">Fast at scale</h3>
+                  <p class="band-muted">
+                    ~8× XState's throughput, flat-ish memory, surgical
+                    re-renders. <a class="band-link" href={`${base}benchmark`}
+                      >See the benchmark →</a
+                    >
+                  </p>
+                </div>
+              </li>
+              <li class="band-item">
+                <span class="band-num">🧠</span>
+                <div class="band-body">
+                  <h3 class="band-title">Behavior, not render</h3>
+                  <p class="band-muted">
+                    A pure behavioral kernel — states, events, context. Runs on
+                    the DOM, React Native, or any JS runtime.
+                  </p>
+                </div>
+              </li>
+            </ul>
           </div>
-          <div class="dark-card rounded-lg px-3 py-2">
-            <span class="text-down">ghost</span>
-            <span id="dbg-ghost" class="text-[#9a9aa2]"> · …</span>
-          </div>
-          <div class="dark-card rounded-lg px-3 py-2">
-            <span class="text-up">board</span>
-            <span id="dbg-board" class="text-[#9a9aa2]"> · …</span>
-          </div>
-        </div>
+        </section>
 
-        <!-- three renderers, one composed game -->
-        <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <!-- WEB / DOM -->
-          <div class="dark-card">
-            <div class="panel-head flex items-center justify-between px-4 py-2.5">
-              <span class="font-mono text-[12px] text-fg">Web</span>
-              <span class="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted">DOM</span>
-            </div>
-            <div class="flex justify-center p-3">
-              <div id="render-web" class="pac-grid" aria-hidden="true"></div>
-            </div>
+        <!-- FAST MACHINES: the machine configs behind the live demo. Left 60%
+             (row 3) so the game slides down the right 40% past the snippets. -->
+        <section
+          class="order-3 lg:col-span-3 lg:col-start-1 lg:row-start-3 mt-8 lg:mt-24"
+          aria-label="The Chimba machines behind the demo"
+        >
+          <div class="mb-8">
+            <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+              Fast machines
+            </h2>
+            <p class="mt-3 text-lg text-muted">
+              Few bytes of state, events and context per machine. A tiny
+              footprint can spin up thousands of them
+              <br />
+              <br />
+              Built for <strong class="font-semibold text-fg"
+                >high density × high frequency</strong
+              >.
+            </p>
           </div>
 
-          <!-- NATIVE (RN-style facsimile) -->
-          <div class="dark-card">
-            <div class="panel-head flex items-center justify-between px-4 py-2.5">
-              <span class="font-mono text-[12px] text-fg">Native</span>
-              <span class="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted">RN-style</span>
-            </div>
-            <div class="flex justify-center p-3">
-              <div class="rounded-[1.4rem] border-2 border-[#34343c] bg-black/40 p-2">
-                <div id="render-native" class="pac-grid" aria-hidden="true"></div>
+          <!-- all four snippets in ONE dark "IDE" card — three machine files +
+               the compose that unites them — each with its own filename header,
+               separated by hairline dividers. An emoji prefix tells them apart. -->
+          <div class="dark-card ide-card">
+            <pre
+              class="overflow-x-auto px-4 py-3 font-mono text-[12px] leading-relaxed"><code set:html={pacmanCode} /></pre>
+
+            <pre
+              class="overflow-x-auto px-4 py-3 font-mono text-[12px] leading-relaxed"><code set:html={ghostCode} /></pre>
+
+            <pre
+              class="overflow-x-auto px-4 py-3 font-mono text-[12px] leading-relaxed"><code set:html={boardCode} /></pre>
+
+            <pre
+              class="overflow-x-auto px-4 py-3 font-mono text-[12px] leading-relaxed"><code set:html={composeCode} /></pre>
+          </div>
+        </section>
+
+        <!-- RIGHT cell (~40%): the LIVE machine panel, spanning ALL THREE grid
+             rows so its tall cell gives `position: sticky` room to ride down —
+             the game slides past the hero, the "Fast machines" snippets, and
+             comes to rest in the SNES dock beside "One machine". On mobile it
+             sits right after the hero copy (order-2). -->
+        <div
+          class="order-5 lg:order-none lg:col-span-2 lg:col-start-4 lg:row-span-3 lg:row-start-1 z-10 -mb-[210px]"
+        >
+          <div
+            id="hero-live"
+            class="relative md:ml-auto md:w-[362px] lg:sticky lg:top-30 lg:w-[465px] 2xl:w-[540px] min-[1800px]:w-[600px]"
+          >
+            <!-- the running game, dressed up as a game CASSETTE TAPE that slides
+                 down and docks into the console near the frames below -->
+            <div id="pac-card" class="cassette dark-card relative">
+              <!-- the three machines' live state as a fixed-layout table -->
+              <table
+                class="pac-table w-full font-mono text-[10px] sm:text-[11px]"
+              >
+                <thead>
+                  <tr
+                    class="panel-head text-left text-[9px] uppercase tracking-wider"
+                  >
+                    <th class="px-3 py-2 font-medium">machine</th>
+                    <th class="px-1 py-2 font-medium">state</th>
+                    <th class="px-2 py-2 font-medium">context</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr id="row-pacman" class="">
+                    <td class="px-3 py-1.5 text-[#ffe66d]"
+                      ><span aria-hidden="true">⚙️</span> pacman</td
+                    >
+                    <td id="st-pacman" class="px-1 py-1.5">…</td>
+                    <td id="cx-pacman" class="cx-cell px-3 py-1.5"> </td>
+                  </tr>
+                  <tr id="row-ghost" class="">
+                    <td class="px-3 py-1.5 text-[#62b3ff]"
+                      ><span aria-hidden="true">⚙️</span> ghost</td
+                    >
+                    <td id="st-ghost" class="px-1 py-1.5">…</td>
+                    <td id="cx-ghost" class="cx-cell px-3 py-1.5"> </td>
+                  </tr>
+                  <tr id="row-board" class="">
+                    <td class="px-3 py-1.5 text-[#ff5d52]"
+                      ><span aria-hidden="true">⚙️</span> board</td
+                    >
+                    <td id="st-board" class="px-1 py-1.5">…</td>
+                    <td id="cx-board" class="cx-cell px-3 py-1.5"> </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- routing band: the wires bow out past the card edge and back.
+                   The game board + deck are hidden on mobile (lg+ only); the
+                   live state TABLE above stays visible everywhere. -->
+              <div class="hidden h-8 lg:block"></div>
+
+              <!-- the game (board), centered. The wires bow OUTSIDE the card on
+                   the right, then come back in to plug into the board's edge. -->
+              <div class="hidden justify-center px-3 pb-3 lg:flex">
+                <pre
+                  id="render-tui"
+                  class="pac-tui m-0 overflow-x-auto text-left font-mono leading-[1.05]"
+                  aria-hidden="true">
+                </pre>
               </div>
+
+              <!-- the cassette's chunky BOTTOM SHELL — the play/pause sit on it -->
+              <div class="cassette-deck">
+                <!-- play / pause — two icon-only buttons on the cassette deck -->
+                <div id="pac-controls" class="flex gap-1.5" data-paused="false">
+                  <button
+                    id="pac-play"
+                    type="button"
+                    aria-label="Play"
+                    class="pac-ctrl rounded-lg p-2 text-muted transition-colors hover:text-fg"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                      aria-hidden="true"><path d="M4 2.5v11l9-5.5z"></path></svg
+                    >
+                  </button>
+                  <button
+                    id="pac-pause"
+                    type="button"
+                    aria-label="Pause"
+                    class="pac-ctrl rounded-lg p-2 text-muted transition-colors hover:text-fg"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      ><rect x="3.5" y="2.5" width="3" height="11" rx="1"
+                      ></rect><rect x="9.5" y="2.5" width="3" height="11" rx="1"
+                      ></rect></svg
+                    >
+                  </button>
+                </div>
+              </div>
+              <!-- /cassette-deck -->
+              <!-- the "connection" wires live on the (un-clipped) card so they can
+                 bow OUTSIDE the black card before returning to the board. -->
+              <svg
+                id="pac-wires"
+                class="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible lg:block"
+                aria-hidden="true"></svg>
             </div>
+            <!-- /cassette card -->
+
+            <!-- FEED cable: from the cassette's bottom down to the console it
+                 docks into. Lives on #hero-live so it tracks the sticky game; it
+                 overflows downward to reach the console below. -->
+            <svg
+              id="feed-cable"
+              class="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible"
+              aria-hidden="true"></svg>
+          </div>
+          <!-- /hero-live -->
+        </div>
+        <!-- /RIGHT column -->
+      </div>
+      <!-- /HERO + FAST MACHINES grid -->
+
+      <!-- SHOWCASE: one big premium panel that unifies the "One machine" copy
+           and the device lineup below it — breaks the rigid left/right split.
+           The game cassette overlaps its top-right edge. -->
+      <section class="showcase">
+        <h2
+          class="text-3xl font-bold leading-[1.08] tracking-tight sm:text-4xl 2xl:text-5xl"
+        >
+          One machine.<br />
+          Rendered on any JS runner.
+        </h2>
+        <p class="mt-4 max-w-xl text-lg text-muted 2xl:text-xl">
+          The machine is a <strong class="font-semibold text-fg"
+            >pure kernel</strong
+          > with no environment assumptions. Plug it into any JS UI. If JS runs it,
+          <strong class="font-semibold text-fg">the machine drives it</strong>.
+        </p>
+
+        <!-- BROADCAST: the cassette's cable runs down into the CONSOLE (hub),
+             which fans out to the three frames. The frames are always live. -->
+        <div id="broadcast" class="relative">
+          <!-- the console the cassette's cable plugs into — the hub feeding all 3.
+             SAME width as the cassette and right-aligned, so it sits perfectly
+             under it. lg+ only. -->
+          <div
+            id="dock"
+            class="console ml-auto hidden lg:block lg:w-[465px] 2xl:w-[540px] min-[1800px]:w-[600px]"
+          >
+            <span class="console-slot" aria-hidden="true"></span>
+            <span class="console-label">
+              <span class="console-led" aria-hidden="true"></span>
+              <span class="console-text">ON / CH-03</span>
+            </span>
           </div>
 
-          <!-- TERMINAL (TUI-style facsimile) -->
-          <div class="dark-card">
-            <div class="panel-head flex items-center justify-between px-4 py-2.5">
-              <span class="font-mono text-[12px] text-fg">Terminal</span>
-              <span class="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted">TUI-style</span>
-            </div>
-            <div class="p-3">
-              <pre id="render-tui" class="pac-tui m-0 overflow-x-auto text-center font-mono leading-[1.05]" aria-hidden="true"></pre>
-            </div>
-          </div>
-        </div>
-      </section>
+          <!-- black, rounded-corner cables: console → each frame, always connected
+             (drawn by JS into this SVG, with a plug at each end). lg+ only. -->
+          <svg
+            id="cables"
+            class="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible"
+            aria-hidden="true"></svg>
 
-      <!-- alternating (zig-zag) feature rows, emoji on alternating sides -->
-      <section class="mt-20 flex flex-col gap-12 sm:mt-24 sm:gap-16">
-        <!-- 1: emoji left -->
-        <div class="flex flex-col items-center gap-6 sm:flex-row sm:gap-10">
-          <div class="text-6xl sm:text-7xl" aria-hidden="true">🧩</div>
-          <div class="text-center sm:text-left">
-            <h3 class="mb-2 text-xl font-semibold">Behavior, not render</h3>
-            <p class="text-muted">
-              The machine is a pure behavioral kernel — states, events, context, effects. It knows
-              nothing about a renderer, so the same machine runs on the DOM, React Native, or any JS
-              runtime.
-            </p>
-          </div>
+          <!-- mobile: all three stacked; md+: all three in one row -->
+          <section
+            class="mt-12 grid select-none grid-cols-1 items-end justify-items-center gap-10 sm:mt-24 md:grid-cols-3"
+            aria-label="The same machine rendered in three frames"
+          >
+            <!-- LAPTOP — the screen shows a BROWSER window (chrome bar + URL) -->
+            <figure id="frame-laptop" class="frame laptop">
+              <div class="laptop-screen">
+                <div class="browser-bar">
+                  <span class="browser-dots" aria-hidden="true"
+                    ><i></i><i></i><i></i></span
+                  >
+                  <span class="browser-url">chimba-ui.com</span>
+                </div>
+                <div class="browser-body">
+                  <pre
+                    class="frame-tui pac-tui m-0 text-left font-mono leading-[1.05]"
+                    aria-hidden="true">
+                  </pre>
+                </div>
+              </div>
+              <div class="laptop-base"></div>
+              <figcaption class="stage-label">
+                Web · <b>React</b> (DOM)
+              </figcaption>
+            </figure>
+
+            <!-- IPHONE — rounded body, side rails, Dynamic Island, home bar.
+               Nudged 50px right on lg for better centring in its column. -->
+            <figure
+              id="frame-phone"
+              class="frame flex flex-col items-center lg:translate-x-[50px]"
+            >
+              <div class="iphone">
+                <span class="iphone-island" aria-hidden="true"></span>
+                <div class="iphone-screen">
+                  <pre
+                    class="frame-tui pac-tui m-0 text-left font-mono leading-[1.05]"
+                    aria-hidden="true">
+                  </pre>
+                </div>
+                <span class="iphone-home" aria-hidden="true"></span>
+              </div>
+              <figcaption class="stage-label">
+                Native · <b>React Native</b>
+              </figcaption>
+            </figure>
+
+            <!-- TERMINAL -->
+            <figure
+              id="frame-terminal"
+              class="frame flex flex-col items-center"
+            >
+              <div class="terminal">
+                <div class="terminal-bar">
+                  <span style="background:#ff5d52"></span>
+                  <span style="background:#ffe66d"></span>
+                  <span style="background:#a2e57b"></span>
+                </div>
+                <div class="terminal-body">
+                  <pre
+                    class="frame-tui pac-tui m-0 text-left font-mono leading-[1.05]"
+                    aria-hidden="true">
+                  </pre>
+                </div>
+              </div>
+              <figcaption class="stage-label">
+                <b>Terminal</b> (TUI) · live today
+              </figcaption>
+            </figure>
+          </section>
         </div>
-        <!-- 2: emoji right -->
-        <div class="flex flex-col items-center gap-6 sm:flex-row-reverse sm:gap-10">
-          <div class="text-6xl sm:text-7xl" aria-hidden="true">⚡</div>
-          <div class="text-center sm:text-right">
-            <h3 class="mb-2 text-xl font-semibold">Fast at scale</h3>
-            <p class="text-muted">
-              ~8× XState's event throughput, flat-ish memory per machine, surgical re-renders. Built
-              for the hard case: many machines reacting to many events in one frame.
-              <a class="text-accent hover:underline" href={`${base}benchmark`}>See the benchmark →</a>
-            </p>
-          </div>
-        </div>
-        <!-- 3: emoji left -->
-        <div class="flex flex-col items-center gap-6 sm:flex-row sm:gap-10">
-          <div class="text-6xl sm:text-7xl" aria-hidden="true">🌍</div>
-          <div class="text-center sm:text-left">
-            <h3 class="mb-2 text-xl font-semibold">Truly agnostic</h3>
-            <p class="text-muted">
-              Zag proved the headless, framework-agnostic component-as-a-machine idea. Chimba takes
-              it one step further: no environment assumption at all.
-              <a class="text-accent hover:underline" href={`${base}comparison`}>Compare →</a>
-            </p>
-          </div>
-        </div>
+        <!-- /broadcast -->
       </section>
+      <!-- /showcase -->
     </main>
 
-    <footer class="mt-20 border-t border-border sm:mt-24">
+    <!-- big, dark, premium footer: a closing CTA + install + link columns -->
+    <!-- slim, premium dark footer: oversized wordmark + GitHub + maintainer -->
+    <footer class="site-footer">
       <div
-        class="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-muted sm:flex-row sm:px-6"
+        class="mx-auto flex max-w-5xl flex-col items-center gap-10 px-6 py-20 text-center sm:py-28 xl:max-w-6xl"
       >
-        <span>Made with <span class="text-down">♥</span> by the Chimba UI team</span>
-        <a class="text-accent hover:underline" href={repo} target="_blank" rel="noreferrer">
-          github.com/chimba-ui/state-machine
-        </a>
+        <div
+          class="flex flex-col items-center gap-5 border-t border-white/10 pt-10 sm:flex-row sm:gap-8"
+        >
+          <a
+            class="footer-gh inline-flex items-center gap-2"
+            href={repo}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Chimba on GitHub"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              aria-hidden="true"
+              ><path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"
+              ></path></svg
+            >
+            GitHub
+          </a>
+          <span class="hidden text-white/20 sm:inline" aria-hidden="true"
+            >·</span
+          >
+          <span class="text-sm text-white/50">
+            Maintained by
+            <a
+              class="footer-gh font-medium"
+              href="https://github.com/ivanbanov"
+              target="_blank"
+              rel="noreferrer">@ivanbanov</a
+            >
+          </span>
+        </div>
       </div>
     </footer>
 
     <script>
-      import { createGame, MAZE, ROWS, COLS, key, type Dir } from '../pacman'
+      import { createGame, MAZE, ROWS, COLS, key, type Dir } from "../pacman";
 
       // THREE machines (pacman · ghost · board) composed into one game. Three
       // renderers read the SAME composed state and paint it three ways.
-      const game = createGame()
-      const { pacman, ghost, board } = game
+      const game = createGame();
+      const { pacman, ghost, board } = game;
 
-      // light each machine's live STATE in its code panel
-      const stateLines = document.querySelectorAll<HTMLElement>('[data-machine][data-state]')
-      const lightCode = () => {
-        const live: Record<string, string> = {
-          pacman: pacman.state,
-          ghost: ghost.state,
-          board: board.state,
-        }
-        for (const el of stateLines)
-          el.dataset.active = String(live[el.dataset.machine!] === el.dataset.state)
-      }
-
-      // --- mouth SVG: an open/closed wedge, rotated by direction ---------------
-      const ROT: Record<Dir, number> = { right: 0, down: 90, left: 180, up: 270 }
-      const pacSvg = (dir: Dir, mouth: 'open' | 'closed') => {
-        // open = wedge cut out of the disc; closed = full disc
-        const d =
-          mouth === 'open'
-            ? 'M50 50 L95 28 A50 50 0 1 0 95 72 Z'
-            : 'M50 50 m-48 0 a48 48 0 1 0 96 0 a48 48 0 1 0 -96 0 Z'
-        return `<svg viewBox="0 0 100 100" style="transform:rotate(${ROT[dir]}deg)"><path d="${d}" fill="#ffe66d"/></svg>`
-      }
-
-      // --- WEB + NATIVE renderers: CSS grids of cells --------------------------
-      const buildGrid = (id: string, extra = '') => {
-        const grid = document.getElementById(id)!
-        grid.style.setProperty('--cols', String(COLS))
-        const cells: HTMLElement[] = []
+      // --- TUI renderer FACTORY: same composed state, painted into ANY <pre>. ---
+      // This is the whole pitch (option B): one machine, many render targets. Each
+      // call builds a fixed monospace grid and returns a paint() that reads the
+      // SHARED game state. Cells are rigid CSS boxes so glyphs never widen a row.
+      const PAC = "🟡";
+      const makeTuiRenderer = (pre: HTMLElement) => {
+        const cells: HTMLElement[] = [];
         for (let y = 0; y < ROWS; y++) {
+          const row = document.createElement("div");
+          row.className = "tui-row";
           for (let x = 0; x < COLS; x++) {
-            const cell = document.createElement('div')
-            cell.className = 'pac-cell' + (extra ? ' ' + extra : '')
-            if (MAZE[y][x] === 1) cell.dataset.wall = 'true'
-            grid.appendChild(cell)
-            cells.push(cell)
+            const c = document.createElement("span");
+            c.className = "tui-cell";
+            row.appendChild(c);
+            cells.push(c);
           }
+          pre.appendChild(row);
         }
-        return cells
-      }
-      const webCells = buildGrid('render-web')
-      const nativeCells = buildGrid('render-native', 'native')
-
-      const paintCells = (cells: HTMLElement[]) => {
-        const p = pacman.context
-        const dir = p.dir
-        const g = ghost.context
-        const b = board.context
-        for (let y = 0; y < ROWS; y++) {
-          for (let x = 0; x < COLS; x++) {
-            const cell = cells[y * COLS + x]
-            let kind = ''
-            let html = ''
-            if (x === p.x && y === p.y) {
-              kind = 'pac'
-              html = pacman.state === 'dead' ? '💀' : pacSvg(dir, p.mouth)
-            } else if (x === g.x && y === g.y) {
-              kind = 'ghost'
-              html = '👻'
-            } else if (b.cherry && x === b.cherry.x && y === b.cherry.y) {
-              kind = 'cherry'
-              html = '🍒'
-            } else if (b.dots.has(key(x, y))) {
-              kind = 'dot'
-            }
-            // re-render when the kind OR the glyph changes (pac alive↔dead, mouth)
-            const stamp = kind + ':' + html
-            if (cell.dataset.stamp !== stamp) {
-              cell.dataset.stamp = stamp
-              cell.dataset.kind = kind
-              cell.innerHTML = html
+        return () => {
+          const p = pacman.context;
+          const g = ghost.context;
+          const b = board.context;
+          for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+              const c = cells[y * COLS + x];
+              let ch = " ";
+              if (x === p.x && y === p.y)
+                ch = pacman.state === "dead" ? "💀" : PAC;
+              else if (x === g.x && y === g.y) ch = "👻";
+              else if (b.cherry && x === b.cherry.x && y === b.cherry.y)
+                ch = "🍒";
+              else if (MAZE[y][x] === 1) ch = "🟦";
+              else if (b.dots.has(key(x, y))) ch = "·";
+              if (c.textContent !== ch) c.textContent = ch;
             }
           }
-        }
-      }
+        };
+      };
 
-      // --- TERMINAL renderer: emoji glyphs on a fixed monospace grid -----------
-      // Each cell is a fixed-width box (CSS), so double-width emoji can't stretch
-      // a row and resize the panel. Built once as spans; paint just swaps text.
-      const PAC_EMOJI: Record<Dir, string> = { right: '🟡', left: '🟡', up: '🟡', down: '🟡' }
-      const tui = document.getElementById('render-tui')!
-      const tuiCells: HTMLElement[] = []
-      for (let y = 0; y < ROWS; y++) {
-        const row = document.createElement('div')
-        row.className = 'tui-row'
-        for (let x = 0; x < COLS; x++) {
-          const c = document.createElement('span')
-          c.className = 'tui-cell'
-          row.appendChild(c)
-          tuiCells.push(c)
-        }
-        tui.appendChild(row)
-      }
+      // ONE machine, many render targets (the whole pitch). Mount a renderer on
+      // the hero board and on each device frame; they ALL read the shared state,
+      // so they stay byte-for-byte in sync. Static — no scroll effects.
+      const painters: Array<() => void> = [];
+      const heroPre = document.getElementById("render-tui");
+      if (heroPre) painters.push(makeTuiRenderer(heroPre));
+      document
+        .querySelectorAll<HTMLElement>(".frame-tui")
+        .forEach((pre) => painters.push(makeTuiRenderer(pre)));
       const paintTui = () => {
-        const p = pacman.context
-        const g = ghost.context
-        const b = board.context
-        for (let y = 0; y < ROWS; y++) {
-          for (let x = 0; x < COLS; x++) {
-            const c = tuiCells[y * COLS + x]
-            let ch = ' '
-            if (x === p.x && y === p.y) ch = pacman.state === 'dead' ? '💀' : PAC_EMOJI[p.dir]
-            else if (x === g.x && y === g.y) ch = '👻'
-            else if (b.cherry && x === b.cherry.x && y === b.cherry.y) ch = '🍒'
-            else if (MAZE[y][x] === 1) ch = '🟦'
-            else if (b.dots.has(key(x, y))) ch = '·'
-            if (c.textContent !== ch) c.textContent = ch
-          }
-        }
-      }
+        for (const paint of painters) paint();
+      };
 
-      // --- live debug labels: each machine's own data --------------------------
-      const dbgPacman = document.getElementById('dbg-pacman')!
-      const dbgGhost = document.getElementById('dbg-ghost')!
-      const dbgBoard = document.getElementById('dbg-board')!
+      // --- live state TABLE: state + context per machine -----------------------
+      // Values are padded to fixed widths so the { … } never changes size and the
+      // table stays rock-still as numbers tick (no layout jitter).
+      const stPacman = document.getElementById("st-pacman")!;
+      const stGhost = document.getElementById("st-ghost")!;
+      const stBoard = document.getElementById("st-board")!;
+      const cxPacman = document.getElementById("cx-pacman")!;
+      const cxGhost = document.getElementById("cx-ghost")!;
+      const cxBoard = document.getElementById("cx-board")!;
+      // pad a number on the right so the column width is constant
+      const n2 = (v: number) => String(v).padStart(2, " ");
+      const dir5 = (d: Dir) => d.padEnd(5, " "); // longest dir = "right"
       const paintDebug = () => {
-        const p = pacman.context
-        const g = ghost.context
-        const b = board.context
-        dbgPacman.textContent = ` · ${pacman.state} { x:${p.x} y:${p.y} dir:${p.dir} mouth:${p.mouth} }`
-        dbgGhost.textContent = ` · ${ghost.state} { x:${g.x} y:${g.y} dir:${g.dir} }`
-        dbgBoard.textContent = ` · ${board.state} { score:${b.score} dots:${b.dots.size} }`
-      }
+        const p = pacman.context;
+        const g = ghost.context;
+        const b = board.context;
+        stPacman.textContent = pacman.state;
+        stGhost.textContent = ghost.state;
+        stBoard.textContent = board.state;
+        cxPacman.textContent = `{ x:${n2(p.x)} y:${n2(p.y)} dir:${dir5(p.dir)} }`;
+        cxGhost.textContent = `{ x:${n2(g.x)} y:${n2(g.y)} dir:${dir5(g.dir)} }`;
+        cxBoard.textContent = `{ score:${String(b.score).padStart(4, " ")} }`;
+      };
 
-      // --- one render pass paints all three renderers + labels + code ----------
+      // --- one render pass paints all renderers + the live state table --------
       const render = () => {
-        paintCells(webCells)
-        paintCells(nativeCells)
-        paintTui()
-        paintDebug()
-        lightCode()
-      }
+        paintTui();
+        paintDebug();
+      };
       // any member changing repaints everything (coarse, like the docs' sync)
-      game.group.sync(render)
-      game.group.start()
-      render()
+      game.group.sync(render);
+      game.group.start();
+      render();
 
-      // --- drive it: keyboard steering + the shared game tick ------------------
-      const KEYS: Record<string, Dir> = {
-        ArrowRight: 'right', ArrowLeft: 'left', ArrowUp: 'up', ArrowDown: 'down',
-        d: 'right', a: 'left', w: 'up', s: 'down',
-      }
-      // A keypress steers the next few ticks; after that the autopilot takes over.
-      let steer: Dir | null = null
-      let steerUntil = 0
-      addEventListener('keydown', (e) => {
-        const dir = KEYS[e.key]
-        if (!dir) return
-        e.preventDefault()
-        steer = dir
-        steerUntil = performance.now() + 4000
-        game.face(dir)
-      })
+      // --- "connection" wires: one per machine row → into the board -----------
+      // Drawn as SVG paths from the right edge of each table row, out to a shared
+      // bus, down, and into the top of the running board. Each carries a flowing
+      // dot in the machine's color. Recomputed on load/resize so it stays exact.
+      const SVG_NS = "http://www.w3.org/2000/svg";
+      const card = document.getElementById("pac-card")!;
+      const wires = document.getElementById("pac-wires")!;
+      const tuiEl = document.getElementById("render-tui")!;
+      // line = the light cable tint; dot = the bright signal traveling it
+      const WIRE: { row: string; line: string; dot: string }[] = [
+        { row: "row-pacman", line: "#fff1a8", dot: "#ffe66d" }, // light yellow
+        { row: "row-ghost", line: "#a9d3ff", dot: "#62b3ff" }, // light blue
+        { row: "row-board", line: "#ffb0ab", dot: "#ff5d52" }, // light red/pink
+      ];
+      const drawWires = () => {
+        const cb = card.getBoundingClientRect();
+        if (!cb.width) return;
+        wires.setAttribute("viewBox", `0 0 ${cb.width} ${cb.height}`);
+        wires.innerHTML = "";
+        // board geometry, in card-local coords
+        const b = tuiEl.getBoundingClientRect();
+        const boardRight = b.right - cb.left; // board's right edge (plug line)
+        const boardTop = b.top - cb.top;
+        const boardH = b.height;
+        const LANE_STEP = 14; // how much further out each successive wire bows
+        const PLUG_STEP = boardH / 4; // vertical spacing of plugs on board edge
+        // Each wire leaves its row at the card's right edge, bows OUTSIDE the card
+        // (to x > card width), arcs down, then comes back IN to plug into the
+        // board's right edge. Outer wires bow further so the three nest cleanly.
+        WIRE.forEach((w, i) => {
+          const r = document.getElementById(w.row)!.getBoundingClientRect();
+          const ry = r.top - cb.top + r.height / 2; // row mid-height
+          const sx = cb.width; // exit exactly at the card's right edge
+          const outX = cb.width + 22 + i * LANE_STEP; // vertical lane, outside card
+          const plugY = boardTop + PLUG_STEP * (i + 1); // where it re-enters board
+          // SQUARED (orthogonal) out-and-back: exit right → out to lane → straight
+          // down → back in to the board's right edge. Right angles only.
+          const d =
+            `M ${sx} ${ry} ` + `H ${outX} ` + `V ${plugY} ` + `H ${boardRight}`;
+          // a single solid light-tint line for the cable
+          const line = document.createElementNS(SVG_NS, "path");
+          line.setAttribute("d", d);
+          line.setAttribute("fill", "none");
+          line.setAttribute("stroke", w.line);
+          line.setAttribute("stroke-width", "1.5");
+          line.setAttribute("stroke-linejoin", "miter");
+          line.setAttribute("stroke-linecap", "butt");
+          wires.appendChild(line);
+          // the "signal" dot: a solid bright dot with a glow, traveling the line
+          const dot = document.createElementNS(SVG_NS, "circle");
+          dot.setAttribute("r", "3");
+          dot.setAttribute("fill", w.dot);
+          const motion = document.createElementNS(SVG_NS, "animateMotion");
+          motion.setAttribute("path", d);
+          motion.setAttribute("dur", "2.2s");
+          motion.setAttribute("begin", `${i * 0.5}s`);
+          motion.setAttribute("repeatCount", "indefinite");
+          motion.setAttribute("rotate", "auto");
+          dot.appendChild(motion);
+          wires.appendChild(dot);
+        });
+      };
+      // always draw the cables; the CSS pauses the signal dot for reduced motion
+      drawWires();
+      addEventListener("resize", drawWires, { passive: true });
+      setTimeout(drawWires, 250); // redraw once fonts/layout settle
 
+      // --- drive it: the autopilot runs the game on a fixed tick --------------
       // tick() fans the shared step to all three machines; the autopilot's choice
-      // lives inside tick (nextDir), overridden by `steer` while the player drives.
-      let paused = false
+      // (nextDir) decides Pac-Man's direction — no player input.
+      let paused = false;
       setInterval(() => {
-        if (paused) return
-        const forced = steer && performance.now() < steerUntil ? steer : undefined
-        game.tick(forced ?? undefined)
-      }, 200)
+        if (!paused) game.tick();
+      }, 200);
 
-      // pause/resume button
-      const toggle = document.getElementById('pac-toggle')!
-      toggle.addEventListener('click', () => {
-        paused = !paused
-        toggle.textContent = paused ? '▶ Resume' : '⏸ Pause'
-        toggle.dataset.paused = String(paused)
-      })
-      // a steering keypress also resumes, so the player isn't stuck on a paused board
-      addEventListener('keydown', (e) => {
-        if (paused && KEYS[e.key]) {
-          paused = false
-          toggle.textContent = '⏸ Pause'
-          toggle.removeAttribute('data-paused')
+      // play / pause — two icon buttons under the demo. Pausing also freezes the
+      // SVG signal dots traveling the wires, so game + wires stop together. The
+      // active control is highlighted via [data-paused] on the wrapper.
+      const controls = document.getElementById("pac-controls")!;
+      const wireSvg = document.getElementById(
+        "pac-wires",
+      ) as unknown as SVGSVGElement;
+      const setPaused = (next: boolean) => {
+        paused = next;
+        controls.dataset.paused = String(paused);
+        if (paused) wireSvg.pauseAnimations();
+        else wireSvg.unpauseAnimations();
+      };
+      document
+        .getElementById("pac-play")!
+        .addEventListener("click", () => setPaused(false));
+      document
+        .getElementById("pac-pause")!
+        .addEventListener("click", () => setPaused(true));
+
+      // The game panel rides down the page via native `position: sticky` (see
+      // the right column markup) — no JS scroll handler, so no render flicker.
+
+      // --- connector + cassette wiring --------------------------------------
+      // The connector is a permanent hub wired to the three (always-live) frames
+      // by black, rounded-corner orthogonal cables (plug at each end). The game
+      // cassette slides DOWN the right column on scroll and PARKS a bit above the
+      // connector; a feed cable joins the two.
+      const dock = document.getElementById("dock")!;
+      const cables = document.getElementById("cables")!;
+      const heroLive = document.getElementById("hero-live")!;
+      const FRAME_IDS = ["frame-laptop", "frame-phone", "frame-terminal"];
+      // cables only make sense on lg+, where the connector and frames sit apart;
+      // on mobile everything stacks, so we skip them.
+      const wideDock = matchMedia("(min-width: 1024px)");
+
+      // a small plug rectangle centred on (x, y)
+      const plug = (x: number, y: number) => {
+        const p = document.createElementNS(SVG_NS, "rect");
+        p.setAttribute("x", String(x - 4));
+        p.setAttribute("y", String(y - 3));
+        p.setAttribute("width", "8");
+        p.setAttribute("height", "6");
+        p.setAttribute("rx", "1.5");
+        p.setAttribute("class", "cable-plug");
+        return p;
+      };
+      // draw the three cables: cassette bottom → each frame top, orthogonal with
+      // rounded corners (drop straight down, run across, drop into the frame).
+      const R = 10; // corner radius
+      const drawCables = () => {
+        cables.innerHTML = "";
+        if (!wideDock.matches) return;
+        const base = broadcast.getBoundingClientRect();
+        if (!base.width) return;
+        cables.setAttribute("viewBox", `0 0 ${base.width} ${base.height}`);
+        const d = dock.getBoundingClientRect();
+        const sx = d.left + d.width / 2 - base.left; // console bottom-center
+        const sy = d.bottom - base.top;
+        const busY = sy + 26; // shared horizontal bus just below the console
+        for (const id of FRAME_IDS) {
+          const fig = document.getElementById(id);
+          if (!fig) continue;
+          // anchor to the device CHASSIS (not the figure, which also holds the
+          // caption) so the plug always lands on the device's top edge.
+          const el =
+            fig.querySelector<HTMLElement>(
+              ".laptop-screen, .iphone, .terminal",
+            ) ?? fig;
+          const r = el.getBoundingClientRect();
+          const ex = r.left + r.width / 2 - base.left; // device top-center
+          const ey = r.top - base.top;
+          let path: string;
+          if (Math.abs(ex - sx) < R * 2) {
+            // (near-)straight below the cassette — drop straight down, no jog
+            path = `M ${sx} ${sy} V ${ey}`;
+          } else {
+            // drop from the cassette, rounded turn onto the bus, run across,
+            // rounded turn, drop into the frame. Right angles + rounded corners.
+            const dir = Math.sign(ex - sx);
+            path =
+              `M ${sx} ${sy} ` +
+              `V ${busY - R} ` +
+              `Q ${sx} ${busY} ${sx + dir * R} ${busY} ` +
+              `H ${ex - dir * R} ` +
+              `Q ${ex} ${busY} ${ex} ${busY + R} ` +
+              `V ${ey}`;
+          }
+          const line = document.createElementNS(SVG_NS, "path");
+          line.setAttribute("d", path);
+          line.setAttribute("class", "cable");
+          cables.appendChild(line);
+          cables.appendChild(plug(sx, sy)); // plug at the console
+          cables.appendChild(plug(ex, ey)); // plug at the frame
         }
-      })
+      };
+
+      // scroll-driven park: the cassette slides down and stops a bit ABOVE the
+      // connector (a gap), held there with a translateY clamp. No activation —
+      // the frames are always live. Negative gap parks it LOWER (onto the
+      // console) — move the stop point down a touch.
+      const PARK_GAP = -40; // px relative to the console top (− = lower/into it)
+      const parkCassette = () => {
+        if (!wideDock.matches) {
+          heroLive.style.transform = "";
+          return;
+        }
+        const stopY = dock.getBoundingClientRect().top - PARK_GAP;
+        // measure the cassette's UN-clamped bottom (ignore any park transform)
+        heroLive.style.transform = "";
+        const cassetteBottom = heroLive.getBoundingClientRect().bottom;
+        const overshoot = cassetteBottom - stopY;
+        if (overshoot > 0) {
+          heroLive.style.transform = `translateY(${-overshoot}px)`;
+        }
+      };
+
+      // the cassette can overflow its grid cell, so its right edge won't match
+      // the container edge the console aligns to. Nudge the console so its right
+      // edge sits exactly under the cassette's — perfectly aligned + same width.
+      const alignConsole = () => {
+        dock.style.transform = "";
+        if (!wideDock.matches) return;
+        const casRight = heroLive.getBoundingClientRect().right;
+        const conRight = dock.getBoundingClientRect().right;
+        const dx = casRight - conRight;
+        if (dx) dock.style.transform = `translateX(${dx}px)`;
+      };
+
+      // FEED cable: from the cassette's bottom down to the console. The cassette
+      // is sticky, so this MUST track scroll — but it's a single cheap path in
+      // its own SVG (#feed-cable), so it doesn't rebuild the frame cables.
+      const feed = document.getElementById(
+        "feed-cable",
+      )! as unknown as SVGSVGElement;
+      const drawFeed = () => {
+        feed.innerHTML = "";
+        if (!wideDock.matches) return;
+        const hb = heroLive.getBoundingClientRect();
+        const db = dock.getBoundingClientRect();
+        if (!hb.width || !db.width) return;
+        feed.setAttribute("viewBox", `0 0 ${hb.width} ${hb.height}`);
+        const cx = hb.width / 2; // cassette bottom-center (local X)
+        const cy = hb.height; // cassette bottom (local Y)
+        const tx = db.left + db.width / 2 - hb.left; // console top-center
+        const ty = db.top - hb.top;
+        if (ty <= cy) return; // console above/overlapping the cassette → no cable
+        let path: string;
+        if (Math.abs(tx - cx) < R * 2) {
+          path = `M ${cx} ${cy} V ${ty}`;
+        } else {
+          const midY = (cy + ty) / 2;
+          const dir = Math.sign(tx - cx);
+          path =
+            `M ${cx} ${cy} ` +
+            `V ${midY - R} ` +
+            `Q ${cx} ${midY} ${cx + dir * R} ${midY} ` +
+            `H ${tx - dir * R} ` +
+            `Q ${tx} ${midY} ${tx} ${midY + R} ` +
+            `V ${ty}`;
+        }
+        const line = document.createElementNS(SVG_NS, "path");
+        line.setAttribute("d", path);
+        line.setAttribute("class", "cable");
+        feed.appendChild(line);
+        feed.appendChild(plug(cx, cy)); // plug at the cassette
+        feed.appendChild(plug(tx, ty)); // plug at the console
+      };
+
+      // the console→frames cables are in normal flow — only redraw on RESIZE.
+      // The feed cable + dock toggle track scroll (both cheap).
+      addEventListener(
+        "scroll",
+        () => {
+          parkCassette();
+          drawFeed();
+        },
+        { passive: true },
+      );
+      addEventListener(
+        "resize",
+        () => {
+          alignConsole();
+          drawCables();
+          drawFeed();
+          parkCassette();
+        },
+        { passive: true },
+      );
+      alignConsole();
+      drawCables();
+      parkCassette();
+      drawFeed();
+      // redraw once after fonts/layout settle (one-off, not on every scroll)
+      setTimeout(() => {
+        alignConsole();
+        drawCables();
+        parkCassette();
+        drawFeed();
+      }, 250);
 
       // copy the install command
-      const copyBtn = document.getElementById('install-copy')
-      const cmd = document.getElementById('install-cmd')
-      copyBtn?.addEventListener('click', async () => {
+      const copyBtn = document.getElementById("install-copy");
+      const cmd = document.getElementById("install-cmd");
+      copyBtn?.addEventListener("click", async () => {
         try {
-          await navigator.clipboard.writeText(cmd?.textContent ?? '')
-          const prev = copyBtn.textContent
-          copyBtn.textContent = '✓'
-          setTimeout(() => (copyBtn.textContent = prev), 1200)
+          await navigator.clipboard.writeText(cmd?.textContent ?? "");
+          const prev = copyBtn.textContent;
+          copyBtn.textContent = "✓";
+          setTimeout(() => (copyBtn.textContent = prev), 1200);
         } catch {
           /* clipboard blocked — no-op */
         }
-      })
+      });
     </script>
 
     <!-- is:global because the code spans are injected via set:html and so don't
          receive Astro's scope hash — scoped selectors wouldn't match them. -->
     <style is:global>
+      /* feature band: dark background that bleeds to the LEFT viewport edge
+         while the content stays aligned with the rest of the left column. The
+         .band-left-bg layer paints from the content's left edge out to -100vw. */
+      .band-left {
+        position: relative;
+        color: var(--color-code-fg);
+      }
+      .band-left-bg {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        left: -100vw;
+        background: #f5f5f5;
+        z-index: 0;
+        border-radius: 0 16px 16px;
+      }
+      /* premium typography for the light feature band */
+      .band-eyebrow {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: color-mix(in srgb, var(--color-fg) 45%, transparent);
+      }
+      /* SHOWCASE — one large, soft premium panel unifying the "One machine"
+         statement and the device lineup. The dark game cassette overlaps its
+         top edge (negative margin pulls the panel up under it). */
+      .showcase {
+        position: relative;
+        margin-top: 3rem;
+        padding: 2.5rem 1.5rem 3rem;
+        border: 1px solid var(--color-border);
+        border-radius: 1.75rem;
+        background:
+          radial-gradient(
+            120% 80% at 20% 0%,
+            color-mix(in srgb, var(--color-fg) 4%, transparent),
+            transparent 60%
+          ),
+          color-mix(in srgb, var(--color-fg) 2%, var(--color-bg));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.5),
+          0 1px 2px rgba(0, 0, 0, 0.04),
+          0 40px 80px -48px rgba(0, 0, 0, 0.3);
+      }
+      @media (min-width: 1024px) {
+        .showcase {
+          padding: 3.5rem;
+        }
+      }
+
+      .band-item {
+        display: flex;
+        gap: 1.25rem;
+        padding: 1.6rem 0;
+        border-top: 1px solid
+          color-mix(in srgb, var(--color-fg) 10%, transparent);
+      }
+      .band-item:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+      .band-item:last-child {
+        padding-bottom: 0;
+      }
+      .band-num {
+        flex: none;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 36px;
+        font-weight: 600;
+        line-height: 2.1;
+        font-variant-numeric: tabular-nums;
+      }
+      .band-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.15;
+        color: var(--color-fg);
+      }
+      .band-left .band-muted {
+        margin-top: 0.4rem;
+        max-width: 42ch;
+        line-height: 1.6;
+        color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+      }
+      .band-link {
+        color: var(--color-accent);
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .band-link:hover {
+        text-decoration: underline;
+      }
+
+      /* ====================================================================
+         FOOTER — a big, dark, premium close: CTA + install + link columns.
+         ==================================================================== */
+      .site-footer {
+        background: radial-gradient(
+          120% 120% at 15% 0%,
+          #15171c 0%,
+          #0b0c0f 55%,
+          #050507 100%
+        );
+        color: #fff;
+      }
+      .footer-gh {
+        color: rgba(255, 255, 255, 0.7);
+        transition: color 0.15s ease;
+      }
+      .footer-gh:hover {
+        color: #fff;
+      }
+
+      /* play / pause icon controls on the dark cassette deck: dim grey by
+         default, bright + chip-highlighted for the ACTIVE one. data-paused on
+         the wrapper flips which is "on": playing → play active; paused → pause. */
+      #pac-controls .pac-ctrl {
+        color: #6b7079;
+      }
+      #pac-controls .pac-ctrl:hover {
+        color: #c9ccd6;
+      }
+      #pac-controls[data-paused="false"] #pac-play,
+      #pac-controls[data-paused="true"] #pac-pause {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
       /* Dark surface for code panels + demo cards, so source/glyphs stay legible
          against the light page. Use class "dark-card" on the card element. */
       .dark-card {
@@ -472,7 +1106,6 @@ const composeCode = `<span class="cmt">// one unit; tick() fans to all three</sp
         border: 1px solid var(--color-code-border);
         color: var(--color-code-fg);
         border-radius: 1rem;
-        overflow: hidden;
         box-shadow:
           0 1px 2px rgba(0, 0, 0, 0.08),
           0 12px 30px rgba(0, 0, 0, 0.12);
@@ -482,109 +1115,443 @@ const composeCode = `<span class="cmt">// one unit; tick() fans to all three</sp
         color: var(--color-code-muted);
       }
 
-      /* --- code panel: lightweight syntax tokens (on the dark card) --- */
+      /* IDE card: one dark surface holding several files, divided by hairlines */
+      .ide-card > figure + figure {
+        border-top: 1px solid var(--color-code-border);
+      }
+
+      /* --- code panel: syntax tokens, Monokai Pro (Filter Machine) palette --- */
       .cmt {
-        color: #6b6c75;
+        color: #6b7678; /* comment */
       }
       .kw {
-        color: #c89bff;
+        color: #ff6d7e; /* red — keyword */
       }
       .str {
-        color: #e0a85a;
+        color: #ffed72; /* yellow — string */
       }
       .fn {
-        color: #62b3ff;
+        color: #a2e57b; /* green — function */
       }
-      /* the three state lines; the live one glows */
+      .num {
+        color: #ffb86b; /* orange — number */
+      }
+      /* the three state lines render as plain code — no live highlight */
       .st {
-        border-radius: 4px;
-        padding: 0 4px;
-        margin: 0 -4px;
-        transition:
-          background-color 0.25s ease,
-          color 0.25s ease,
-          box-shadow 0.25s ease;
         color: var(--color-code-fg);
       }
-      .st[data-active='true'] {
-        background: color-mix(in srgb, var(--color-accent) 38%, transparent);
-        color: #fff;
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 60%, transparent);
+
+      /* live state table — fixed layout so columns never reflow as values tick */
+      .pac-table {
+        table-layout: fixed;
+        border-collapse: collapse;
+        /* tabular figures: every digit is the same width, so numbers never shift */
+        font-variant-numeric: tabular-nums;
+      }
+      /* context cell: preserve the padding spaces + lock the width so the closing
+         "}" never moves (no "dancing" brackets as values tick) */
+      .cx-cell {
+        white-space: pre;
+        font-variant-numeric: tabular-nums;
+      }
+      /* give the context column the room it needs; machine/state stay compact */
+      .pac-table th:nth-child(1),
+      .pac-table td:nth-child(1) {
+        width: 30%;
+      }
+      .pac-table th:nth-child(2),
+      .pac-table td:nth-child(2) {
+        width: 22%;
+      }
+      .pac-table th:nth-child(3),
+      .pac-table td:nth-child(3) {
+        width: 48%;
+      }
+      .pac-table th {
+        color: var(--color-code-muted);
+      }
+      .pac-table thead th {
+        border-bottom: 1px solid var(--color-code-border);
+      }
+      .pac-table td {
+        vertical-align: top;
+        white-space: nowrap;
+      }
+      /* "connection" wires (SVG): a single solid light-tint cable per machine,
+         with a bright solid "signal" dot traveling it. */
+      @media (prefers-reduced-motion: reduce) {
+        #pac-wires animateMotion {
+          display: none;
+        }
       }
 
-      /* --- Pac-Man grids: same state, three renderers ------------------------ */
-      .pac-grid {
-        /* fixed cell size → the grid is rigid; a glyph can never push a cell */
-        --cell: 18px;
-        display: grid;
-        grid-template-columns: repeat(var(--cols), var(--cell));
-        grid-auto-rows: var(--cell);
-        gap: 0;
-      }
-      .pac-cell {
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: var(--cell);
-        height: var(--cell);
-        overflow: hidden;
-        line-height: 1;
-        color: #ffe66d;
-      }
-      .pac-cell[data-wall='true'] {
-        background: color-mix(in srgb, var(--color-accent) 38%, #0a0a14);
-        border-radius: 2px;
-      }
-      .pac-cell.native[data-wall='true'] {
-        background: color-mix(in srgb, #62b3ff 34%, #0a0a14);
-      }
-      /* dots */
-      .pac-cell[data-kind='dot']::after {
-        content: '';
-        width: 3px;
-        height: 3px;
-        border-radius: 50%;
-        background: #6b6b78;
-      }
-      /* glyphs (ghost/cherry/dead) sized to sit comfortably INSIDE the cell */
-      .pac-cell[data-kind='cherry'],
-      .pac-cell[data-kind='ghost'],
-      .pac-cell[data-kind='pac'] {
-        font-size: 13px;
-      }
-      /* Pac-Man is an inline SVG wedge (open/closed mouth), rotated by direction */
-      .pac-cell[data-kind='pac'] svg {
-        width: 14px;
-        height: 14px;
-        flex: 0 0 auto;
-        filter: drop-shadow(0 0 4px rgba(255, 230, 109, 0.6));
-      }
-
-      /* terminal renderer — a FIXED pixel grid. Each cell is a rigid 16px box and
-         the glyph (emoji or dot) is scaled to fit, so nothing can widen a row. */
+      /* terminal renderer — a FIXED pixel grid. Each cell is a rigid box sized by
+         --tui (so a frame can scale the whole board); the glyph is scaled to fit,
+         so nothing can widen a row. */
       .pac-tui {
+        --tui: 16px;
         display: inline-block;
         color: var(--color-up);
         line-height: 0;
+        user-select: none;
       }
       .tui-row {
         display: flex;
-        height: 16px;
+        height: var(--tui);
       }
       .tui-cell {
         box-sizing: border-box;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 16px;
-        min-width: 16px;
-        max-width: 16px;
-        height: 16px;
-        flex: 0 0 16px;
+        width: var(--tui);
+        min-width: var(--tui);
+        max-width: var(--tui);
+        height: var(--tui);
+        flex: 0 0 var(--tui);
         overflow: hidden;
-        font-size: 12px;
+        font-size: calc(var(--tui) * 0.75);
         line-height: 1;
+      }
+
+      /* ====================================================================
+         THREE FRAMES: the same machine state, rendered into three device
+         chassis (laptop · iPhone · terminal). Static — the whole pitch in one
+         glance: one behavior, many renderers.
+         ==================================================================== */
+      .stage-label {
+        margin-top: 0.75rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        color: var(--color-muted);
+        text-align: center;
+      }
+      .stage-label b {
+        color: var(--color-fg);
+        font-weight: 600;
+      }
+
+      /* the game inside a frame renders smaller than the hero board. Each device
+         picks its own --tui so the LAPTOP reads biggest, the TERMINAL mid, the
+         iPHONE smallest. Each screen wraps the game snugly — no dead space. */
+      .frame {
+        user-select: none;
+      }
+      .frame .frame-tui {
+        --tui: 11px;
+      }
+      /* sized so the board fits each screen: laptop 350×270 → ~17px; terminal
+         square → 13px; iPhone 75px wide → ~5px. */
+      .laptop .frame-tui {
+        --tui: 17px;
+      }
+      .terminal .frame-tui {
+        --tui: 13px;
+      }
+      /* LAPTOP: a lid holding a BROWSER window, on a tapered base bar */
+      .laptop {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .laptop-screen {
+        display: flex;
+        flex-direction: column;
+        /* smaller on mobile so it fits the screen; full size at md+ */
+        width: 280px;
+        height: 216px;
+        background: #0c0d10;
+        border: 8px solid #1c1e24;
+        border-bottom-width: 14px;
+        border-radius: 0.9rem 0.9rem 0.4rem 0.4rem;
+        overflow: hidden;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+      }
+      @media (min-width: 768px) {
+        .laptop-screen {
+          width: 350px;
+          height: 270px;
+        }
+      }
+      /* the browser chrome inside the screen */
+      .browser-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.4rem 0.6rem;
+        background: #2a2d35;
+        border-bottom: 1px solid #14161b;
+      }
+      .browser-dots {
+        display: flex;
+        gap: 4px;
+      }
+      .browser-dots i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4a4d57;
+      }
+      .browser-dots i:nth-child(1) {
+        background: #ff5d52;
+      }
+      .browser-dots i:nth-child(2) {
+        background: #ffe66d;
+      }
+      .browser-dots i:nth-child(3) {
+        background: #a2e57b;
+      }
+      .browser-url {
+        flex: 1;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #16181e;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 9px;
+        color: #8a8f9a;
+        text-align: center;
+      }
+      /* the page area below the chrome bar fills the rest of the 350×270 screen,
+         the game centred inside it. */
+      .browser-body {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0c0d10;
+      }
+      .laptop-base {
+        position: relative;
+        width: 128%;
+        height: 13px;
+        background: linear-gradient(#d7d7de, #aeaeb8);
+        border-radius: 0 0 0.4rem 0.4rem;
+        box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.18);
+      }
+      /* the trackpad notch on the laptop hinge */
+      .laptop-base::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 16%;
+        height: 5px;
+        background: #9b9ba6;
+        border-radius: 0 0 6px 6px;
+      }
+      /* IPHONE: rounded titanium body, side rails, Dynamic Island + home bar */
+      .iphone {
+        position: relative;
+        background: #0c0d10;
+        border: 3px solid #2c2e35;
+        border-radius: 1.1rem;
+        padding: 0.25rem;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+          0 18px 40px rgba(0, 0, 0, 0.22);
+      }
+      /* side rails (volume + power buttons) */
+      .iphone::before,
+      .iphone::after {
+        content: "";
+        position: absolute;
+        width: 2px;
+        border-radius: 2px;
+        background: #2c2e35;
+      }
+      .iphone::before {
+        left: -4px;
+        top: 28%;
+        height: 14%;
+      }
+      .iphone::after {
+        right: -4px;
+        top: 24%;
+        height: 22%;
+      }
+      /* Dynamic Island */
+      .iphone-island {
+        position: absolute;
+        top: 0.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40%;
+        height: 9px;
+        background: #000;
+        border-radius: 999px;
+        z-index: 2;
+      }
+      /* portrait phone screen: tall (9 : 19.5), game centred and large enough
+         to read. */
+      .iphone-screen {
+        width: 116px;
+        aspect-ratio: 9 / 19.5;
+        border-radius: 1.1rem;
+        overflow: hidden;
+        background: #0c0d10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .iphone .frame-tui {
+        --tui: 8px; /* 13 × 8 = 104px, fits the 116px screen */
+        width: 104px;
+      }
+      /* home indicator bar */
+      .iphone-home {
+        position: absolute;
+        bottom: 0.45rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 36%;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.55);
+        z-index: 2;
+      }
+      /* TERMINAL: title bar with traffic-light dots */
+      .terminal {
+        background: var(--color-code);
+        border: 1px solid var(--color-code-border);
+        border-radius: 0.7rem;
+        overflow: hidden;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+      }
+      .terminal-bar {
+        display: flex;
+        gap: 6px;
+        padding: 0.55rem 0.75rem;
+        border-bottom: 1px solid var(--color-code-border);
+      }
+      .terminal-bar span {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      /* the terminal body wraps the game snugly — the game fills it */
+      .terminal-body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem;
+      }
+
+      /* HUGE screens: scale the three device frames up so they fill the wider
+         container instead of floating small. Boards grow with their --tui. */
+      @media (min-width: 1800px) {
+        .laptop-screen {
+          width: 440px;
+          height: 340px;
+        }
+        .laptop .frame-tui {
+          --tui: 22px;
+        }
+        .iphone-screen {
+          width: 150px;
+        }
+        .iphone .frame-tui {
+          --tui: 10px;
+          width: 130px;
+        }
+        .terminal .frame-tui {
+          --tui: 17px;
+        }
+        .stage-label {
+          font-size: 14px;
+        }
+      }
+
+      /* ====================================================================
+         CASSETTE — the running game is dressed as a chunky game cartridge: a
+         thick dark shell around the screen and a BIG bottom deck that the
+         play/pause buttons sit on (like a cassette's lower half).
+         ==================================================================== */
+      .cassette {
+        position: relative;
+        border: 6px solid #0c0d10;
+        border-radius: 1rem;
+        background: #15171c; /* shell colour shows around the screen */
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.06),
+          0 1px 2px rgba(0, 0, 0, 0.1),
+          0 16px 40px rgba(0, 0, 0, 0.22);
+      }
+      /* the BIG bottom deck — the cartridge's lower shell; play/pause ride here.
+         Hidden on mobile (the game it controls is hidden there too). */
+      .cassette-deck {
+        position: relative;
+        margin-top: 0.25rem;
+        padding: 1.1rem 1rem 1.25rem;
+        background: linear-gradient(180deg, #20232b 0%, #15171c 100%);
+        border-top: 2px solid #0c0d10;
+        /* twin reel hubs hinting at a cassette tape */
+        display: none;
+        justify-content: center;
+      }
+      @media (min-width: 1024px) {
+        .cassette-deck {
+          display: flex;
+        }
+      }
+
+      /* ====================================================================
+         CONSOLE — the hub the cassette's cable plugs into, sitting just above
+         the lined-up frames. Permanently wired to all three (always live).
+         ==================================================================== */
+      .console {
+        position: relative;
+        padding: 1rem 1.1rem 0.85rem;
+        border-radius: 0.5rem 0.5rem 0.65rem 0.65rem;
+        background: linear-gradient(180deg, #2a2c33 0%, #1d1f25 100%);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          inset 0 -3px 6px rgba(0, 0, 0, 0.4);
+      }
+      /* the cartridge slot the cassette's cable enters */
+      .console-slot {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 62%;
+        height: 12px;
+        border-radius: 3px;
+        background: #0c0d10;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+      }
+      .console-label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+      .console-text {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        color: #c9ccd6;
+      }
+      /* power LED — steady green (the demo is always live) */
+      .console-led {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #a2e57b;
+        box-shadow: 0 0 6px 1px rgba(162, 229, 123, 0.7);
+      }
+
+      /* the three frames are always live — black, always-connected cables */
+      .cable {
+        fill: none;
+        stroke: #15171c;
+        stroke-width: 2.5;
+        stroke-linejoin: round;
+        stroke-linecap: round;
+      }
+      .cable-plug {
+        fill: #15171c;
       }
     </style>
   </body>

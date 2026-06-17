@@ -1,16 +1,3 @@
-/**
- * The Pac-Man demo's BEHAVIOR — THREE real Chimba machines, zero render.
- *
- *   • pacman — direction is its STATE (right/left/up/down); context holds only
- *     Pac-Man's own data: { x, y, mouth }. A `tick` steps forward + flips mouth.
- *   • ghost  — its own machine; context { x, y, dir }. A `tick` chases Pac-Man.
- *   • board  — the shared/general info: { dots, cherry, score, status }.
- *
- * `createGame()` composes the three and exposes `tick()`, which orchestrates the
- * shared step in order (pac moves → board eats at pac's cell → ghost moves →
- * board checks catch). Each machine knows nothing about a renderer OR each other;
- * the page subscribes and paints them, and the cross-machine rules live in tick().
- */
 import { compose, machine, type Composition, type Machine } from '@chimba-ui/state-machine'
 
 // 1 = wall, 0 = path. A small, symmetric maze that reads as "Pac-Man".
