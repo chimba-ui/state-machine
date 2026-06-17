@@ -66,8 +66,11 @@ export function createPairMachine(
       })),
     },
     effects: {
-      priceTicker: ({ send }) => {
-        let current = initialPrice
+      // The price feed. Lives on every state so it keeps ticking through
+      // buying/holding/selling, not just idle. Seeds from the live context
+      // price so re-entry (a state transition) never resets the price.
+      priceTicker: ({ context, send }) => {
+        let current = context.price
         const id = setInterval(() => {
           // Gaussian-approximate random walk via Box-Muller
           const u1 = Math.random()
@@ -115,7 +118,7 @@ export function createPairMachine(
 
     states: {
       idle: {
-        // Start the price ticker when we enter idle; stop it on exit.
+        // The ticker runs in every state so the price never freezes.
         effects: ['priceTicker'],
         on: {
           BUY: { guard: 'canBuy', target: 'buying' },
@@ -123,6 +126,7 @@ export function createPairMachine(
       },
 
       buying: {
+        effects: ['priceTicker'],
         on: {
           CANCEL: { target: 'idle' },
         },
@@ -134,12 +138,14 @@ export function createPairMachine(
       },
 
       holding: {
+        effects: ['priceTicker'],
         on: {
           SELL: { guard: 'canSell', target: 'selling' },
         },
       },
 
       selling: {
+        effects: ['priceTicker'],
         // Simulate close delay: after 600 ms return to idle and clear entry.
         after: {
           600: { target: 'idle', actions: [act({ entryPrice: 0, pnl: 0 })] },
