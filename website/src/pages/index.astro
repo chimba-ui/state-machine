@@ -577,24 +577,36 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       <!-- /showcase -->
     </main>
 
-    <!-- ORIGIN QUOTE — full-bleed dark strip -->
+    <!-- ORIGIN QUOTE -->
     <section class="origin-section">
       <div class="origin-inner">
-        <span class="origin-mark" aria-hidden="true">"</span>
-        <blockquote class="origin-body">
-          <p class="origin-line">I spent a decade rebuilding</p>
-          <p class="origin-line origin-line-accent">the same button.</p>
-          <p class="origin-line">New company. New stack.</p>
-          <p class="origin-line origin-line-dim">Same button.</p>
-        </blockquote>
-        <p class="origin-sub">
-          The behaviors never changed — focus, keyboard, ARIA, state.
-          All documented by the W3C. All rebuilt from scratch, every time.
-          The final boss was a canvas-based collaborative whiteboard that
-          needed the same primitives with zero DOM. That's when I stopped
-          rebuilding and started building <em>once</em>.
-        </p>
-        <a href={`${base}get-started`} class="origin-cta">Read the full story →</a>
+        <div class="origin-layout">
+          <!-- left: avatar -->
+          <a href="https://x.com/ivanbanov" target="_blank" rel="noreferrer" class="origin-avatar-link" aria-label="Ivan Banov on X">
+            <img
+              src="https://avatars.githubusercontent.com/u/2953018?v=4"
+              alt="Ivan Banov"
+              class="origin-avatar"
+              width="80"
+              height="80"
+            />
+          </a>
+
+          <!-- right: quote + sub + cta -->
+          <div class="origin-content">
+            <blockquote class="origin-body">
+              <p class="origin-line">I spent a decade rebuilding</p>
+              <p class="origin-line">the same components,</p>
+              <p class="origin-line origin-line-dim">over and over again.</p>
+            </blockquote>
+            <p class="origin-sub">
+              New company, new stack, new design system — but the same button, the same tooltip,
+              the same dialog. The behaviors never changed. All documented by the W3C.
+              All rebuilt from scratch, every time.
+            </p>
+            <a href={`${base}get-started`} class="origin-cta">Read the full story →</a>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1579,30 +1591,58 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       }
 
       /* ====================================================================
-         ORIGIN SECTION — full-bleed dark, big raw quote
+         ORIGIN SECTION — pure typography, no background
          ==================================================================== */
       .origin-section {
-        background: #0b0c0f;
+        background: radial-gradient(120% 80% at 10% 0%, #15171c 0%, #0b0c0f 60%, #050507 100%);
         color: #f2fffc;
-        padding: 6rem 1.5rem;
+        padding: 6rem 1.5rem 5rem;
       }
       .origin-inner {
-        max-width: 52rem;
+        max-width: 56rem;
         margin: 0 auto;
+      }
+      .origin-layout {
+        display: flex;
+        gap: 3rem;
+        align-items: flex-start;
+      }
+      .origin-avatar-link {
+        flex-shrink: 0;
+        display: block;
+        margin-top: 0.5rem;
+      }
+      .origin-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        border: 2px solid rgba(242,255,252,0.15);
+        display: block;
+        transition: border-color 0.2s;
+      }
+      .origin-avatar-link:hover .origin-avatar {
+        border-color: var(--color-accent);
+      }
+      .origin-content {
         position: relative;
       }
-      .origin-mark {
+      /* big decorative opening quote */
+      .origin-content::before {
+        content: '\201C';
+        position: absolute;
+        top: -2rem;
+        left: -0.25rem;
         font-family: Georgia, 'Times New Roman', serif;
-        font-size: 10rem;
-        line-height: 0.8;
+        font-size: 9rem;
+        line-height: 1;
         color: var(--color-accent);
         opacity: 0.22;
-        display: block;
-        margin-bottom: -1rem;
+        pointer-events: none;
         user-select: none;
       }
       .origin-body {
-        margin: 0 0 2.5rem;
+        margin: 0 0 2rem;
+        position: relative;
       }
       .origin-line {
         font-size: 2.75rem;
@@ -1615,8 +1655,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       @media (min-width: 640px) {
         .origin-line { font-size: 3.5rem; }
       }
-      .origin-line-accent { color: var(--color-accent); }
-      .origin-line-dim    { color: rgba(242,255,252,0.3); }
+      .origin-line-dim { color: var(--color-accent); }
       .origin-sub {
         font-size: 1rem;
         line-height: 1.75;
@@ -1624,10 +1663,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         max-width: 38rem;
         margin: 0 0 2rem;
       }
-      .origin-sub em { color: rgba(242,255,252,0.8); font-style: normal; font-weight: 600; }
       .origin-cta {
-        display: inline-flex;
-        align-items: center;
         font-size: 0.9rem;
         font-weight: 500;
         color: var(--color-accent);
@@ -2098,13 +2134,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
          LAB SECTION — dark full-width strip with two live demos
          ==================================================================== */
       .lab-section {
-        margin-top: 5rem;
-        background: radial-gradient(
-          120% 80% at 10% 0%,
-          #15171c 0%,
-          #0b0c0f 60%,
-          #050507 100%
-        );
+        background: radial-gradient(120% 80% at 10% 0%, #15171c 0%, #0b0c0f 60%, #050507 100%);
         color: #f2fffc;
         padding: 5rem 1.5rem 5.5rem;
       }
