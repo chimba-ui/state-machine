@@ -1,8 +1,9 @@
 ---
-layout: ../layout.astro
 title: Benchmark
 description: Throughput and memory vs. XState and Zag.
 ---
+
+import { Aside } from '@astrojs/starlight/components';
 
 # Benchmark
 
@@ -94,13 +95,11 @@ These loads are extreme by design — they only reflect real software when a sin
 
 The sharpest target is a dense live financial surface: 5k–20k live cells, updating tens of thousands of times per second, often needed on **web and native from one codebase** — where every property this benchmark measures pays at once.
 
-import Callout from '../components/Callout.astro'
-
-<Callout type='note'>
+<Aside type='note'>
   **This is not the engine for every use case.** A handful-of-symbols chart, a typical SaaS
   dashboard, a chat app — dozens to a few hundred live elements. The engine works there too, but so
   does anything; at that scale you'd pick it for the environment-agnostic render and memory reasons,
   not the throughput these tables show.
-</Callout>
+</Aside>
 
 Full methodology, fairness notes, and all per-scenario tables in the [benchmark README](https://github.com/dunky-dev/state-machine/blob/main/benchmark/README.md).

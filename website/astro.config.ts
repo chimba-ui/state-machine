@@ -1,4 +1,5 @@
 import { defineConfig } from 'astro/config'
+import starlight from '@astrojs/starlight'
 import mdx from '@astrojs/mdx'
 import { resolve } from 'node:path'
 
@@ -11,7 +12,73 @@ const base = process.env.BASE_PATH ?? '/state-machine/'
 export default defineConfig({
   site: 'https://dunky-dev.github.io',
   base,
-  integrations: [mdx()],
+  integrations: [
+    starlight({
+      title: 'Dunky',
+      logo: {
+        light: './public/logo.svg',
+        dark: './public/logo-white.png',
+        replacesTitle: true,
+      },
+      customCss: ['./src/styles/starlight.css'],
+      sidebar: [
+        {
+          label: 'Guides',
+          items: [
+            { label: 'Get started', link: 'get-started' },
+            { label: 'Install', link: 'install' },
+            { label: 'Comparison', link: 'comparison' },
+            { label: 'Benchmark', link: 'benchmark' },
+          ],
+        },
+        {
+          label: 'Core',
+          items: [
+            { label: 'Setup', link: 'api/setup' },
+            { label: 'Context', link: 'api/context' },
+            { label: 'States & Transitions', link: 'api/states' },
+            { label: 'Guards', link: 'api/guards' },
+            { label: 'Actions', link: 'api/actions' },
+            { label: 'Effects', link: 'api/effects' },
+            { label: 'Computed', link: 'api/computed' },
+            { label: 'Timers', link: 'api/timers' },
+            { label: 'Watch', link: 'api/watch' },
+            { label: 'Subscriptions', link: 'api/subscriptions' },
+          ],
+        },
+        {
+          label: 'View layer',
+          items: [
+            { label: 'Connector', link: 'api/connector' },
+            { label: 'Reactions', link: 'api/reactions' },
+          ],
+        },
+        {
+          label: 'Composition',
+          items: [
+            { label: 'Peer machines', link: 'api/compose' },
+            { label: 'Store', link: 'api/create-store' },
+            { label: 'Shared states', link: 'api/flat-states' },
+          ],
+        },
+        {
+          label: 'Integrations',
+          items: [
+            { label: 'React', link: 'libs/react' },
+            { label: 'React Native', link: 'libs/react-native' },
+          ],
+        },
+        {
+          label: 'Reference',
+          items: [
+            { label: 'API overview', link: 'api' },
+            { label: 'Glossary', link: 'glossary' },
+          ],
+        },
+      ],
+    }),
+    mdx(),
+  ],
   vite: {
     resolve: {
       // The engine package is workspace-linked; alias straight to its `src`

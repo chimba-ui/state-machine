@@ -10,6 +10,7 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/starlight": "^0.40.0",
     "@dunky-dev/state-machine": "workspace:*"
   },
   "devDependencies": {
