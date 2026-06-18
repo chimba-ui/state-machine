@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./https://raw.githubusercontent.com/dunky-dev/state-machine/refs/heads/main/website/public/logo%402x.png" alt="Dunky" width="100%" />
+  <img src="./website/public/logo%402x.png" alt="Dunky" width="400px" />
 </p>
 
 # STATE-MACHINE
