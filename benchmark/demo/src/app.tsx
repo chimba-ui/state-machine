@@ -173,7 +173,7 @@ export function App() {
       }}
     >
       <header style={{ marginBottom: 16 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 20 }}>Chimba UI — engine throughput, live</h1>
+        <h1 style={{ margin: '0 0 4px', fontSize: 20 }}>Dunky — engine throughput, live</h1>
         <p style={{ margin: 0, opacity: 0.6, fontSize: 13, maxWidth: 920 }}>
           Every cell is a real state machine doing engine work per update — a guarded transition
           that feeds a computed. One change stream feeds all four; each gets an equal{' '}

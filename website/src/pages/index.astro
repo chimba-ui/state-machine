@@ -4,10 +4,10 @@ import Footer from "../components/Footer.astro";
 import "../styles/global.css";
 
 const base = import.meta.env.BASE_URL;
-const repo = "https://github.com/chimba-ui/state-machine";
+const repo = "https://github.com/dunky-dev/state-machine";
 
 // The three machines, written out (set:html so literal braces survive the JSX
-// parser) — faithful to the real @chimba-ui/state-machine API + the pacman demo:
+// parser) — faithful to the real @dunky-dev/state-machine API + the pacman demo:
 // `const x = machine({...})`, `on: { EVENT: { target, actions: act(...) } }`,
 // and compose() members driven independently via .send({ type }).
 const pacmanCode = `<span class="cmt">// 🟡 pacman — eats until the ghost gets him</span>
@@ -67,7 +67,7 @@ game.<span class="fn">sync</span>(() => {
 game.<span class="fn">start</span>()`;
 
 // the closing quick-start — a real, minimal machine (matches the README).
-const quickStartCode = `<span class="kw">import</span> { machine, act } <span class="kw">from</span> <span class="str">'@chimba-ui/state-machine'</span>
+const quickStartCode = `<span class="kw">import</span> { machine, act } <span class="kw">from</span> <span class="str">'@dunky-dev/state-machine'</span>
 
 <span class="kw">const</span> toggle = <span class="fn">machine</span>({
   initial: <span class="str">'inactive'</span>,
@@ -89,7 +89,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Chimba UI — a state machine built for performance</title>
+    <title>Dunky — a state machine built for performance</title>
     <link rel="icon" href={`${base}logo-symbol.svg`} type="image/svg+xml" />
     <meta
       name="description"
@@ -187,7 +187,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           >
             <span class="select-none text-muted">$</span>
             <code id="install-cmd" class="whitespace-nowrap text-fg"
-              >npm i @chimba-ui/state-machine</code
+              >npm i @dunky-dev/state-machine</code
             >
             <button
               id="install-copy"
@@ -512,7 +512,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
                   <span class="browser-dots" aria-hidden="true"
                     ><i></i><i></i><i></i></span
                   >
-                  <span class="browser-url">chimba-ui.com</span>
+                  <span class="browser-url">dunky-dev.com</span>
                 </div>
                 <div class="browser-body">
                   <pre
@@ -857,14 +857,14 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           Built in the open.<br />Improved together.
         </h2>
         <p class="contrib-sub">
-          Chimba UI is early and growing. If something feels off, a use case
-          isn't covered, or you just want to say hi — every issue, PR, and share
+          Dunky is early and growing. If something feels off, a use case isn't
+          covered, or you just want to say hi — every issue, PR, and share
           genuinely helps.
         </p>
 
         <div class="contrib-actions">
           <a
-            href="https://github.com/chimba-ui/state-machine/issues/new"
+            href="https://github.com/dunky-dev/state-machine/issues/new"
             target="_blank"
             rel="noreferrer"
             class="contrib-btn contrib-btn-primary"
@@ -1380,8 +1380,8 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
             posEl.className = "trade-order-val";
           }
 
-          btnBuy.disabled   = state !== "idle";
-          btnSell.disabled  = state !== "holding";
+          btnBuy.disabled = state !== "idle";
+          btnSell.disabled = state !== "holding";
           btnCancl.disabled = state !== "buying";
         };
 

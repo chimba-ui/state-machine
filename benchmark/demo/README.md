@@ -1,7 +1,7 @@
 # Live demo — engine throughput
 
 The ops/sec tables in [`../README.md`](../README.md) measure how much engine work
-each of Chimba UI, XState, and Zag clears per unit time. This makes that
+each of Dunky, XState, and Zag clears per unit time. This makes that
 **visible**: four panels, each a grid of real per-cell state machines, fed one
 ramping change stream under an equal per-frame budget — and you watch which
 panels' backlogs grow as the load climbs.
@@ -43,7 +43,7 @@ nothing. This demo is deliberately **engine-bound**, not DOM-bound:
 
 | Panel                  | Per-cell model                                                |
 | ---------------------- | ------------------------------------------------------------- |
-| **Chimba UI**          | machine per cell · guarded transition + memoized computed     |
+| **Dunky**              | machine per cell · guarded transition + memoized computed     |
 | **XState**             | actor per cell · guarded transition + assign-derived field    |
 | **Zag**                | VanillaMachine per cell · guarded transition + bindable cells |
 | **Plain JS** (control) | no engine — the same guard walk + derive as plain JS          |

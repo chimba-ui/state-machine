@@ -1,6 +1,6 @@
 # Benchmark suite
 
-A performance harness for `@chimba-ui/state-machine`. It measures the engine's
+A performance harness for `@dunky-dev/state-machine`. It measures the engine's
 hot paths in isolation and compares the runnable parts against
 [XState](https://stately.ai/docs) and [Zag](https://zagjs.com/).
 
@@ -36,11 +36,11 @@ node --expose-gc --import tsx -e "import('./tests/memory').then(m => m.runMemory
 
 The engines don't all fit every test, because they don't all run the same way:
 
-| Engine        | How `send` works              | Where it's measured                                |
-| ------------- | ----------------------------- | -------------------------------------------------- |
-| **Chimba UI** | synchronous                   | everywhere                                         |
-| **XState**    | synchronous                   | the ops/sec loops, construction, memory, rendering |
-| **Zag**       | **async** (microtask-batched) | construction, memory, and React rendering only     |
+| Engine     | How `send` works              | Where it's measured                                |
+| ---------- | ----------------------------- | -------------------------------------------------- |
+| **Dunky**  | synchronous                   | everywhere                                         |
+| **XState** | synchronous                   | the ops/sec loops, construction, memory, rendering |
+| **Zag**    | **async** (microtask-batched) | construction, memory, and React rendering only     |
 
 A `tinybench` ops/sec loop counts synchronous iterations, so it can only compare
 **synchronous** engines fairly. Zag's headless `send` is microtask-batched, so it
@@ -52,7 +52,7 @@ appears only where it runs synchronously (construction, memory via the headless
 Two XState variants appear in the fine-grain tables:
 
 - **`xstate`** — `actor.subscribe` with a hand-written `value` diff in the
-  listener (the same dedup Chimba UI does for free).
+  listener (the same dedup Dunky does for free).
 - **`xstate-raw`** — stock `actor.subscribe`, which fires on _every_ snapshot
   change with no diff.
 
@@ -87,19 +87,19 @@ The selection layer at scale — the thing that decides whether thousands of
 machines stay cheap. Zag can't run these (async `send`).
 
 **A. Propagation — change 1 of N.** ONE machine, N fields, N observers (one per
-field). Bump one field. Chimba UI's `select` is a coarse bus: every selection
+field). Bump one field. Dunky's `select` is a coarse bus: every selection
 re-evaluates its selector on each notify and value-compares, so only the touched
 field's _listener_ fires (downstream is O(changed)) — but the re-eval pass itself
 is O(N observers) per write. The table shows _how_ that degrades with N versus
 XState's coarse `actor.subscribe`.
 
-| Change 1 of N | Chimba UI (ops/sec) | XState (ops/sec) |   Zag |
-| ------------- | ------------------: | ---------------: | ----: |
-| 100           |               325 K |            253 K | n/a ᵃ |
-| 1000          |              10.7 K |           10.7 K | n/a ᵃ |
-| 5000          |           **7.9 K** |              741 | n/a ᵃ |
+| Change 1 of N | Dunky (ops/sec) | XState (ops/sec) |   Zag |
+| ------------- | --------------: | ---------------: | ----: |
+| 100           |           325 K |            253 K | n/a ᵃ |
+| 1000          |          10.7 K |           10.7 K | n/a ᵃ |
+| 5000          |       **7.9 K** |              741 | n/a ᵃ |
 
-→ Roughly par at small N, but Chimba UI **~10× faster at 5000 observers** — XState's
+→ Roughly par at small N, but Dunky **~10× faster at 5000 observers** — XState's
 coarse subscribe degrades much faster as the observer set grows.
 
 **B. Fine-grain — change an UNOBSERVED field.** Change a field nobody selects. The
@@ -107,12 +107,12 @@ dedup layer re-evaluates and value-compares, so no listener fires — the
 subscriber-side cost is ~zero. This is the "irrelevant write" that a cell-per-field
 model gets for free and a coarse bus has to work to ignore.
 
-| Irrelevant write, N cells | Chimba UI (ops/sec) | XState (ops/sec) |   Zag |
-| ------------------------- | ------------------: | ---------------: | ----: |
-| 1000                      |           **4.5 M** |            536 K | n/a ᵃ |
-| 5000                      |           **1.9 M** |            453 K | n/a ᵃ |
+| Irrelevant write, N cells | Dunky (ops/sec) | XState (ops/sec) |   Zag |
+| ------------------------- | --------------: | ---------------: | ----: |
+| 1000                      |       **4.5 M** |            536 K | n/a ᵃ |
+| 5000                      |       **1.9 M** |            453 K | n/a ᵃ |
 
-→ Chimba UI is **~8× faster** at shrugging off a write nobody is watching (1000
+→ Dunky is **~8× faster** at shrugging off a write nobody is watching (1000
 cells); the value-deduping bus skips waking observers entirely.
 
 **C. Throughput — single machine, one event.** Per-transition cost with no
@@ -120,12 +120,12 @@ selection scaling — the raw `send` price.
 
 | Single machine, one event |   ops/sec |
 | ------------------------- | --------: |
-| Chimba UI                 | **7.2 M** |
+| Dunky                     | **7.2 M** |
 | XState (raw)              |     898 K |
 | XState (diffed)           |     897 K |
 | Zag                       |     n/a ᵃ |
 
-→ Chimba UI pushes **~8× the events/sec** of XState. Context is mutated in place,
+→ Dunky pushes **~8× the events/sec** of XState. Context is mutated in place,
 so a transition allocates nothing; XState builds a fresh snapshot per event.
 
 ## 2. Compose / synced machines (`tests/compose.ts`)
@@ -140,11 +140,11 @@ only `m0`. It re-evaluates on _any_ member change but fires its listener only wh
 `m0` changes. **B. sync** — a coarse cross-region rule that wakes on _any_ member
 change (the O(members) path by design).
 
-| Members | Chimba UI combine (ops/sec) | Chimba UI sync (ops/sec) | XState | Zag   |
-| ------- | --------------------------: | -----------------------: | ------ | ----- |
-| 2       |                       6.7 M |                    7.1 M | n/a ᶠ  | n/a ᶠ |
-| 10      |                       6.6 M |                    6.5 M | n/a ᶠ  | n/a ᶠ |
-| 50      |                       5.8 M |                    6.2 M | n/a ᶠ  | n/a ᶠ |
+| Members | Dunky combine (ops/sec) | Dunky sync (ops/sec) | XState | Zag   |
+| ------- | ----------------------: | -------------------: | ------ | ----- |
+| 2       |                   6.7 M |                7.1 M | n/a ᶠ  | n/a ᶠ |
+| 10      |                   6.6 M |                6.5 M | n/a ᶠ  | n/a ᶠ |
+| 50      |                   5.8 M |                6.2 M | n/a ᶠ  | n/a ᶠ |
 
 → Cross-region coordination stays in the **~5.8–7.1 M ops/sec** band even at 50
 synced members — the O(M) re-eval pass costs ~13% going from 2 to 50.
@@ -161,12 +161,12 @@ against a dep snapshot, glitch-free computed→computed chains. This is a subsys
 profile: XState has no first-class lazy/memoized `computed` (**n/a ᶠ**), and Zag's
 `send` is async (**n/a ᵃ**), so neither has a comparable primitive to time.
 
-| Scenario                             | Chimba UI (ops/sec) | XState | Zag   |
-| ------------------------------------ | ------------------: | ------ | ----- |
-| Cached read (no change)              |          **16.6 M** | n/a ᶠ  | n/a ᵃ |
-| Fine-grain (change unread, re-read)  |               6.2 M | n/a ᶠ  | n/a ᵃ |
-| Recompute (change read field)        |               2.1 M | n/a ᶠ  | n/a ᵃ |
-| 4-deep chain (change root, read tip) |               567 K | n/a ᶠ  | n/a ᵃ |
+| Scenario                             | Dunky (ops/sec) | XState | Zag   |
+| ------------------------------------ | --------------: | ------ | ----- |
+| Cached read (no change)              |      **16.6 M** | n/a ᶠ  | n/a ᵃ |
+| Fine-grain (change unread, re-read)  |           6.2 M | n/a ᶠ  | n/a ᵃ |
+| Recompute (change read field)        |           2.1 M | n/a ᶠ  | n/a ᵃ |
+| 4-deep chain (change root, read tip) |           567 K | n/a ᶠ  | n/a ᵃ |
 
 → A cached read is **~16.6 M/sec** (near-free memo hit), and changing a field the
 computed _doesn't_ read stays a memo hit at ~6.2 M/sec — read-key tracking means
@@ -175,19 +175,19 @@ you only pay the recompute when an input you actually read changes.
 ## 4. Engine hot paths (`tests/engine.ts`)
 
 The parts of `send` that do real statechart work (everything else in the suite
-stays in one state and only mutates context). These probe Chimba UI internals in
+stays in one state and only mutates context). These probe Dunky internals in
 isolation — there's no comparable isolated path to time in XState (**n/a ᶠ**), and
 Zag's `send` is async (**n/a ᵃ**).
 
-| Scenario                               | Chimba UI (ops/sec) | XState | Zag   |
-| -------------------------------------- | ------------------: | ------ | ----- |
-| Guard fallthrough — 2 candidates       |               3.4 M | n/a ᶠ  | n/a ᵃ |
-| Guard fallthrough — 8 candidates       |               2.9 M | n/a ᶠ  | n/a ᵃ |
-| Guard fallthrough — 32 candidates      |               2.0 M | n/a ᶠ  | n/a ᵃ |
-| State churn — exit+entry every event   |               5.6 M | n/a ᶠ  | n/a ᵃ |
-| Effect churn — boot+cleanup each trans |               5.5 M | n/a ᶠ  | n/a ᵃ |
-| Sub churn — stable set                 |               7.0 M | n/a ᶠ  | n/a ᵃ |
-| Sub churn — churning set (rebuild)     |               4.8 M | n/a ᶠ  | n/a ᵃ |
+| Scenario                               | Dunky (ops/sec) | XState | Zag   |
+| -------------------------------------- | --------------: | ------ | ----- |
+| Guard fallthrough — 2 candidates       |           3.4 M | n/a ᶠ  | n/a ᵃ |
+| Guard fallthrough — 8 candidates       |           2.9 M | n/a ᶠ  | n/a ᵃ |
+| Guard fallthrough — 32 candidates      |           2.0 M | n/a ᶠ  | n/a ᵃ |
+| State churn — exit+entry every event   |           5.6 M | n/a ᶠ  | n/a ᵃ |
+| Effect churn — boot+cleanup each trans |           5.5 M | n/a ᶠ  | n/a ᵃ |
+| Sub churn — stable set                 |           7.0 M | n/a ᶠ  | n/a ᵃ |
+| Sub churn — churning set (rebuild)     |           4.8 M | n/a ᶠ  | n/a ᵃ |
 
 → Even the heavy paths hold **~2–7 M ops/sec**: a 32-candidate guard walk, full
 state transitions with entry/exit actions, and effect boot/cleanup every
@@ -199,12 +199,12 @@ Wall-clock to build + `start()` N machines, no events sent (matches a real mount
 Synchronous for all three, so it's a fair three-way table. Median of 5 passes, JIT
 warmed first.
 
-| Build + start | Chimba UI (µs/machine) | XState |  Zag |
-| ------------- | ---------------------: | -----: | ---: |
-| 10 000        |                   2.42 |   1.95 | 8.16 |
+| Build + start | Dunky (µs/machine) | XState |  Zag |
+| ------------- | -----------------: | -----: | ---: |
+| 10 000        |               2.42 |   1.95 | 8.16 |
 
-→ Construction is the one axis where Chimba UI **doesn't** win — XState spins up
-~1.2× faster. Chimba UI's bet is flat memory + hot-path throughput, not spin-up;
+→ Construction is the one axis where Dunky **doesn't** win — XState spins up
+~1.2× faster. Dunky's bet is flat memory + hot-path throughput, not spin-up;
 it's still ~3.4× faster than Zag's per-field reactive cells.
 
 ## 6. Memory per machine (`tests/memory.ts`)
@@ -215,26 +215,26 @@ double-GCs before sampling). Two context widths — **thin** (2 fields) and **fa
 stays ~flat in field count. Rows below are the **written** mode (one `hit` each —
 the footprint a churny app actually pays).
 
-| Context  | Chimba UI (KB/machine) | XState |     Zag |
-| -------- | ---------------------: | -----: | ------: |
-| 2-field  |                   3.60 |   3.62 |    9.06 |
-| 64-field |                   4.10 |   4.10 | **134** |
+| Context  | Dunky (KB/machine) | XState |     Zag |
+| -------- | -----------------: | -----: | ------: |
+| 2-field  |               3.60 |   3.62 |    9.06 |
+| 64-field |               4.10 |   4.10 | **134** |
 
-→ Going 2 → 64 fields costs Chimba UI only **~0.5 KB/machine** — memory grows with
+→ Going 2 → 64 fields costs Dunky only **~0.5 KB/machine** — memory grows with
 the data you store, not with a per-field cell. **Zag is the contrast**: one reactive
 cell per field balloons the 64-field context to ~134 KB/machine — **~33× more** than
-Chimba UI.
+Dunky.
 
-**Idle vs written.** Chimba UI owns its context copy from construction and mutates
+**Idle vs written.** Dunky owns its context copy from construction and mutates
 it in place forever, so its idle and written footprints match by design — while a
 lazy-copy scheme steps up once writes start:
 
-| 64-field, 5000 machines | Chimba UI | XState | Zag |
-| ----------------------- | --------: | -----: | --: |
-| Idle (never written)    |      4.10 |   3.55 | 130 |
-| Written (1 event each)  |      4.10 |   4.10 | 134 |
+| 64-field, 5000 machines | Dunky | XState | Zag |
+| ----------------------- | ----: | -----: | --: |
+| Idle (never written)    |  4.10 |   3.55 | 130 |
+| Written (1 event each)  |  4.10 |   4.10 | 134 |
 
-→ Chimba UI idle ≡ written; XState's first `assign` allocates a per-actor context,
+→ Dunky idle ≡ written; XState's first `assign` allocates a per-actor context,
 so its written row grows.
 
 ## 7. React rendering (`tests/rendering/`)
@@ -250,15 +250,15 @@ List of 1000 rows:
 
 | Strategy             | Rows woken / move | Mount (ms) | Re-render wall (ms) |
 | -------------------- | ----------------: | ---------: | ------------------: |
-| Chimba UI/instance   |             **2** |        5.6 |             **3.9** |
-| Chimba UI/selector   |                 2 |        8.4 |                 5.9 |
+| Dunky/instance       |             **2** |        5.6 |             **3.9** |
+| Dunky/selector       |                 2 |        8.4 |                 5.9 |
 | xstate/selector      |                 2 |        5.7 |                 6.8 |
 | zag/instance         |                 2 |        6.2 |               n/a ᵃ |
 | naive (anti-pattern) |           **980** |        7.1 |                56.2 |
 
 → Every properly-set-up engine wakes only the **2** rows that changed (vs. the
 naive whole-snapshot subscription, which re-renders all **980** — a ~490× gap and
-~14× the wall time). Among the surgical strategies Chimba UI re-renders **~1.7×
+~14× the wall time). Among the surgical strategies Dunky re-renders **~1.7×
 faster than XState**.
 
 Zag mounts and wakes the same **2** rows, but its re-render wall is **n/a ᵃ** — the

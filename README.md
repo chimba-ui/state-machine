@@ -7,7 +7,7 @@
 **Define a behavior once. Render it anywhere.**
 
 A UI component is really two things tangled together: _behavior_ and _render_.
-Chimba UI splits them. You describe behavior as a plain TypeScript
+Dunky splits them. You describe behavior as a plain TypeScript
 **state machine** that knows nothing about the environment and a thin per-substrate
 layer plugs it into a runtime.
 
@@ -42,7 +42,7 @@ transitions, same accessibility intent. Only the render differs.
 
 This project was inspired by [Zag](https://zagjs.com/), which pioneered the
 component-as-a-headless-machine approach. Zag is agnostic about _which framework_
-renders the DOM, but it still assumes a DOM exists. Chimba UI takes that one step
+renders the DOM, but it still assumes a DOM exists. Dunky takes that one step
 further: it assumes _nothing_ about the environment. The machine is a pure
 behavioral kernel with no environment touchpoints, every place behavior meets the
 platform — a keydown listener, a timer, a focus — is pushed to the per-target
@@ -57,7 +57,7 @@ canvas board, a game HUD. There the cost of each transition and the memory per
 machine, multiplied by thousands, is what decides whether you hold the frame. The
 engine is built for it:
 
-| At scale (thousands of machines) | Chimba UI | XState |     Zag |
+| At scale (thousands of machines) |     Dunky | XState |     Zag |
 | -------------------------------- | --------: | -----: | ------: |
 | Event throughput (ops/s)         | **7.2 M** |  897 K |   n/a ᵃ |
 | Memory / machine, 2-field (KB)   |   **3.6** |    3.6 |     9.1 |
@@ -66,7 +66,7 @@ engine is built for it:
 → **~8× XState's throughput**, on par with XState for memory but at least **3× lighter than Zag** — and the gap widens as context grows, because memory stays ~flat in field count (no per-field cell). ᵃ Zag uses async ops, so a synchronous ops/s loop can't time it. Full methodology + per-scenario tables in the
 **[benchmark README](./benchmark/README.md)**.
 
-**▶ [Try the live benchmark demo](https://chimba-ui.github.io/state-machine/)** — watch all three engines run in your browser.
+**▶ [Try the live benchmark demo](https://dunky-dev.github.io/state-machine/)** — watch all three engines run in your browser.
 
 ## How it's built
 
@@ -104,7 +104,7 @@ The full layered model and the "the machine never sees props" rule are in:
 
 ## Inspiration & prior art
 
-Chimba UI stands on the shoulders of the amazing libs:
+Dunky stands on the shoulders of the amazing libs:
 
 - **[XState](https://stately.ai/docs)** — for the disciplined statechart model:
   queued run-to-completion transitions, guards, entry/exit, the rigor of treating

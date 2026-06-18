@@ -35,7 +35,7 @@ jobs:
 
       - name: Build demo
         # base must match the repo name so asset URLs resolve under
-        # https://chimba-ui.github.io/state-machine/
+        # https://dunky-dev.github.io/state-machine/
         env:
           BASE_PATH: /state-machine/
         run: pnpm -C benchmark/demo build

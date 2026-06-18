@@ -8,7 +8,7 @@ const base = process.env.BASE_PATH ?? '/'
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://chimba-ui.github.io',
+  site: 'https://dunky-dev.github.io',
   base,
   integrations: [mdx()],
   vite: {
@@ -16,7 +16,7 @@ export default defineConfig({
       // The engine package is workspace-linked; alias straight to its `src`
       // so docs demos run the real TS source with no build step.
       alias: {
-        '@chimba-ui/state-machine': resolve(import.meta.dirname, '../packages/core/src'),
+        '@dunky-dev/state-machine': resolve(import.meta.dirname, '../packages/core/src'),
       },
     },
   },

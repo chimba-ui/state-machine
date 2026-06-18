@@ -5,7 +5,7 @@ import {
   compose,
   type Machine,
   type Composition,
-} from '@chimba-ui/state-machine'
+} from '@dunky-dev/state-machine'
 
 // ---------------------------------------------------------------------------
 // Pair machine — types

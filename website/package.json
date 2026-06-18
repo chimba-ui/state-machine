@@ -10,7 +10,7 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@chimba-ui/state-machine": "workspace:*"
+    "@dunky-dev/state-machine": "workspace:*"
   },
   "devDependencies": {
     "@astrojs/mdx": "^6.0.3",

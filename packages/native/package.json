@@ -1,9 +1,9 @@
 {
-  "name": "@chimba-ui/native-state-machine",
+  "name": "@dunky-dev/native-state-machine",
   "version": "0.0.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chimba-ui/state-machine.git",
+    "url": "git+https://github.com/dunky-dev/state-machine.git",
     "directory": "packages/native"
   },
   "files": [
@@ -32,9 +32,9 @@
     "build": "tsdown"
   },
   "peerDependencies": {
-    "@chimba-ui/react-state-machine": "workspace:^",
-    "@chimba-ui/shared-state-machine": "workspace:^",
-    "@chimba-ui/state-machine": "workspace:^",
+    "@dunky-dev/react-state-machine": "workspace:^",
+    "@dunky-dev/shared-state-machine": "workspace:^",
+    "@dunky-dev/state-machine": "workspace:^",
     "react": "*",
     "react-native": "*"
   }

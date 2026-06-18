@@ -1,8 +1,8 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "chimba-ui/state-machine" }],
+  "changelog": ["@changesets/changelog-github", { "repo": "dunky-dev/state-machine" }],
   "commit": false,
-  "fixed": [["@chimba-ui/*"]],
+  "fixed": [["@dunky-dev/*"]],
   "linked": [],
   "access": "public",
   "baseBranch": "origin/main",

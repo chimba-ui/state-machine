@@ -8,11 +8,11 @@ description: Throughput and memory vs. XState and Zag.
 
 The hard case is **thousands of machines reacting to thousands of events inside one frame budget** — trading terminals, live order books, monitoring walls, dense collaborative canvases. That's what this engine is built for.
 
-**▶ [Watch it live](https://chimba-ui.github.io/state-machine/)** — all three engines driving a real grid in your browser. Watch which ones fall behind as the load climbs.
+**▶ [Watch it live](https://dunky-dev.github.io/state-machine/)** — all three engines driving a real grid in your browser. Watch which ones fall behind as the load climbs.
 
 ## The headline
 
-|                           |          Chimba UI | XState |    Zag |
+|                           |              Dunky | XState |    Zag |
 | ------------------------- | -----------------: | -----: | -----: |
 | Event throughput          |    **7.2 M ops/s** |  897 K |  n/a ᵃ |
 | Memory, 2-field context   | **3.6 KB/machine** | 3.6 KB | 9.1 KB |
@@ -25,19 +25,19 @@ The hard case is **thousands of machines reacting to thousands of events inside 
 
 A single machine, one event, tight loop:
 
-|               |   ops/sec |
-| ------------- | --------: |
-| **Chimba UI** | **7.2 M** |
-| XState        |     898 K |
-| Zag           |     n/a ᵃ |
+|           |   ops/sec |
+| --------- | --------: |
+| **Dunky** | **7.2 M** |
+| XState    |     898 K |
+| Zag       |     n/a ᵃ |
 
-XState allocates a new immutable snapshot on every transition. Chimba UI mutates context in place — a transition allocates nothing.
+XState allocates a new immutable snapshot on every transition. Dunky mutates context in place — a transition allocates nothing.
 
 ## ~8× faster at ignoring writes nobody is watching
 
 Change a field no observer has selected. The dedup layer re-evaluates and value-compares — no listener fires:
 
-| Irrelevant write, N observers |       Chimba UI | XState |
+| Irrelevant write, N observers |           Dunky | XState |
 | ----------------------------- | --------------: | -----: |
 | 1 000                         | **4.5 M ops/s** |  536 K |
 | 5 000                         | **1.9 M ops/s** |  453 K |
@@ -48,7 +48,7 @@ XState's coarse `actor.subscribe` fires on every snapshot change. You have to ha
 
 One machine, 5 000 observers, bump one field:
 
-| Change 1 of N observers | Chimba UI | XState |
+| Change 1 of N observers |     Dunky | XState |
 | ----------------------- | --------: | -----: |
 | 100                     |     325 K |  253 K |
 | 1 000                   |    10.7 K | 10.7 K |
@@ -60,12 +60,12 @@ Roughly par at small N. At 5 000 observers XState degrades ~10× harder — its 
 
 The whole point of the plain-object model: memory grows with your data, not with the framework's bookkeeping.
 
-| Context width |  Chimba UI | XState |        Zag |
+| Context width |      Dunky | XState |        Zag |
 | ------------- | ---------: | -----: | ---------: |
 | 2 fields      |     3.6 KB | 3.6 KB |     9.1 KB |
 | 64 fields     | **4.1 KB** | 4.1 KB | **134 KB** |
 
-Going 2 → 64 fields costs Chimba UI **~0.5 KB/machine**. Zag allocates one reactive cell per field — 64-field context balloons to **134 KB/machine**, ~33× more.
+Going 2 → 64 fields costs Dunky **~0.5 KB/machine**. Zag allocates one reactive cell per field — 64-field context balloons to **134 KB/machine**, ~33× more.
 
 ## Construction cost
 
@@ -74,10 +74,10 @@ Spin-up cost per machine:
 |            | µs / machine |
 | ---------- | -----------: |
 | **XState** |     **1.95** |
-| Chimba UI  |         2.42 |
+| Dunky      |         2.42 |
 | Zag        |         8.16 |
 
-XState cold-starts ~1.2× faster. Zag is ~3.4× slower than both. Chimba UI's bet is flat memory and hot-path throughput, not spin-up speed.
+XState cold-starts ~1.2× faster. Zag is ~3.4× slower than both. Dunky's bet is flat memory and hot-path throughput, not spin-up speed.
 
 ## Where this matters
 
@@ -103,4 +103,4 @@ import Callout from '../components/Callout.astro'
   not the throughput these tables show.
 </Callout>
 
-Full methodology, fairness notes, and all per-scenario tables in the [benchmark README](https://github.com/chimba-ui/state-machine/blob/main/benchmark/README.md).
+Full methodology, fairness notes, and all per-scenario tables in the [benchmark README](https://github.com/dunky-dev/state-machine/blob/main/benchmark/README.md).

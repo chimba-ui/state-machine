@@ -13,7 +13,7 @@ export const PANELS: { id: PanelId; label: string; blurb: string; isEngine: bool
   },
   {
     id: 'chimba',
-    label: 'Chimba UI',
+    label: 'Dunky',
     blurb: 'machine per cell · guarded transition + memoized computed',
     isEngine: true,
   },

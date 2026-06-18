@@ -5,8 +5,8 @@ description: This skill should be used whenever the user asks to run the benchma
 
 # Run the benchmark suite
 
-Runs the `@chimba-ui/state-machine` benchmark and, only after asking, refreshes
-the documented result tables.
+Runs the `@dunky-dev/state-machine` benchmark and, only after asking, refreshes
+all documented result tables across the repo and website.
 
 ## The rule
 
@@ -41,28 +41,28 @@ rendering 1000-row mount + re-render).
 After showing the numbers, ask the user — use the AskUserQuestion tool — whether
 to update the documented results. Offer at least:
 
-- **Update the benchmark README** — refresh the per-section result tables.
+- **Update all docs** — refresh numbers in the benchmark README, the core package
+  README, and the website benchmark page.
 - **Don't update** — just keep the run output.
 
 Do not proceed to Step 3 unless the user says yes.
 
 ## Step 3 — update the results (only on a yes)
 
-`benchmark/README.md` is the **single source of truth** for result tables. Each
-`## N.` section has its table inline, followed by a one-line `→` takeaway. Update
-the numbers in those tables and **recheck each takeaway's "X faster" claim** (e.g.
-"~3.5× the events/sec") against the fresh figures. Touch nothing else — the engine
-README (`packages/core/README.md`) deliberately carries only a short prose claim +
-a link, no tables, so leave it alone unless a headline ratio genuinely moved (see
-below).
+Three files carry benchmark numbers. Update all three in one pass:
+
+### A. `benchmark/README.md` — full tables (source of truth)
+
+Each `## N.` section has its table inline, followed by a one-line `→` takeaway.
+Update the numbers in those tables and **recheck each takeaway's "X faster" claim**
+(e.g. "~3.5× the events/sec") against the fresh figures.
 
 Update **only the numbers** — never reword prose, change column layouts, or alter
 footnotes. Keep each table's existing alignment. Two formatting rules to preserve:
 
-- **Every comparison table keeps all three engine columns** (Chimba UI, XState,
-  Zag). Where an engine can't run a test, keep the marker — `n/a ᵃ` (async: Zag in
-  any sync ops/sec or `flushSync` loop) or `n/a ᶠ` (no equivalent feature: e.g.
-  XState has no `compose`/`computed`). Never drop a column to "tidy up".
+- **Every comparison table keeps all three engine columns** (Dunky, XState,
+  Zag). Where an engine can't run a test, keep the marker — `n/a ᵃ` (async) or
+  `n/a ᶠ` (no equivalent feature). Never drop a column to "tidy up".
 - **ops/sec values use K/M notation**: ≥1,000,000 → `M` (e.g. `3,038,317` →
   `3.0 M`), ≥1,000 → `K` (e.g. `9,532` → `9.5 K`), below that stay raw (`709`).
   One decimal. The construction (µs), memory (KB), and rendering (ms) tables are
@@ -70,24 +70,42 @@ footnotes. Keep each table's existing alignment. Two formatting rules to preserv
 
 Map the run output:
 
-- **Throughput → single machine, one event**: `core` + `xstate-raw` from section
-  C (K/M notation as above).
-- **Throughput → fine-grain 1/5000**: `core` + `xstate` from section B
-  ("Fine-grain … 5000 cells") — the diffed variant, to match the table.
+- **Throughput → single machine, one event**: `core` + `xstate-raw` from section C.
+- **Throughput → fine-grain 1/5000**: `core` + `xstate` from section B ("Fine-grain … 5000 cells") — diffed variant.
 - **Construct 10k**: the `µs / machine` column of "Construct 10,000 machines".
-- **Memory**: the `KB / machine` column, **written** rows (thin = 2-field,
-  fat = 64-field).
-- **Rendering**: the "list of 1000" table — `mount (ms)` + `re-render wall (ms)`
-  for `core/instance`, `xstate/selector`, `zag`; rows-woken = `avg rows / move`.
+- **Memory**: the `KB / machine` column, **written** rows (thin = 2-field, fat = 64-field).
+- **Rendering**: the "list of 1000" table — `mount (ms)` + `re-render wall (ms)` for `core/instance`, `xstate/selector`, `zag`; rows-woken = `avg rows / move`.
 
-If a fresh ratio clearly crossed a round number (e.g. throughput drops from ~4×
-to ~3×, or memory from ~28× to ~20×), also fix the one-line claim in
-`packages/core/README.md` ("up to ~4× …", "~28×"). Don't churn it for a rounding
-wobble.
+### B. `packages/core/README.md` — headline ratios only
 
-### After updating
+The core README carries short prose claims ("up to ~8× the event throughput",
+"~33× more") and a link to the benchmark README — no tables. Update only if a
+headline ratio clearly crossed a round number (e.g. throughput drops from ~8× to
+~6×, or memory from ~33× to ~25×). Don't churn it for a rounding wobble.
 
-- Re-read the edited tables to confirm the markdown pipes still line up.
+Relevant lines to check:
+
+- The `### Performance` section prose claim ("up to ~8× the event throughput").
+- The memory comparison claim ("~33×" in the `## How it compares` diff table footnotes).
+
+### C. `website/src/pages/benchmark.mdx` — headline table + section numbers
+
+The website benchmark page at
+`/Users/ivanbanov/dev/dunky-dev/.worktrees/website/website/src/pages/benchmark.mdx`
+carries:
+
+1. **The headline table** — event throughput ops/s, memory 2-field and 64-field
+   KB/machine. Update all three Dunky / XState / Zag cells.
+2. **Each section's table** — "~8× the event throughput", "~10× faster selection
+   at scale", "~33× less memory as context grows wide", "Construction cost". Update
+   the numbers and **recheck the section heading ratios** against the fresh figures
+   (e.g. if throughput is now 6.1 M vs 897 K, the heading becomes "~7×", not "~8×").
+
+Apply the same K/M notation rules as `benchmark/README.md`.
+
+### After updating all three
+
+- Re-read each edited file's tables to confirm markdown pipes still line up.
 - Run `pnpm format` at the repo root so formatting matches the repo style.
-- Remind the user these are disposable first-look numbers from one machine — a
-  single run is a snapshot, not a verdict.
+- Remind the user these are first-look numbers from one machine — a single run is
+  a snapshot, not a verdict.

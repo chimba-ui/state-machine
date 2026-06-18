@@ -1,9 +1,9 @@
 {
-  "name": "@chimba-ui/react-state-machine",
+  "name": "@dunky-dev/react-state-machine",
   "version": "0.0.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chimba-ui/state-machine.git",
+    "url": "git+https://github.com/dunky-dev/state-machine.git",
     "directory": "packages/react"
   },
   "files": [
@@ -40,8 +40,8 @@
     "react-dom": "^19.2.6"
   },
   "peerDependencies": {
-    "@chimba-ui/shared-state-machine": "workspace:^",
-    "@chimba-ui/state-machine": "workspace:^",
+    "@dunky-dev/shared-state-machine": "workspace:^",
+    "@dunky-dev/state-machine": "workspace:^",
     "react": "*"
   }
 }
