@@ -15,7 +15,7 @@ const RAMP_EVERY_MS = 1200
 const PAINT_EVERY_MS = 100 // throttle canvas paint to ~10fps (off the hot path)
 const OVERFLOW_AT = 3000 // backlog over this = decisively "falling behind"
 
-const ENGINE_IDS: PanelId[] = ['chimba', 'xstate', 'zag'] // raw doesn't count
+const ENGINE_IDS: PanelId[] = ['Dunky', 'xstate', 'zag'] // raw doesn't count
 
 type Stat = {
   backlog: number
@@ -26,7 +26,7 @@ type Stat = {
 const blankStat = (): Stat => ({ backlog: 0, appliedPerSec: 0, overflowedAt: null })
 const zeroStats = (): Record<PanelId, Stat> => ({
   raw: blankStat(),
-  chimba: blankStat(),
+  Dunky: blankStat(),
   xstate: blankStat(),
   zag: blankStat(),
 })
@@ -43,7 +43,7 @@ export function App() {
 
   const handles = React.useRef<Record<PanelId, PanelHandle | null>>({
     raw: null,
-    chimba: null,
+    Dunky: null,
     xstate: null,
     zag: null,
   })
@@ -77,11 +77,11 @@ export function App() {
     let lastSample = performance.now()
     let lastPaint = performance.now()
     let frames = 0
-    const applied: Record<PanelId, number> = { raw: 0, chimba: 0, xstate: 0, zag: 0 }
+    const applied: Record<PanelId, number> = { raw: 0, Dunky: 0, xstate: 0, zag: 0 }
     // queued captured at first overflow, per panel (persists across samples)
     const overflowedAt: Record<PanelId, number | null> = {
       raw: null,
-      chimba: null,
+      Dunky: null,
       xstate: null,
       zag: null,
     }
@@ -257,7 +257,7 @@ export function App() {
         {DRAIN_BUDGET_MS}ms/frame budget (higher is better). The moment a panel can't keep up it
         latches a red <b>fell behind by N</b> flag (the backlog it had stacked up). Watch the panels
         diverge as the load ramps. <b>Vanilla</b> is the control (no engine); the comparison that
-        matters is Chimba vs XState vs Zag.
+        matters is Dunky vs XState vs Zag.
       </p>
 
       {/* auto-fit + minmax so the four panels wrap to fewer columns as the

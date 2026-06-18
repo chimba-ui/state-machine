@@ -13,7 +13,7 @@
  */
 import React from 'react'
 import {
-  makeChimbaEngine,
+  makeDunkyEngine,
   makeXStateEngine,
   makeZagEngine,
   makeRawEngine,
@@ -27,7 +27,7 @@ const GAP = 1
 
 const ENGINE_FACTORY: Record<PanelId, (size: number, seed: (i: number) => number) => CellEngine> = {
   raw: makeRawEngine,
-  chimba: makeChimbaEngine,
+  Dunky: makeDunkyEngine,
   xstate: makeXStateEngine,
   zag: makeZagEngine,
 }
@@ -81,7 +81,7 @@ export const Panel = React.forwardRef<PanelHandle, { id: PanelId; side: number; 
         // Apply in chunks, re-checking the wall clock; each update is a guarded
         // transition + computed through the engine (the measured cost).
         //
-        // SYNC engines (Chimba/XState/raw, `flush` absent): the work is done when
+        // SYNC engines (Dunky/XState/raw, `flush` absent): the work is done when
         // `update` returns, so we count the chunk immediately — identical to the
         // original synchronous loop, no yielding.
         //

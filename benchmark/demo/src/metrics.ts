@@ -1,6 +1,6 @@
 /** Panel metadata, in display order. (Timing/backlog is owned by the app loop.) */
 
-export type PanelId = 'raw' | 'chimba' | 'xstate' | 'zag'
+export type PanelId = 'raw' | 'Dunky' | 'xstate' | 'zag'
 
 // `raw` is the no-engine control and comes first; the three engines follow in a
 // fixed sequence so the panels are always lined up the same way.
@@ -12,7 +12,7 @@ export const PANELS: { id: PanelId; label: string; blurb: string; isEngine: bool
     isEngine: false,
   },
   {
-    id: 'chimba',
+    id: 'Dunky',
     label: 'Dunky',
     blurb: 'machine per cell · guarded transition + memoized computed',
     isEngine: true,

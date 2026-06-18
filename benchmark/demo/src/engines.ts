@@ -38,13 +38,13 @@ function derive(v: number): number {
 // which guard branch wins depends on v, so the guard list is actually walked
 const BRANCHES = 4
 
-// --- Chimba: one machine per cell, guarded transition + computed -------------
+// --- Dunky: one machine per cell, guarded transition + computed -------------
 
 type CCtx = { raw: number; bucket: number }
 type CEv = { type: 'set'; v: number }
 type CComputed = { out: number }
 
-export function makeChimbaEngine(size: number, seed: (i: number) => number): CellEngine {
+export function makeDunkyEngine(size: number, seed: (i: number) => number): CellEngine {
   const cells: Machine<'idle', CCtx, CEv, CComputed>[] = Array.from({ length: size }, (_, i) => {
     const m = machine<'idle', CCtx, CEv, CComputed>({
       initial: 'idle',

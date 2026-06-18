@@ -48,7 +48,7 @@ nothing. This demo is deliberately **engine-bound**, not DOM-bound:
 | **Zag**                | VanillaMachine per cell · guarded transition + bindable cells |
 | **Plain JS** (control) | no engine — the same guard walk + derive as plain JS          |
 
-> **One asymmetry, disclosed:** Chimba's derived value is a **lazy/memoized
+> **One asymmetry, disclosed:** Dunky's derived value is a **lazy/memoized
 > `computed`** (recomputes only when its input changes); XState and Zag recompute
 > it eagerly in the transition. Here it's ~neutral — every update changes the input,
 > so all three recompute every update anyway — but it's a genuine model difference,
