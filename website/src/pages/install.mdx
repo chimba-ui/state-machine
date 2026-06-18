@@ -6,27 +6,9 @@ description: Add Dunky to your project.
 
 # Install
 
-## Core
-
-The pure behavior engine — no renderer, no framework.
-
 ```bash
 pnpm add @dunky-dev/state-machine
 ```
-
-## React
-
-```bash
-pnpm add @dunky-dev/react-state-machine
-```
-
-## React Native
-
-```bash
-pnpm add @dunky-dev/native-state-machine
-```
-
----
 
 ## Your first machine
 
@@ -46,5 +28,3 @@ toggle.start()
 toggle.send({ type: 'flip' })
 toggle.state // 'on'
 ```
-
-No renderer, no framework — just behavior. Plug it into React, React Native, or anything else; the machine is identical on every target.
