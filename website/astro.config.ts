@@ -15,10 +15,10 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Dunky',
-      favicon: '/logo-symbol.svg',
+      favicon: '/logo/logo-symbol.svg',
       logo: {
-        light: './public/logo.svg',
-        dark: './public/logo-white.png',
+        light: './public/logo/logo.svg',
+        dark: './public/logo/logo-white.png',
         replacesTitle: true,
       },
       customCss: ['./src/styles/starlight.css'],
