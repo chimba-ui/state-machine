@@ -2,9 +2,10 @@ import { defineConfig } from 'astro/config'
 import mdx from '@astrojs/mdx'
 import { resolve } from 'node:path'
 
-// The site is served from the repo subpath on GitHub Pages.
-// The deploy workflow sets BASE_PATH=/state-machine/; locally it's /.
-const base = process.env.BASE_PATH ?? '/'
+// The site is served under the /state-machine/ path on dunky.dev
+// (dunky.dev/ redirects there; see vercel.json). BASE_PATH can override
+// it (e.g. '/' for an isolated local preview).
+const base = process.env.BASE_PATH ?? '/state-machine/'
 
 // https://astro.build/config
 export default defineConfig({
