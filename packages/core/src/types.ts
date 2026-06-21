@@ -46,7 +46,7 @@ export interface GuardParams<Context extends object, Event, Computed = Record<st
 // A config references named impls by string: `guard: 'isOpen'`, `entry: ['log']`,
 // `effects: ['track']`, `after: { openDelay: … }`. By default each name slot is
 // `AnyString` (any name compiles; a typo is caught at runtime). When a config is
-// authored through `setup({...}).createMachine(...)`, the builder threads the
+// authored through `setup.as().config(...).createMachine(...)`, the builder threads the
 // registry's keys into these params so a name is checked + autocompleted against
 // what's actually registered — a typo becomes a compile error.
 
@@ -67,7 +67,7 @@ export type Guard<Context extends object, Event, Computed = Record<string, never
 /** A guard arg in a transition: an inline predicate or a registered name
  * (resolved against implementations.guards). Missing name → throw in dev,
  * warn + false in prod. `GuardName` is the set of valid names — any string by
- * default (unchecked), the registered guard keys under `setup()`. */
+ * default (unchecked), the registered guard keys under `setup.as()`. */
 export type GuardArg<
   Context extends object,
   Event,
@@ -321,7 +321,7 @@ export interface TransitionConfig<
   Event extends { type: string },
   Computed = Record<string, never>,
   // The registered-name unions. All default to `AnyString` (any name compiles —
-  // today's behavior); `setup({...}).createMachine(...)` supplies the real
+  // today's behavior); `setup.as().config(...).createMachine(...)` supplies the real
   // registry keys so a `guard`/action/effect/delay name is checked + autocompleted.
   GuardName extends string = AnyString,
   ActionName extends string = AnyString,
@@ -382,7 +382,7 @@ export interface TransitionConfig<
  * Public alias for the machine config shape. Annotating a config with this
  * still requires the generics (`const c: MachineConfig<'a' | 'b', Ctx, Ev>`);
  * for type-checking + inference at the definition site with no manual generics,
- * author it with `setup().createMachine(...)` instead.
+ * author it with `setup.infer().createMachine(...)` instead.
  */
 export type MachineConfig<
   State extends string,

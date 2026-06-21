@@ -19,15 +19,15 @@ const connect = ({ state, send }) => ({
 
 const c = connector(m, connect, /* initial props */ {})
 
-c.snapshot // memoized view API — stable identity until something changes
-c.subscribe(render) // coarse — wake the view on any change
+c.snapshot // memoized view API; stable identity until something changes
+c.subscribe(render) // coarse: wake the view on any change
 c.select // forwarded fine-grained path
-c.setProps(props) // push new props in — shallow-dedup'd
+c.setProps(props) // push new props in (shallow-dedup'd)
 ```
 
 ## The machine never sees props
 
-A machine here is pure behavior — it has no `props` argument. Every job a prop does lands at the **edge**, never the machine:
+A machine here is pure behavior. It has no `props` argument, and every job a prop does lands at the **edge**, never the machine:
 
 | A prop that…            | …goes here                                              |
 | ----------------------- | ------------------------------------------------------- |
@@ -39,14 +39,14 @@ This is what keeps the same machine running byte-for-byte identically on every t
 
 ## `connect` function
 
-`connect` is a **pure function** — it maps a machine snapshot to a view-facing API object. It receives `{ state, context, computed, send, matches, hasTag }` and returns whatever the view needs:
+`connect` is a **pure function**: it maps a machine snapshot to a view-facing API object. It receives `{ state, context, computed, props, send }` and returns whatever the view needs:
 
 ```ts
-const connect = ({ state, context, send, matches }) => ({
-  isOpen: matches('open'),
+const connect = ({ state, context, send }) => ({
+  isOpen: state === 'open',
   value: context.value,
   triggerProps: { onPress: () => send({ type: 'toggle' }) },
-  panelProps: { role: 'region', hidden: !matches('open') },
+  panelProps: { role: 'region', hidden: state !== 'open' },
 })
 ```
 
@@ -54,7 +54,7 @@ Returning abstract bindings (`onPress`, `role`) instead of platform props (`onCl
 
 ## `setProps`
 
-Props are a reactive input to the connector. `setProps` is shallow-dedup'd — passing a fresh-but-equal props object (common when a host rebuilds props every render) is a no-op and won't recompute the snapshot or wake subscribers.
+Props are a reactive input to the connector. `setProps` is shallow-dedup'd: passing a fresh-but-equal props object (common when a host rebuilds props every render) is a no-op and won't recompute the snapshot or wake subscribers.
 
 ## Snapshot identity
 

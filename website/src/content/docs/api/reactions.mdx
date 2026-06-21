@@ -17,11 +17,13 @@ const reaction = makeReaction<State, Context, Event, Props>()
 
 const onOpenChange = reaction(
   m => m.matches('open'), // selector → Value is boolean
-  (open, props) => props.onOpenChange?.({ open }), // callback — open is boolean
+  (open, props) => props.onOpenChange?.({ open }), // callback: open is boolean
 )
 
+// reactions live on the `connect` function; the connector picks them up on build
+connect.reactions = [onOpenChange]
+
 const c = connector(m, connect, props)
-c.reactions = [onOpenChange]
 ```
 
 When the machine transitions `closed → open`, `onOpenChange({ open: true })` fires automatically. The machine itself has no idea `onOpenChange` exists.
@@ -31,19 +33,19 @@ When the machine transitions `closed → open`, `onOpenChange({ open: true })` f
 The connector runs each reaction's selector as a value-deduped `select(...)`. When the result changes it calls the callback with:
 
 1. The new value (typed to match the selector's return)
-2. The **current** props — so a swapped callback is always the one that fires, not a stale closure
+2. The **current** props, so a swapped callback is always the one that fires, not a stale closure
 
-Reactions are **wired automatically** off the machine's own lifecycle (`onStart` / `onStop`) — no activation call needed. They come alive on `start()` and are torn down on `stop()`.
+Reactions are **wired automatically** off the machine's own lifecycle (`onStart` / `onStop`); no activation call needed. They come alive on `start()` and are torn down on `stop()`.
 
 ## `makeReaction()`
 
 `makeReaction` is an inference helper. Without it, a bare array tuple lands in `Reaction<…, any>` and the callback's first argument is untyped. With it, the selector's return type flows through to the callback:
 
 ```ts
-// without makeReaction — `open` is `any`
-c.reactions = [[m => m.matches('open'), (open, props) => props.onOpenChange?.({ open })]]
+// without makeReaction, `open` is `any`
+connect.reactions = [[m => m.matches('open'), (open, props) => props.onOpenChange?.({ open })]]
 
-// with makeReaction — `open` is `boolean`
+// with makeReaction, `open` is `boolean`
 const reaction = makeReaction<State, Context, Event, Props>()
 const onOpenChange = reaction(
   m => m.matches('open'),

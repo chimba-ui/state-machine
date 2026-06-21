@@ -280,7 +280,7 @@ hypothetical — these are whole product categories:
 | **Live-data spreadsheets**          | Excel/Sheets + market add-ins, Bloomberg BQNT | a visible sheet is 5k–20k cells, many bound to streaming feeds + recompute   |     5k–20k |
 | **Observability walls**             | Grafana, Datadog, Netdata                     | hundreds of panels × series, or a per-second host grid                       |     5k–50k |
 | **Live log / trace tails**          | Datadog Live Tail, Kibana, Sentry             | streaming rows, each a tiny stateful unit, into a long virtualized buffer    |     5k–50k |
-| **Dense collaborative canvases**    | Figma, Miro, tldraw                           | 5k–50k nodes; a `pointermove` / cursor stream fans out to all visible shapes |     5k–50k |
+| **Dense collaborative canvases**    | Figma, tldraw                                 | 5k–50k nodes; a `pointermove` / cursor stream fans out to all visible shapes |     5k–50k |
 | **NOC / k8s / network walls**       | k9s, Lens, traffic grids                      | thousands of pods/nodes/flows, each a live cell                              |     5k–20k |
 
 The sharpest target is a **dense live financial surface** (full order book or

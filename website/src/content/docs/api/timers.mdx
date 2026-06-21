@@ -18,7 +18,7 @@ const tooltip = machine({
   },
   implementations: {
     delays: {
-      openDelay: ({ context }) => context.openMs, // dynamic — reads context
+      openDelay: ({ context }) => context.openMs, // dynamic: reads context
     },
   },
 })
@@ -28,12 +28,12 @@ const tooltip = machine({
 
 A delay key is either:
 
-- **A number** — milliseconds, inline: `after: { 300: { target: 'idle' } }`
-- **A named delay** — resolved from `implementations.delays`, which can read `context` and `computed`, making it dynamic
+- **A number:** milliseconds, inline: `after: { 300: { target: 'idle' } }`
+- **A named delay:** resolved from `implementations.delays`, which can read `context` and `computed`, making it dynamic
 
 ## An `after` entry is a full transition
 
-It can have a `target`, run `actions`, use a `guard`, and participate in fallthrough — exactly like an `on` transition:
+It can have a `target`, run `actions`, use a `guard`, and participate in fallthrough, exactly like an `on` transition:
 
 ```ts
 states: {
@@ -50,7 +50,7 @@ states: {
 
 ## Sleep pattern
 
-A guardless timed transition with no other events is a plain "wait then advance" — useful for flash messages, skeletons, or sequenced animations:
+A guardless timed transition with no other events is a plain "wait then advance," useful for flash messages, skeletons, or sequenced animations:
 
 ```ts
 states: {

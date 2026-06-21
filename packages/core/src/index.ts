@@ -7,11 +7,11 @@ export type { Machine } from './types'
 // The synthetic boot event (start()).
 export { MACHINE_INIT } from './constants'
 
-// Config types (annotate a config literal when needed; for authoring, use setup()).
+// Config types (annotate a config literal when needed; for authoring, use setup).
 export type { MachineConfig, TransitionConfig, Transition, Implementations } from './types'
 
-// The authoring entry point. `setup().createMachine(literal)` for a quick config
-// (types inferred, names loose); `setup<Ctx,Ev>().config(registries).createMachine(...)`
+// The authoring entry point. `setup.infer().createMachine(literal)` for a quick config
+// (types inferred, names loose); `setup.as<Ctx,Ev>().config(registries).createMachine(...)`
 // to check every guard/action/effect/delay name (a typo becomes a compile error).
 export { setup } from './setup'
 

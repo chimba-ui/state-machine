@@ -7,11 +7,17 @@ import "../styles/global.css";
 const base = import.meta.env.BASE_URL;
 const repo = "https://github.com/dunky-dev/state-machine";
 
+// "Share on X", an intent URL (prefilled tweet + link), not a profile link.
+const shareText =
+  "Dunky: a state machine designed for UIs. Define states once, render anywhere.";
+const shareUrl = "https://dunky.dev";
+const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+
 // The three machines, written out (set:html so literal braces survive the JSX
-// parser) — faithful to the real @dunky-dev/state-machine API + the pacman demo:
+// parser), faithful to the real @dunky-dev/state-machine API + the pacman demo:
 // `const x = machine({...})`, `on: { EVENT: { target, actions: act(...) } }`,
 // and compose() members driven independently via .send({ type }).
-const pacmanCode = `<span class="cmt">// 🟡 pacman — eats until the ghost gets him</span>
+const pacmanCode = `<span class="cmt">// 🟡 pacman: eats until the ghost gets him</span>
 <span class="kw">const</span> pacman = <span class="fn">machine</span>({
   initial: <span class="str">'eating'</span>,
   context: { x: <span class="num">1</span>, y: <span class="num">1</span>, dir: <span class="str">'right'</span>, mouth: <span class="str">'open'</span> },
@@ -24,7 +30,7 @@ const pacmanCode = `<span class="cmt">// 🟡 pacman — eats until the ghost ge
   },
 })`;
 
-const ghostCode = `<span class="cmt">// 👻 ghost — chases on each tick, stops on a catch</span>
+const ghostCode = `<span class="cmt">// 👻 ghost: chases on each tick, stops on a catch</span>
 <span class="kw">const</span> ghost = <span class="fn">machine</span>({
   initial: <span class="str">'roaming'</span>,
   context: { x: <span class="num">11</span>, y: <span class="num">10</span>, dir: <span class="str">'up'</span> },
@@ -37,7 +43,7 @@ const ghostCode = `<span class="cmt">// 👻 ghost — chases on each tick, stop
   },
 })`;
 
-const boardCode = `<span class="cmt">// 🍒 board — dots, cherry, score</span>
+const boardCode = `<span class="cmt">// 🍒 board: dots, cherry, score</span>
 <span class="kw">const</span> board = <span class="fn">machine</span>({
   initial: <span class="str">'playing'</span>,
   context: { dots, cherry, score: <span class="num">0</span> },
@@ -50,7 +56,7 @@ const boardCode = `<span class="cmt">// 🍒 board — dots, cherry, score</span
   },
 })`;
 
-const composeCode = `<span class="cmt">// ⏱️ a clock machine self-drives via \`after\` — no external loop</span>
+const composeCode = `<span class="cmt">// ⏱️ a clock machine self-drives via \`after\`: no external loop</span>
 <span class="kw">const</span> clock = <span class="fn">machine</span>({
   initial: <span class="str">'running'</span>,
   states: { <span class="st">running</span>: { after: { <span class="num">200</span>: { target: <span class="str">'running'</span> } } } },
@@ -67,7 +73,7 @@ game.<span class="fn">sync</span>(() => {
 
 game.<span class="fn">start</span>()`;
 
-// the closing quick-start — a real, minimal machine (matches the README).
+// the closing quick-start, a real, minimal machine (matches the README).
 const quickStartCode = `<span class="kw">import</span> { machine, act } <span class="kw">from</span> <span class="str">'@dunky-dev/state-machine'</span>
 
 <span class="kw">const</span> toggle = <span class="fn">machine</span>({
@@ -90,11 +96,11 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Dunky — a state machine built for performance</title>
+    <title>Dunky: a state machine built for performance</title>
     <link rel="icon" href={`${base}logo-symbol.svg`} type="image/svg+xml" />
     <meta
       name="description"
-      content="A state machine built for performance — inspired by XState and Zag. Define a behavior once, render it anywhere."
+      content="A state machine built for performance, inspired by XState and Zag. Define a behavior once, render it anywhere."
     />
   </head>
   <body>
@@ -106,14 +112,14 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       <!-- HERO + FAST MACHINES share ONE grid so the game panel can use native
            `position: sticky` (no JS scroll transform → no flicker). On lg it's a
            5-col grid: copy (3/5) over the code (3/5) on the left, and the game
-           (2/5) spanning BOTH rows on the right — that tall right cell is what
+           (2/5) spanning BOTH rows on the right, that tall right cell is what
            lets the sticky game ride down past the hero and through "Fast
            machines", releasing at the grid's end. On mobile it's one column,
            ordered copy → game → code. -->
       <div
         class="grid grid-cols-1 items-start gap-10 lg:items-stretch lg:grid-cols-5 lg:gap-x-12 lg:gap-y-0"
       >
-        <!-- the polished DX-lib copy column (top-left) — fills the first screen -->
+        <!-- the polished DX-lib copy column (top-left), fills the first screen -->
         <section
           class="order-1 flex flex-col lg:justify-center lg:col-span-3 lg:col-start-1 lg:row-start-1"
         >
@@ -142,11 +148,11 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
             class="mt-6 max-w-xl text-lg text-muted sm:text-xl 2xl:max-w-2xl 2xl:text-2xl"
           >
             <strong class="font-semibold text-fg"
-              >A state machine built for performance</strong
+              >A state-machine for design systems and complex UIs.</strong
             >
             <br />
-            States as pure, serializable data you can plug into anything that renders.
-            Inspired by
+            Blazing fast sealed in pure states and events. The same behavior drops
+            into any JS renderer. Inspired by
             <a
               class="text-accent hover:underline"
               href="https://stately.ai/docs"
@@ -195,7 +201,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           </div>
         </section>
 
-        <!-- FEATURE BAND — three value props, right after the hero. Sits in the
+        <!-- FEATURE BAND, three value props, right after the hero. Sits in the
              left column (row 2); its dark background bleeds to the LEFT viewport
              edge while the text stays aligned with the rest of the left content.
              Three lined up on lg, stacked on mobile. -->
@@ -207,37 +213,37 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
             <p class="band-eyebrow">Why Dunky</p>
             <ul class="mt-8 flex flex-col">
               <li class="band-item">
-                <span class="band-num">🌎</span>
+                <span class="band-num">🔒</span>
                 <div class="band-body">
-                  <h3 class="band-title">Truly agnostic</h3>
+                  <h3 class="band-title">Locked in by design</h3>
                   <p class="band-muted">
-                    No environment assumption at all — one step beyond Zag's
-                    headless idea. <a
-                      class="band-link"
-                      href={`${base}comparison`}>Compare →</a
-                    >
+                    No external prop, no callback, no handle into the machine.
+                    Its behavior is closed to the world. Consumers react to the
+                    machine from outside.
+                  </p>
+                </div>
+              </li>
+              <li class="band-item">
+                <span class="band-num">🌍</span>
+                <div class="band-body">
+                  <h3 class="band-title">Take it anywhere</h3>
+                  <p class="band-muted">
+                    The machine carries a universal, interactive UI of its own,
+                    clickable on any JS surface, precisely because it's a closed
+                    box.
                   </p>
                 </div>
               </li>
               <li class="band-item">
                 <span class="band-num">⚡️</span>
                 <div class="band-body">
-                  <h3 class="band-title">Fast at scale</h3>
+                  <h3 class="band-title">Blazing fast</h3>
                   <p class="band-muted">
-                    ~8× XState's throughput, flat-ish memory, surgical
-                    re-renders. <a class="band-link" href={`${base}benchmark`}
-                      >See the benchmark →</a
+                    Design systems and complex UIs can run hundreds of live
+                    machines at once. Dunky is tuned for exactly that load. <a
+                      class="band-link"
+                      href={`${base}benchmark`}>See the benchmark →</a
                     >
-                  </p>
-                </div>
-              </li>
-              <li class="band-item">
-                <span class="band-num">🧠</span>
-                <div class="band-body">
-                  <h3 class="band-title">Behavior, not render</h3>
-                  <p class="band-muted">
-                    A pure behavioral kernel — states, events, context. Runs on
-                    the DOM, React Native, or any JS runtime.
                   </p>
                 </div>
               </li>
@@ -266,8 +272,8 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
             </p>
           </div>
 
-          <!-- all four snippets in ONE dark "IDE" card — three machine files +
-               the compose that unites them — each with its own filename header,
+          <!-- all four snippets in ONE dark "IDE" card, three machine files +
+               the compose that unites them, each with its own filename header,
                separated by hairline dividers. An emoji prefix tells them apart. -->
           <div class="dark-card ide-card">
             <pre
@@ -285,7 +291,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         </section>
 
         <!-- RIGHT cell (~40%): the LIVE machine panel, spanning ALL THREE grid
-             rows so its tall cell gives `position: sticky` room to ride down —
+             rows so its tall cell gives `position: sticky` room to ride down:
              the game slides past the hero, the "Fast machines" snippets, and
              comes to rest in the SNES dock beside "One machine". On mobile it
              sits right after the hero copy (order-2). -->
@@ -352,9 +358,9 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
                 </pre>
               </div>
 
-              <!-- the cassette's chunky BOTTOM SHELL — the play/pause sit on it -->
+              <!-- the cassette's chunky BOTTOM SHELL, the play/pause sit on it -->
               <div class="cassette-deck">
-                <!-- play / pause — two icon-only buttons on the cassette deck -->
+                <!-- play / pause, two icon-only buttons on the cassette deck -->
                 <div id="pac-controls" class="flex gap-1.5" data-paused="false">
                   <button
                     id="pac-play"
@@ -414,7 +420,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       <!-- /HERO + FAST MACHINES grid -->
 
       <!-- SHOWCASE: one big premium panel that unifies the "One machine" copy
-           and the device lineup below it — breaks the rigid left/right split.
+           and the device lineup below it, breaks the rigid left/right split.
            The game cassette overlaps its top-right edge. -->
       <section class="showcase">
         <h2
@@ -430,7 +436,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           <strong class="font-semibold text-fg">the machine drives it</strong>.
         </p>
 
-        <!-- MOBILE-ONLY live state table — sits here, after the "One machine" copy.
+        <!-- MOBILE-ONLY live state table, sits here, after the "One machine" copy.
              On lg+ the cassette card handles this; hidden there. -->
         <div class="mt-6 lg:hidden">
           <table
@@ -474,7 +480,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         <!-- BROADCAST: the cassette's cable runs down into the CONSOLE (hub),
              which fans out to the three frames. The frames are always live. -->
         <div id="broadcast" class="relative">
-          <!-- the console the cassette's cable plugs into — the hub feeding all 3.
+          <!-- the console the cassette's cable plugs into, the hub feeding all 3.
              SAME width as the cassette and right-aligned, so it sits perfectly
              under it. lg+ only. -->
           <div
@@ -500,7 +506,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
             class="mt-12 grid select-none grid-cols-1 items-end justify-items-center gap-10 sm:mt-24 md:grid-cols-3"
             aria-label="The same machine rendered in three frames"
           >
-            <!-- LAPTOP — the screen shows a BROWSER window (chrome bar + URL) -->
+            <!-- LAPTOP, the screen shows a BROWSER window (chrome bar + URL) -->
             <figure id="frame-laptop" class="frame laptop">
               <div class="laptop-screen">
                 <div class="browser-bar">
@@ -522,7 +528,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
               </figcaption>
             </figure>
 
-            <!-- IPHONE — rounded body, side rails, Dynamic Island, home bar.
+            <!-- IPHONE, rounded body, side rails, Dynamic Island, home bar.
                Nudged 50px right on lg for better centring in its column. -->
             <figure
               id="frame-phone"
@@ -601,7 +607,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
               <p class="origin-line origin-line-dim">over and over again.</p>
             </blockquote>
             <p class="origin-sub">
-              New company, new stack, new design system — but the same button,
+              New company, new stack, new design system, but the same button,
               the same tooltip, the same dialog. The behaviors never changed.
               All documented by the W3C. All rebuilt from scratch, every time.
             </p>
@@ -629,7 +635,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           </p>
         </div>
 
-        <!-- col 2: TRADING PANEL — 3 pairs, each its own machine -->
+        <!-- col 2: TRADING PANEL, 3 pairs, each its own machine -->
         <div class="lab-demo" id="demo-trading">
           <div class="lab-demo-header">
             <span class="lab-demo-icon">📈</span>
@@ -638,7 +644,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           </div>
 
           <div class="lab-demo-body">
-            <!-- live symbol strip — all 3 pairs tick simultaneously; click to select -->
+            <!-- live symbol strip, all 3 pairs tick simultaneously; click to select -->
             <div
               class="trade-symbols"
               role="tablist"
@@ -732,7 +738,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
               hidden
             >
               <pre
-                class="trade-code"><code><span class="kw">const</span> &#123; createMachine &#125; = <span class="fn">setup</span>&lt;PairContext, PairEvent, PairComputed&gt;().<span class="fn">config</span>(&#123;
+                class="trade-code"><code><span class="kw">const</span> &#123; createMachine &#125; = <span class="fn">setup.as</span>&lt;PairContext, PairEvent, PairComputed&gt;().<span class="fn">config</span>(&#123;
   guards:  &#123; canBuy: $ =&gt; $.context.entryPrice === <span class="num">0</span>,
               canSell: $ =&gt; $.context.entryPrice &gt; <span class="num">0</span> &#125;,
   actions: &#123; recordEntry: <span class="fn">act</span>($ =&gt; (&#123; entryPrice: $.context.price &#125;)),
@@ -755,8 +761,8 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
     $.setContext(&#123; pnl: $.context.price - $.context.entryPrice &#125;) &#125;] &#125;,
   states: &#123;
     <span class="st">idle</span>:    &#123; effects: [<span class="str">'priceTicker'</span>], on: &#123; BUY: &#123; guard: <span class="str">'canBuy'</span>, target: <span class="str">'buying'</span> &#125; &#125; &#125;,
-    <span class="st">buying</span>:  &#123; on: &#123; CANCEL: <span class="str">'idle'</span> &#125;,
-               after: &#123; <span class="num">600</span>: &#123; target: <span class="str">'holding'</span>, actions: [<span class="str">'recordEntry'</span>] &#125; &#125; &#125;,
+    <span class="st">buying</span>:  &#123; on: &#123; CANCEL: &#123; target: <span class="str">'idle'</span> &#125; &#125;,
+               after: &#123; <span class="num">2000</span>: &#123; target: <span class="str">'holding'</span>, actions: [<span class="str">'recordEntry'</span>] &#125; &#125; &#125;,
     <span class="st">holding</span>: &#123; on: &#123; SELL: &#123; guard: <span class="str">'canSell'</span>, target: <span class="str">'selling'</span> &#125; &#125; &#125;,
     <span class="st">selling</span>: &#123; after: &#123; <span class="num">600</span>: &#123; target: <span class="str">'idle'</span>,
                actions: [<span class="fn">act</span>(&#123; entryPrice: <span class="num">0</span>, pnl: <span class="num">0</span> &#125;)] &#125; &#125; &#125;,
@@ -766,7 +772,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           </div>
         </div>
 
-        <!-- col 3: WHITEBOARD — 10 cursors + 2 sticky notes, autonomous -->
+        <!-- col 3: WHITEBOARD, 10 cursors + 2 sticky notes, autonomous -->
         <div class="lab-demo" id="demo-whiteboard">
           <div class="lab-demo-header">
             <span class="lab-demo-icon">🖊️</span>
@@ -800,7 +806,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
               hidden
             >
               <pre
-                class="trade-code"><code><span class="kw">const</span> &#123; createMachine &#125; = <span class="fn">setup</span>&lt;CursorCtx, CursorEv, CursorComputed&gt;().<span class="fn">config</span>(&#123;
+                class="trade-code"><code><span class="kw">const</span> &#123; createMachine &#125; = <span class="fn">setup.as</span>&lt;CursorCtx, CursorEv, CursorComputed&gt;().<span class="fn">config</span>(&#123;
   guards:  &#123; arrived: $ =&gt; $.context.progress &gt;= <span class="num">1</span> &#125;,
   actions: &#123; stepProgress: <span class="fn">act</span>($ =&gt; (&#123;
                progress: <span class="fn">Math.min</span>(<span class="num">1</span>, $.context.progress + $.context.speed),
@@ -813,7 +819,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
 &#125;)
 
 <span class="kw">const</span> cursor = <span class="fn">createMachine</span>(&#123;
-  computed: &#123; <span class="cmt">// eased position — rendered directly by subscribers</span>
+  computed: &#123; <span class="cmt">// eased position: rendered directly by subscribers</span>
     ex: $ =&gt; $.context.x0 + ($.context.x1 - $.context.x0) * <span class="fn">easeInOut</span>($.context.progress),
     ey: $ =&gt; $.context.y0 + ($.context.y1 - $.context.y0) * <span class="fn">easeInOut</span>($.context.progress) &#125;,
   states: &#123;
@@ -847,14 +853,14 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
     <!-- CONTRIBUTE SECTION -->
     <section class="contrib-section">
       <div class="contrib-inner">
-        <p class="contrib-eyebrow">Open source</p>
         <h2 class="contrib-heading">
           Built in the open.<br />Improved together.
         </h2>
         <p class="contrib-sub">
           Dunky is early and growing. If something feels off, a use case isn't
-          covered, or you just want to say hi — every issue, PR, and share
-          genuinely helps.
+          covered, or you just want to say hi.
+          <br />
+          Every issue, PR, and share genuinely helps.
         </p>
 
         <div class="contrib-actions">
@@ -878,7 +884,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
             Raise an issue
           </a>
           <a
-            href="https://x.com/ivanbanov"
+            href={shareOnX}
             target="_blank"
             rel="noreferrer"
             class="contrib-btn contrib-btn-secondary"
@@ -897,10 +903,6 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
             Share on X
           </a>
         </div>
-
-        <p class="contrib-note">
-          <b>⭐ Star the repo if it helped you a tiny bit ⭐</b>
-        </p>
       </div>
     </section>
     <!-- /contribute section -->
@@ -910,7 +912,14 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
     <Analytics />
 
     <script>
-      import { createGame, MAZE, ROWS, COLS, key, type Dir } from "../demos/pacman";
+      import {
+        createGame,
+        MAZE,
+        ROWS,
+        COLS,
+        key,
+        type Dir,
+      } from "../demos/pacman";
       import { createTradingDemo, type PairState } from "../demos/trading";
       import {
         createWhiteboardDemo,
@@ -965,7 +974,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
 
       // ONE machine, many render targets (the whole pitch). Mount a renderer on
       // the hero board and on each device frame; they ALL read the shared state,
-      // so they stay byte-for-byte in sync. Static — no scroll effects.
+      // so they stay byte-for-byte in sync. Static, no scroll effects.
       const painters: Array<() => void> = [];
       const heroPre = document.getElementById("render-tui");
       if (heroPre) painters.push(makeTuiRenderer(heroPre));
@@ -1097,13 +1106,13 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
 
       // --- drive it: the autopilot runs the game on a fixed tick --------------
       // tick() fans the shared step to all three machines; the autopilot's choice
-      // (nextDir) decides Pac-Man's direction — no player input.
+      // (nextDir) decides Pac-Man's direction, no player input.
       let paused = false;
       setInterval(() => {
         if (!paused) game.tick();
       }, 200);
 
-      // play / pause — two icon buttons under the demo. Pausing also freezes the
+      // play / pause, two icon buttons under the demo. Pausing also freezes the
       // SVG signal dots traveling the wires, so game + wires stop together. The
       // active control is highlighted via [data-paused] on the wrapper.
       const controls = document.getElementById("pac-controls")!;
@@ -1124,7 +1133,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         .addEventListener("click", () => setPaused(true));
 
       // The game panel rides down the page via native `position: sticky` (see
-      // the right column markup) — no JS scroll handler, so no render flicker.
+      // the right column markup), no JS scroll handler, so no render flicker.
 
       // --- connector + cassette wiring --------------------------------------
       // The connector is a permanent hub wired to the three (always-live) frames
@@ -1177,7 +1186,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           const ey = r.top - base.top;
           let path: string;
           if (Math.abs(ex - sx) < R * 2) {
-            // (near-)straight below the cassette — drop straight down, no jog
+            // (near-)straight below the cassette, drop straight down, no jog
             path = `M ${sx} ${sy} V ${ey}`;
           } else {
             // drop from the cassette, rounded turn onto the bus, run across,
@@ -1201,9 +1210,9 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       };
 
       // scroll-driven park: the cassette slides down and stops a bit ABOVE the
-      // connector (a gap), held there with a translateY clamp. No activation —
+      // connector (a gap), held there with a translateY clamp. No activation;
       // the frames are always live. Negative gap parks it LOWER (onto the
-      // console) — move the stop point down a touch.
+      // console), move the stop point down a touch.
       const PARK_GAP = -40; // px relative to the console top (− = lower/into it)
       const parkCassette = () => {
         if (!wideDock.matches) {
@@ -1222,7 +1231,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
 
       // the cassette can overflow its grid cell, so its right edge won't match
       // the container edge the console aligns to. Nudge the console so its right
-      // edge sits exactly under the cassette's — perfectly aligned + same width.
+      // edge sits exactly under the cassette's, perfectly aligned + same width.
       const alignConsole = () => {
         dock.style.transform = "";
         if (!wideDock.matches) return;
@@ -1233,7 +1242,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       };
 
       // FEED cable: from the cassette's bottom down to the console. The cassette
-      // is sticky, so this MUST track scroll — but it's a single cheap path in
+      // is sticky, so this MUST track scroll, but it's a single cheap path in
       // its own SVG (#feed-cable), so it doesn't rebuild the frame cables.
       const feed = document.getElementById(
         "feed-cable",
@@ -1272,7 +1281,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         feed.appendChild(plug(tx, ty)); // plug at the console
       };
 
-      // the console→frames cables are in normal flow — only redraw on RESIZE.
+      // the console→frames cables are in normal flow, only redraw on RESIZE.
       // The feed cable + dock toggle track scroll (both cheap).
       addEventListener(
         "scroll",
@@ -1305,7 +1314,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       }, 250);
 
       // =====================================================================
-      // TRADING PANEL — powered by demos/trading.ts real machines
+      // TRADING PANEL, powered by demos/trading.ts real machines
       // =====================================================================
       {
         const demo = createTradingDemo();
@@ -1382,7 +1391,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           btnCancl.disabled = state !== "buying";
         };
 
-        // symbol strip — subscribe to each pair machine for fine-grained updates
+        // symbol strip, subscribe to each pair machine for fine-grained updates
         const symPriceEls = [0, 1, 2].map(
           (i) => document.getElementById(`sym-price-${i}`)!,
         );
@@ -1447,7 +1456,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       }
 
       // =====================================================================
-      // WHITEBOARD — powered by demos/whiteboard.ts real machines
+      // WHITEBOARD, powered by demos/whiteboard.ts real machines
       // =====================================================================
       {
         const STICKY_DATA = [
@@ -1557,13 +1566,13 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           copyBtn.textContent = "✓";
           setTimeout(() => (copyBtn.textContent = prev), 1200);
         } catch {
-          /* clipboard blocked — no-op */
+          /* clipboard blocked, no-op */
         }
       });
     </script>
 
     <!-- is:global because the code spans are injected via set:html and so don't
-         receive Astro's scope hash — scoped selectors wouldn't match them. -->
+         receive Astro's scope hash, scoped selectors wouldn't match them. -->
     <style is:global>
       /* feature band: dark background that bleeds to the LEFT viewport edge
          while the content stays aligned with the rest of the left column. The
@@ -1591,7 +1600,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         text-transform: uppercase;
         color: color-mix(in srgb, var(--color-fg) 45%, transparent);
       }
-      /* SHOWCASE — one large, soft premium panel unifying the "One machine"
+      /* SHOWCASE, one large, soft premium panel unifying the "One machine"
          statement and the device lineup. The dark game cassette overlaps its
          top edge (negative margin pulls the panel up under it). */
       .showcase {
@@ -1663,7 +1672,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       }
 
       /* ====================================================================
-         ORIGIN SECTION — pure typography, no background
+         ORIGIN SECTION, pure typography, no background
          ==================================================================== */
       .origin-section {
         background: radial-gradient(
@@ -1883,23 +1892,23 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         color: #6b7678; /* comment */
       }
       .kw {
-        color: #ff6d7e; /* red — keyword */
+        color: #ff6d7e; /* red, keyword */
       }
       .str {
-        color: #ffed72; /* yellow — string */
+        color: #ffed72; /* yellow, string */
       }
       .fn {
-        color: #a2e57b; /* green — function */
+        color: #a2e57b; /* green, function */
       }
       .num {
-        color: #ffb86b; /* orange — number */
+        color: #ffb86b; /* orange, number */
       }
-      /* the three state lines render as plain code — no live highlight */
+      /* the three state lines render as plain code, no live highlight */
       .st {
         color: var(--color-code-fg);
       }
 
-      /* live state table — fixed layout so columns never reflow as values tick */
+      /* live state table, fixed layout so columns never reflow as values tick */
       .pac-table {
         table-layout: fixed;
         border-collapse: collapse;
@@ -1943,7 +1952,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         }
       }
 
-      /* terminal renderer — a FIXED pixel grid. Each cell is a rigid box sized by
+      /* terminal renderer, a FIXED pixel grid. Each cell is a rigid box sized by
          --tui (so a frame can scale the whole board); the glyph is scaled to fit,
          so nothing can widen a row. */
       .pac-tui {
@@ -1974,7 +1983,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
 
       /* ====================================================================
          THREE FRAMES: the same machine state, rendered into three device
-         chassis (laptop · iPhone · terminal). Static — the whole pitch in one
+         chassis (laptop · iPhone · terminal). Static, the whole pitch in one
          glance: one behavior, many renderers.
          ==================================================================== */
       .stage-label {
@@ -1991,7 +2000,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
 
       /* the game inside a frame renders smaller than the hero board. Each device
          picks its own --tui so the LAPTOP reads biggest, the TERMINAL mid, the
-         iPHONE smallest. Each screen wraps the game snugly — no dead space. */
+         iPHONE smallest. Each screen wraps the game snugly, no dead space. */
       .frame {
         user-select: none;
       }
@@ -2187,7 +2196,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         height: 10px;
         border-radius: 50%;
       }
-      /* the terminal body wraps the game snugly — the game fills it */
+      /* the terminal body wraps the game snugly, the game fills it */
       .terminal-body {
         display: flex;
         align-items: center;
@@ -2221,7 +2230,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       }
 
       /* ====================================================================
-         CASSETTE — the running game is dressed as a chunky game cartridge: a
+         CASSETTE, the running game is dressed as a chunky game cartridge: a
          thick dark shell around the screen and a BIG bottom deck that the
          play/pause buttons sit on (like a cassette's lower half).
          ==================================================================== */
@@ -2235,7 +2244,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
           0 1px 2px rgba(0, 0, 0, 0.1),
           0 16px 40px rgba(0, 0, 0, 0.22);
       }
-      /* the BIG bottom deck — the cartridge's lower shell; play/pause ride here.
+      /* the BIG bottom deck, the cartridge's lower shell; play/pause ride here.
          Hidden on mobile (the game it controls is hidden there too). */
       .cassette-deck {
         position: relative;
@@ -2254,7 +2263,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       }
 
       /* ====================================================================
-         CONSOLE — the hub the cassette's cable plugs into, sitting just above
+         CONSOLE, the hub the cassette's cable plugs into, sitting just above
          the lined-up frames. Permanently wired to all three (always live).
          ==================================================================== */
       .console {
@@ -2291,7 +2300,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         letter-spacing: 0.14em;
         color: #c9ccd6;
       }
-      /* power LED — steady green (the demo is always live) */
+      /* power LED, steady green (the demo is always live) */
       .console-led {
         width: 8px;
         height: 8px;
@@ -2301,7 +2310,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
       }
 
       /* ====================================================================
-         LAB SECTION — dark full-width strip with two live demos
+         LAB SECTION, dark full-width strip with two live demos
          ==================================================================== */
       .lab-section {
         padding: 5rem 1.5rem 5.5rem;
@@ -2762,7 +2771,7 @@ toggle.context  <span class="cmt">// { count: 1 }</span>`;
         pointer-events: none;
       }
 
-      /* the three frames are always live — black, always-connected cables */
+      /* the three frames are always live, black, always-connected cables */
       .cable {
         fill: none;
         stroke: #15171c;

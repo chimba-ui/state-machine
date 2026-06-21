@@ -3,7 +3,7 @@ title: Setup
 description: Define and type a state machine.
 ---
 
-`machine()` builds and runs a machine. `setup()` is how you author the config with full type-checking — inferred types, compile-checked names, no manual type arguments.
+`machine()` builds and runs a machine. `setup` is how you author the config with full type-checking, via two paths off one entry: `setup.infer()` (types inferred from the literal) and `setup.as<Ctx, Ev>()` (you pin the types, names become compile-checked).
 
 ## `machine(config)`
 
@@ -31,16 +31,16 @@ toggle.state // 'active'
 toggle.context // { count: 1 }
 ```
 
-Returns a **service** — built but not running. Call `.start()` to boot effects and watchers, `.stop()` to tear them down. `.send()` dispatches events; `.state` and `.context` are always readable.
+Returns a **service**, built but not running. Call `.start()` to boot effects and watchers, `.stop()` to tear them down. `.send()` dispatches events; `.state` and `.context` are always readable.
 
-## `setup()` — lightweight path
+## `setup.infer()`, inferred path
 
-Infers `State`, `Context`, and `Event` from the literal. Named guards / actions / effects / delays stay as loose strings.
+Infers `State`, `Context`, and `Event` straight from the literal: no type arguments, no manual annotations. Named guards / actions / effects / delays stay as loose strings.
 
 ```ts
 import { setup } from '@dunky-dev/state-machine'
 
-const config = setup().createMachine({
+const config = setup.infer().createMachine({
   initial: 'closed',
   context: { open: false },
   states: {
@@ -50,9 +50,24 @@ const config = setup().createMachine({
 })
 ```
 
-## `setup()` — checked path
+Everything below was inferred from that object. You wrote no types:
 
-Name a registry of guards / actions / effects / delays. Every reference in the config is compile-checked and autocompleted against the registry keys — a typo is a type error.
+```ts
+// State    inferred as  'closed' | 'open'   (from the `states` keys)
+// Context  inferred as  { open: boolean }   (from `context`)
+// Event    inferred as  { type: 'toggle' }  (from the `on` keys)
+
+const m = machine(config)
+m.matches('open') // ✅ autocompletes 'closed' | 'open'
+m.matches('half') // ✗ type error: not a known state
+m.send({ type: 'tooggle' }) // ✗ type error: not a known event
+```
+
+Inside the config, `act` callbacks get the same inference: `$.context.open` is `boolean`, and the event in a handler is narrowed to the one that triggered it. Nothing here was declared; it all flows from the literal.
+
+## `setup.as<Ctx, Ev>()`, checked path
+
+Pin `Context` and `Event` explicitly, then name a registry of guards / actions / effects / delays. Every reference in the config is compile-checked and autocompleted against the registry keys; a typo is a type error.
 
 ```ts
 import { setup } from '@dunky-dev/state-machine'
@@ -60,7 +75,7 @@ import { setup } from '@dunky-dev/state-machine'
 type Ctx = { open: boolean; locked: boolean }
 type Ev = { type: 'toggle' }
 
-const { createMachine } = setup<Ctx, Ev>().config({
+const { createMachine } = setup.as<Ctx, Ev>().config({
   guards: {
     isUnlocked: ({ context }) => !context.locked,
   },

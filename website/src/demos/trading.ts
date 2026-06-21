@@ -48,7 +48,7 @@ export function createPairMachine(
   initialPrice: number,
   volatility: number,
 ): PairMachine {
-  const { createMachine } = setup<PairContext, PairEvent, PairComputed>().config({
+  const { createMachine } = setup.as<PairContext, PairEvent, PairComputed>().config({
     guards: {
       canBuy: ({ context }) => context.entryPrice === 0,
       canSell: ({ context }) => context.entryPrice > 0,

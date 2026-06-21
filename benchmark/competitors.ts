@@ -69,9 +69,18 @@ export function makeCoreCell(observe = true): Cell {
 
 // -----------------------------------------------------------------------------
 // xstate cell — the real statechart (createMachine + createActor).
-// actor.subscribe is COARSE (fires on every snapshot change). We diff `value`
-// in the listener, the same shape the coarse store uses, so the headless number
-// reflects XState's actual headless subscription behavior.
+//
+// FAIRNESS — this row is charitable TO XState, not against it. `actor.subscribe`
+// is COARSE: it fires on every snapshot change with no per-field dedup. Comparing
+// that raw behavior to core's value-deduped `select` would measure a category
+// difference ("an API that dedups" vs "an API that doesn't"), not a contest. So
+// we hand XState the dedup its users would obviously add — a `value !== last`
+// diff in the listener — and time THAT. This makes XState look BETTER than stock
+// (the un-diffed baseline is `makeXstateRawCell` below, which is slower still);
+// the point of the diffed row is to show the gap that REMAINS after the obvious
+// userland fix. We never juice XState beyond what a real user would write; the
+// diff is deliberately the plainest possible check so it can't be called a
+// strawman in either direction.
 // -----------------------------------------------------------------------------
 export function makeXstateCell(observe = true): Cell {
   const m = createXMachine({
@@ -179,6 +188,11 @@ export function makeCoreFanout(n: number): Fanout {
  * of the N observers gets its own coarse subscribe that diffs its field — which
  * means every observer's listener still RUNS on every snapshot change. That's
  * exactly the O(N)-listener cost this test is built to expose.
+ *
+ * Same FAIRNESS stance as `makeXstateCell` above: the per-observer diff is the
+ * charitable setup (what an XState user would actually write), not a handicap —
+ * it makes XState faster than its stock no-diff behavior, and the gap that
+ * remains is the real result.
  */
 export function makeXstateFanout(n: number): Fanout {
   const m = createXMachine({
