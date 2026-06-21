@@ -110,17 +110,27 @@ function chain<Context extends object, Event extends { type: string }, Computed>
  * (registries merged into `implementations`), so the rest of the pipeline is
  * unchanged.
  */
-export const setup = {
-  /** Infer `State` / `Context` / `Event` from the config literal — no annotations. */
-  infer() {
-    return chain<never, never, Record<string, never>>()
-  },
-  /** Pin `Context` / `Event` (/ `Computed`) explicitly; names become compile-checked via `.config(...)`. */
-  as<
-    Context extends object = never,
-    Event extends { type: string } = never,
-    Computed = Record<string, never>,
-  >() {
-    return chain<Context, Event, Computed>()
-  },
+// `infer` / `as` are function declarations assembled into the `setup` object,
+// so the public surface is `setup.infer()` / `setup.as<...>()`. Both carry an
+// explicit return type (`ReturnType<typeof chain<...>>`) because the package is
+// built with `--isolatedDeclarations`, which can't infer the chain's complex
+// shape for an emitted `.d.ts`.
+
+/** Infer `State` / `Context` / `Event` from the config literal; no annotations. */
+function setupInfer(): ReturnType<typeof chain<never, never, Record<string, never>>> {
+  return chain<never, never, Record<string, never>>()
+}
+
+/** Pin `Context` / `Event` (/ `Computed`) explicitly; names become compile-checked via `.config(...)`. */
+function setupAs<
+  Context extends object = never,
+  Event extends { type: string } = never,
+  Computed = Record<string, never>,
+>(): ReturnType<typeof chain<Context, Event, Computed>> {
+  return chain<Context, Event, Computed>()
+}
+
+export const setup: { infer: typeof setupInfer; as: typeof setupAs } = {
+  infer: setupInfer,
+  as: setupAs,
 }
