@@ -3,7 +3,7 @@ title: Watch
 description: Run actions whenever a context field changes.
 ---
 
-`watch` runs actions whenever a context (or computed) field changes — in any state, for the machine's whole lifetime. It's the declarative form of "subscribe to a field and react."
+`watch` runs actions whenever a context (or computed) field changes, in any state, for the machine's whole lifetime. It's the declarative form of "subscribe to a field and react."
 
 ```ts
 import { machine } from '@dunky.dev/state-machine'
@@ -23,7 +23,7 @@ const m = machine({
 })
 ```
 
-Any time `query` changes — from any transition, in any state — `runSearch` fires. No need to add the action to every transition that touches `query`.
+Any time `query` changes, from any transition, in any state, `runSearch` fires. No need to add the action to every transition that touches `query`.
 
 ## Run-to-completion
 
@@ -43,7 +43,7 @@ Use `watch` when you want to **do** something in response to a field changing. U
 
 ```ts
 watch: {
-  query: ['runSearch'],
+  query:       ['runSearch'],
   activeIndex: ['scrollIntoView', 'announceSelection'],
 }
 ```

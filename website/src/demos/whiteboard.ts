@@ -53,60 +53,62 @@ export interface CursorComputed {
 export type CursorState = 'idle' | 'moving'
 export type CursorMachine = Machine<CursorState, CursorCtx, CursorEv, CursorComputed>
 
-const { createMachine: createCursorConfig } = setup<CursorCtx, CursorEv, CursorComputed>().config({
-  guards: {
-    hasTarget: ({ context }) => context.x1 !== context.x0 || context.y1 !== context.y0,
-    arrived: ({ context }) => context.progress >= 1,
-  },
-  actions: {
-    setTarget: (({ context, event, setContext }) => {
-      if (event.type !== 'PICK_TARGET') return
-      setContext({ x0: context.x, y0: context.y, x1: event.x, y1: event.y, progress: 0 })
-    }) satisfies Action<CursorCtx, CursorEv, CursorComputed>,
-    stepProgress: (({ context, event, setContext }) => {
-      if (event.type !== 'TICK') return
-      const dt = Math.min(event.dt, 50) // cap at 50ms so tab-wake doesn't jump
-      const progress = Math.min(1, context.progress + context.speed * dt)
-      // recompute eased position at the new progress inline
-      const e = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress
-      setContext({
-        progress,
-        x: context.x0 + (context.x1 - context.x0) * e,
-        y: context.y0 + (context.y1 - context.y0) * e,
-      })
-    }) satisfies Action<CursorCtx, CursorEv, CursorComputed>,
-    pickNewTarget: ({ context, setContext }) => {
-      setContext({
-        x0: context.x,
-        y0: context.y,
-        x1: 6 + Math.random() * 86,
-        y1: 6 + Math.random() * 86,
-        progress: 0,
-      })
+const { createMachine: createCursorConfig } = setup
+  .as<CursorCtx, CursorEv, CursorComputed>()
+  .config({
+    guards: {
+      hasTarget: ({ context }) => context.x1 !== context.x0 || context.y1 !== context.y0,
+      arrived: ({ context }) => context.progress >= 1,
     },
-    setPauseMs: act($ => ({
-      pauseMs: 800 + ((Math.abs($.context.x * 17 + $.context.y * 31) | 0) % 2200),
-    })),
-  },
-  effects: {
-    // rAF loop: sends TICK on every animation frame while in `moving`.
-    // Cleans up automatically when the machine exits `moving`.
-    rafLoop: ({ send }) => {
-      let rafId: number
-      let last = performance.now()
-      const loop = (now: number) => {
-        send({ type: 'TICK', dt: now - last })
-        last = now
+    actions: {
+      setTarget: (({ context, event, setContext }) => {
+        if (event.type !== 'PICK_TARGET') return
+        setContext({ x0: context.x, y0: context.y, x1: event.x, y1: event.y, progress: 0 })
+      }) satisfies Action<CursorCtx, CursorEv, CursorComputed>,
+      stepProgress: (({ context, event, setContext }) => {
+        if (event.type !== 'TICK') return
+        const dt = Math.min(event.dt, 50) // cap at 50ms so tab-wake doesn't jump
+        const progress = Math.min(1, context.progress + context.speed * dt)
+        // recompute eased position at the new progress inline
+        const e = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress
+        setContext({
+          progress,
+          x: context.x0 + (context.x1 - context.x0) * e,
+          y: context.y0 + (context.y1 - context.y0) * e,
+        })
+      }) satisfies Action<CursorCtx, CursorEv, CursorComputed>,
+      pickNewTarget: ({ context, setContext }) => {
+        setContext({
+          x0: context.x,
+          y0: context.y,
+          x1: 6 + Math.random() * 86,
+          y1: 6 + Math.random() * 86,
+          progress: 0,
+        })
+      },
+      setPauseMs: act($ => ({
+        pauseMs: 800 + ((Math.abs($.context.x * 17 + $.context.y * 31) | 0) % 2200),
+      })),
+    },
+    effects: {
+      // rAF loop: sends TICK on every animation frame while in `moving`.
+      // Cleans up automatically when the machine exits `moving`.
+      rafLoop: ({ send }) => {
+        let rafId: number
+        let last = performance.now()
+        const loop = (now: number) => {
+          send({ type: 'TICK', dt: now - last })
+          last = now
+          rafId = requestAnimationFrame(loop)
+        }
         rafId = requestAnimationFrame(loop)
-      }
-      rafId = requestAnimationFrame(loop)
-      return () => cancelAnimationFrame(rafId)
+        return () => cancelAnimationFrame(rafId)
+      },
     },
-  },
-  delays: {
-    idlePause: ({ context }) => context.pauseMs,
-  },
-})
+    delays: {
+      idlePause: ({ context }) => context.pauseMs,
+    },
+  })
 
 export function createCursorMachine(
   id: string,
@@ -185,25 +187,29 @@ export interface StickyComputed {
 export type StickyState = 'placed' | 'dragging'
 export type StickyMachine = Machine<StickyState, StickyCtx, StickyEv, StickyComputed>
 
-const { createMachine: createStickyConfig } = setup<StickyCtx, StickyEv, StickyComputed>().config({
-  actions: {
-    startDrag: (({ event, setContext }) => {
-      if (event.type !== 'DRAG_START') return
-      setContext({ dragOffsetX: event.offsetX, dragOffsetY: event.offsetY })
-    }) satisfies Action<StickyCtx, StickyEv, StickyComputed>,
-    moveTo: (({ event, context, setContext }) => {
-      if (event.type !== 'DRAG_MOVE') return
-      setContext({
-        x:
-          ((event.clientX - event.canvasRect.left - context.dragOffsetX) / event.canvasRect.width) *
-          100,
-        y:
-          ((event.clientY - event.canvasRect.top - context.dragOffsetY) / event.canvasRect.height) *
-          100,
-      })
-    }) satisfies Action<StickyCtx, StickyEv, StickyComputed>,
-  },
-})
+const { createMachine: createStickyConfig } = setup
+  .as<StickyCtx, StickyEv, StickyComputed>()
+  .config({
+    actions: {
+      startDrag: (({ event, setContext }) => {
+        if (event.type !== 'DRAG_START') return
+        setContext({ dragOffsetX: event.offsetX, dragOffsetY: event.offsetY })
+      }) satisfies Action<StickyCtx, StickyEv, StickyComputed>,
+      moveTo: (({ event, context, setContext }) => {
+        if (event.type !== 'DRAG_MOVE') return
+        setContext({
+          x:
+            ((event.clientX - event.canvasRect.left - context.dragOffsetX) /
+              event.canvasRect.width) *
+            100,
+          y:
+            ((event.clientY - event.canvasRect.top - context.dragOffsetY) /
+              event.canvasRect.height) *
+            100,
+        })
+      }) satisfies Action<StickyCtx, StickyEv, StickyComputed>,
+    },
+  })
 
 export function createStickyMachine(id: string, initialX: number, initialY: number): StickyMachine {
   void id

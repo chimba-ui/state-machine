@@ -4,66 +4,176 @@ description: How Dunky compares to XState and Zag.
 ---
 
 Anyone who has reached for [XState](https://stately.ai/docs) or [Zag](https://zagjs.com/) will
-feel at home — same statechart vocabulary (`states`, `transitions`, `guards`, `actions`,
-`effects`), same headless philosophy. Those libraries are excellent; this one exists for two
-things they aren't built around: **no environment assumption** and **performance under heavy fan-out**.
+feel at home: same statechart vocabulary (`states`, `transitions`, `guards`, `actions`,
+`effects`), same headless philosophy. Those libraries are excellent; this one is built around two
+things they aren't: **bindings that assume no platform** and **performance under heavy fan-out**.
 
 ## Shared baseline
 
-| Capability                           | Zag         | XState            | Dunky             |
-| ------------------------------------ | ----------- | ----------------- | ----------------- |
-| States / transitions / guards        | ✅          | ✅                | ✅                |
-| Guard combinators (`and`/`or`/`not`) | ✅          | ✅                | ✅                |
-| `entry` / `exit`                     | ✅          | ✅                | ✅                |
-| Conditional actions                  | `choose`    | `choose`          | `oneOf`           |
-| Effects with cleanup                 | `effects` ¹ | invoked callbacks | `effects`         |
-| Computed / derived state             | ✅          | ✅                | ✅                |
-| Timed transitions (`after`)          | ✅          | ✅                | ✅                |
-| Watch (react to a data change)       | `watch`     | via `always`      | `watch`           |
-| Per-platform late binding            | ✅          | via `.provide()`  | `ComponentEffect` |
-
-¹ Zag's effects receive a `scope` (a DOM abstraction) and reach for it. Dunky effects
-receive no environment — they're platform-free by design.
+| Capability                           | Zag       | XState            | Dunky             |
+| ------------------------------------ | --------- | ----------------- | ----------------- |
+| States / transitions / guards        | ✅        | ✅                | ✅                |
+| Guard combinators (`and`/`or`/`not`) | ✅        | ✅                | ✅                |
+| `entry` / `exit`                     | ✅        | ✅                | ✅                |
+| Conditional actions                  | `choose`  | `choose`          | `oneOf`           |
+| Effects with cleanup                 | `effects` | invoked callbacks | `effects`         |
+| Computed / derived state             | ✅        | ✅                | ✅                |
+| Timed transitions (`after`)          | ✅        | ✅                | ✅                |
+| Watch (react to a data change)       | `watch`   | via `always`      | `watch`           |
+| Per-platform late binding            | ✅        | via `.provide()`  | `ComponentEffect` |
 
 ## What's different
 
 The single cause underneath all the differences is **how each engine holds a machine's data**.
 
-|                               | Zag                              | XState                        | Dunky                                     |
-| ----------------------------- | -------------------------------- | ----------------------------- | ----------------------------------------- |
-| Data model                    | reactive cell per field          | immutable snapshot per event  | one plain object, mutated in place        |
-| Fine-grained subscriptions    | ❌ host framework does it        | ⚠️ `actor.select` (coarse)    | ✅ `select` (value-deduped)               |
-| Runs without a host framework | ❌ presumes a DOM framework      | ⚠️ yes, but DOM-tied packages | ✅ any JS runtime                         |
-| Environment assumption        | DOM                              | DOM                           | none (DOM, RN, TUI, WebGL…)               |
-| The machine never sees props  | ❌ `prop()` inside the machine   | ❌ `.provide()` inline        | ✅ props live at the edge only            |
-| Serializable snapshot         | ❌ state is scattered hook cells | ✅ actor model                | ⚠️ no built-in (context is one object)    |
-| Nested / hierarchical states  | ❌ by design                     | ✅                            | ❌ flat                                   |
-| Parallel states               | ❌ by design                     | ✅                            | ⚠️ `compose` (peers, no shared event bus) |
-| Spawned child actors          | ❌ by design                     | ✅                            | ❌ by design                              |
+|                               | Zag                         | XState                         | Dunky                                    |
+| ----------------------------- | --------------------------- | ------------------------------ | ---------------------------------------- |
+| Data model                    | reactive cell per field     | immutable snapshot per event   | one plain object, mutated in place       |
+| Coarse subscription           | `subscribe`                 | `subscribe`                    | `subscribe`                              |
+| Fine-grained selection        | host's job                  | host's job                     | `select` (fine-grained)                  |
+| Bindings                      | DOM/ARIA prop-getters       | manual (`state` + `send` only) | abstract, normalized per target          |
+| External props in the machine | `prop()` inside the machine | host data via `input`          | props live at the edge only              |
+| Serializable snapshot         | no built-in                 | `getPersistedSnapshot()`       | no built-in                              |
+| Nested / hierarchical states  | yes                         | yes                            | flat                                     |
+| Parallel states               | none, by design             | yes                            | `compose` (peer machines, no shared bus) |
+| Spawned child actors          | none, by design             | yes                            | none, by design                          |
 
-**XState** allocates a new immutable snapshot on every transition — the right trade for
+**XState** allocates a new immutable snapshot on every transition. That's the right trade for
 time-travel and serialization, but it taxes the hot path. Dunky mutates in place behind
 a value-deduping notifier, so a transition allocates nothing and an unchanged field wakes no
 observer.
 
-**Zag** pioneered the headless component-as-machine idea and can run outside React, but it
-presumes a host DOM framework and puts reactive cells (one per context field) into framework
-hooks. Dunky owns its reactivity internally — the same machine runs on the DOM, React
-Native, or any other JS runtime.
+**Zag** pioneered the headless component-as-machine idea, but its bindings are DOM-shaped (the
+prop-getters emit `onClick`, `aria-*`, ...) and it holds one reactive cell per context field.
 
-## When to reach for each
+**Dunky** keeps the machine sealed: one plain object mutated in place, with the host kept out at the
+edge. That's the right trade for dense UI work. It gives up time-travel and actors, and in return the
+same machine runs fast with thousands of them running.
 
-| Reach for… | When you need…                                                                                                 |
-| ---------- | -------------------------------------------------------------------------------------------------------------- |
-| **XState** | Nested/parallel statecharts, actor model, time-travel, Stately Studio visual editor                            |
-| **Zag**    | Ready-made headless component machines (accordion, combobox, …) for web                                        |
-| **Dunky**  | Many lightweight UI machines at high event frequency, or the same machine on multiple platforms (web + native) |
+## Deeper look
+
+Take a controlled toggle: a `defaultOpen` prop that seeds the initial state, and an `onOpenChange`
+callback the host wants called when it flips. Watch where each engine puts those two.
+
+In **XState** the prop and the callback ride _into_ the machine: both flow through `input` into
+`context`, and the machine's own actions read them from there.
+
+```ts
+import { setup, createActor, assign } from 'xstate'
+
+const toggle = setup({
+  actions: {
+    flip: assign({ open: ({ context }) => !context.open }),
+    // the machine itself calls the host's callback; it lives in context
+    notify: ({ context }) => context.onOpenChange?.(context.open),
+  },
+}).createMachine({
+  // host data enters the machine here: both defaultOpen and the callback
+  // become part of its state
+  context: ({ input }) => ({ open: input.defaultOpen, onOpenChange: input.onOpenChange }),
+  on: { toggle: { actions: ['flip', 'notify'] } },
+})
+
+const actor = createActor(toggle, {
+  input: { defaultOpen: true, onOpenChange: open => console.log(open) },
+})
+```
+
+In **Zag** the core is headless too, but the host still reaches in: props are read _inside_ the machine
+through the `prop()` helper, and each context field is its own `bindable` reactive cell:
+
+```ts
+import { createMachine } from '@zag-js/core'
+
+const toggle = createMachine({
+  props({ props }) {
+    // host props (defaultOpen, onOpenChange) are declared on the machine…
+    return { defaultOpen: false, ...props }
+  },
+  context({ bindable, prop }) {
+    // …and pulled in here: one bindable cell per field, seeded from a prop
+    return {
+      open: bindable(() => ({
+        defaultValue: prop('defaultOpen'),
+        onChange: open => prop('onOpenChange')?.({ open }), // callback fires from inside
+      })),
+    }
+  },
+  on: { toggle: { actions: ['flip'] } },
+  implementations: {
+    actions: { flip: ({ context }) => context.set('open', o => !o) },
+  },
+})
+```
+
+In **Dunky** the machine has **no `props` argument at all**, it's pure `state → state`. The
+prop and the callback live on the _connector_, at the edge:
+
+```ts
+import { machine, connector } from '@dunky.dev/state-machine'
+
+// The machine. No props, no callbacks, no host. Just states and events.
+const toggle = machine({
+  initial: 'closed',
+  context: {},
+  states: {
+    closed: { on: { toggle: 'open' } },
+    open: { on: { toggle: 'closed' } },
+  },
+})
+
+// connect maps a snapshot → view API. `onPress` is an abstract binding, not `onClick`.
+const connect = ({ state, send }) => ({
+  isOpen: state === 'open',
+  triggerProps: { onPress: () => send({ type: 'toggle' }) },
+})
+
+// A reaction ([selector, callback]) calls the host from the OUTSIDE when a
+// derived value flips. It lives on `connect`, not on the machine.
+connect.reactions = [[m => m.matches('open'), (open, props) => props.onOpenChange?.({ open })]]
+
+// The connector owns the host. `defaultOpen` resolved the initial state *before*
+// the machine was built; the callback lives in props on the connector, and the
+// machine never learns onOpenChange exists.
+const toggleConnection = connector(toggle, connect, props) // props = { onOpenChange }
+```
+
+In **XState** and **Zag** the machine **definition references the host**: its transitions, context, and
+actions can read `input` / `prop(...)`, so the machine is coupled to "a host with these props
+exists." In Dunky the machine definition (`closed`/`open` + `toggle`) has **zero references to
+props.** It can't read them; they're not in scope. Props live only on the connector, at the edge.
+
+### So what is the value?
+
+The machine becomes a pure `(state, event) → state` function, identical on every platform, with all
+the host coupling quarantined to one swappable edge. That buys you four things cleanly:
+
+- 🌍 **Runs anywhere.** Nothing platform-specific is inside the machine, so the same one drives web,
+  native, or a headless test untouched; only the thin edge layer changes per target.
+- 🧪 **Trivial to test.** Send an event, assert on the state. No host to mock, no props to supply,
+  no framework to spin up. Just the behavior.
+- 🔄 **No stale callbacks.** Swap a callback and the new one fires next time; the machine keeps its
+  state through prop changes because props were never part of it.
+- 🧠 **Easy to reason about.** The machine is only "what states exist and what flips them." Everything
+  the host wants (configured values, callbacks) lives entirely at the edge, in separate files.
+
+#### The honest trade-off
+
+We'll be straight: the speed comes from mutating in place, and that costs you things:
+
+**No time-travel or persistence.** Mutating in place means there's no history to replay and no
+snapshot to serialize. Spawned actors and nested states are out too. If you're modeling
+**full application state** (undo/redo, save-and-restore, deep actor trees), reach for
+[XState](https://stately.ai/docs); that's exactly what it's built for, and it's excellent at it.
+
+**Dunky is for UI behavior, at scale.** Buttons, tooltips, dialogs, cells: hundreds of them
+live on one screen, the same machine running on web and native. That's the job a sealed, mutate-in-place
+kernel does best: portable, and [fast](/benchmark) where it counts.
 
 ## Performance
 
-Dunky is built for **density × frequency** — many machines reacting to a high-frequency
+Dunky is built for **density × frequency**: many machines reacting to a high-frequency
 stream inside one frame budget (trading terminals, canvas boards, monitoring walls, game HUDs).
-In practice that's **up to ~8× the event throughput** of the alternatives, flat memory as
-context grows wide, and surgical re-renders that wake only the rows that actually changed.
+In practice that's **up to ~8× the event throughput** of the alternatives, flat memory.
 
-See the [benchmark](/benchmark) for methodology and full tables.
+See the benchmark for methodology and full tables.

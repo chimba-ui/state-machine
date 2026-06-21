@@ -8,10 +8,43 @@ import { resolve } from 'node:path'
 // it (e.g. '/' for an isolated local preview).
 const base = process.env.BASE_PATH ?? '/state-machine/'
 
+// Astro does NOT prepend `base` to root-absolute markdown links (`[x](/api/y)`),
+// so they 404 under a non-root base. This rehype plugin rewrites internal
+// root-absolute hrefs to include the base. External links and already-based
+// links are left alone. The sidebar is already base-aware (Starlight handles it).
+// Dependency-free hast walk (avoids relying on a transitive unist-util-visit).
+const basePrefix = base.replace(/\/$/, '')
+function rehypeBaseLinks() {
+  type Node = {
+    type?: string
+    tagName?: string
+    properties?: { href?: unknown }
+    children?: Node[]
+  }
+  const walk = (node: Node) => {
+    if (node.tagName === 'a') {
+      const href = node.properties?.href
+      if (
+        typeof href === 'string' &&
+        href.startsWith('/') &&
+        !href.startsWith('//') &&
+        !(basePrefix && (href === basePrefix || href.startsWith(`${basePrefix}/`)))
+      ) {
+        node.properties!.href = `${basePrefix}${href}`
+      }
+    }
+    if (node.children) for (const child of node.children) walk(child)
+  }
+  return (tree: Node) => walk(tree)
+}
+
 // https://astro.build/config
 export default defineConfig({
   site: 'https://dunky-dev.github.io',
   base,
+  markdown: {
+    rehypePlugins: [rehypeBaseLinks],
+  },
   integrations: [
     starlight({
       title: 'Dunky',

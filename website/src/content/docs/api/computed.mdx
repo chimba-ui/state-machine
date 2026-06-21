@@ -3,7 +3,7 @@ title: Computed
 description: Lazy, memoized values derived from context.
 ---
 
-Computeds are values derived from context (or other computeds). They are **lazy** — only evaluated when read — and **memoized** — only re-evaluated when an input they actually read changes.
+Computeds are values derived from context (or other computeds). They are **lazy** (only evaluated when read) and **memoized** (only re-evaluated when an input they actually read changes).
 
 ```ts
 import { machine } from '@dunky.dev/state-machine'
@@ -25,14 +25,14 @@ m.computed.isEmpty // false
 
 ## Where computeds are available
 
-A computed value is accessible anywhere context is — guards, actions, effects, watchers — via `{ computed }` in the `$` argument:
+A computed value is accessible anywhere context is (guards, actions, effects, watchers) via `{ computed }` in the `$` argument:
 
 ```ts
 states: {
   idle: {
     on: {
       submit: {
-        guard: ({ computed }) => !computed.isEmpty,
+        guard:   ({ computed }) => !computed.isEmpty,
         actions: ({ computed }) => console.log('items:', computed.count),
       },
     },
@@ -56,4 +56,4 @@ const m = machine({
 })
 ```
 
-`filtered` only recomputes when `query` or `items` changes. `highlighted` only recomputes when `filtered` or `activeIndex` changes. The memoization is automatic — no `useMemo`, no manual deps.
+`filtered` only recomputes when `query` or `items` changes. `highlighted` only recomputes when `filtered` or `activeIndex` changes. The memoization is automatic: no `useMemo`, no manual deps.

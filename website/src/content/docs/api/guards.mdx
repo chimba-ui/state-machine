@@ -3,7 +3,7 @@ title: Guards
 description: Gate transitions with conditions.
 ---
 
-A guard is a predicate that gates a transition — return `false` and it doesn't fire. It receives `{ context, event, computed }`.
+A guard is a predicate that gates a transition: return `false` and it doesn't fire. It receives `{ context, event, computed }`.
 
 ```ts
 import { machine } from '@dunky.dev/state-machine'
@@ -27,14 +27,14 @@ const m = machine({
 
 ## Fallthrough
 
-Give an event an array of transitions — the first whose guard passes wins. A guardless branch is the fallback:
+Give an event an array of transitions. The first whose guard passes wins, and a guardless branch is the fallback:
 
 ```ts
 on: {
   tick: [
     { guard: ({ context }) => context.n >= 10, target: 'max' },
-    { guard: ({ context }) => context.n > 0, target: 'some' },
-    { target: 'zero' }, // no guard = fallback
+    { guard: ({ context }) => context.n > 0,   target: 'some' },
+    { target: 'zero' },  // no guard = fallback
   ],
 }
 ```

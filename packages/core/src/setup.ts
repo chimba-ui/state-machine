@@ -1,70 +1,17 @@
 import type { Implementations, TransitionConfig, AnyString } from './types'
 
 /**
- * `setup()` — the authoring entry point, with two paths off one call:
- *
- *   // lightweight: no registries, types inferred from the literal, names loose
- *   const cfg = setup().createMachine({ initial, context, states })
- *
- *   // checked: name a registry first, then every guard/action/effect/delay
- *   // reference in the config is checked + autocompleted against its keys
- *   const { createMachine } = setup<Ctx, Ev, Computed>().config({ ... })
- *   createMachine({ ... })
- *
- * (`setup<Ctx,Ev>().createMachine(...)` — types but no `.config` — compiles, but
- * the names are NOT checked; use `.config(...)` to get checking.)
- *
- * The checked chain in full:
- *
- *   const { createMachine } = setup<Ctx, Ev, Computed>().config({
- *     guards:  { isOpen: ({ context }) => context.open },
- *     actions: { setId:  ({ context }) => store.set(context.id) },
- *     effects: { track:  ({ send }) => store.subscribe(...) },
- *     delays:  { openDelay: ({ context }) => context.openMs },
- *   })
- *
- *   createMachine({
- *     initial: 'closed',
- *     context: { ... },
- *     states: {
- *       open: {
- *         entry:   ['setId'],            // ✅ checked against `actions`
- *         effects: ['track'],            // ✅ checked against `effects`
- *         after:   { openDelay: { ... } }, // ✅ checked against `delays` (numbers still ok)
- *         on: { close: { target: 'closed', guard: 'isOpen' } }, // ✅ checked against `guards`
- *       },
- *     },
- *   })
- *
- * Plain `config({ states, implementations })` types every name as a loose string
- * (a typo only throws at runtime) — because `states` and `implementations` infer
- * together in one object, neither can constrain the other's names. The chain
- * orders the inferences so the registries are known before the states reference
- * them, which is what makes the names checkable:
- *
- *   1. `setup<Ctx, Ev, Computed>()` — pin the machine types. They can't be inferred
- *      from a registry (TS does no partial type-arg inference), so they're explicit
- *      here, like `config`'s.
- *   2. `.config(registries)` — infer the registry object (`const`, so keys stay
- *      literal); its callbacks are typed from step 1's Ctx/Ev.
- *   3. `.createMachine(config)` — the config, with every guard/action/effect/delay
- *      name now checked + autocompleted against step 2's keys.
- *
- * `createMachine` returns the same `TransitionConfig` shape `machine()` consumes
- * (registries merged into `implementations`), so the rest of the pipeline is
- * unchanged.
+ * The shared authoring chain, parameterized by the machine types. Both entry
+ * points (`setup.infer()` and `setup.as<...>()`) return this same object — they
+ * differ only in whether `Context`/`Event` are inferred from the literal
+ * (`infer`, both default to `never`) or pinned explicitly (`as<Ctx, Ev>`).
  */
-export function setup<
-  Context extends object = never,
-  Event extends { type: string } = never,
-  Computed = Record<string, never>,
->() {
+function chain<Context extends object, Event extends { type: string }, Computed>() {
   return {
     /**
-     * Build a config directly — no named-impl registries, names left loose
-     * (the lightweight path, replacing the old `config()`). With no type args on
-     * `setup()`, `State` / `Context` / `Event` are inferred from the literal.
-     * For checked names, go through `.config(registries)` first instead.
+     * Build a config directly — no named-impl registries, names left loose.
+     * Under `setup.infer()`, `State` / `Context` / `Event` are inferred from the
+     * literal. For checked names, go through `.config(registries)` first.
      */
     createMachine<
       State extends string,
@@ -112,4 +59,78 @@ export function setup<
       }
     },
   }
+}
+
+/**
+ * `setup` — the authoring entry point, with two symmetric paths that share the
+ * same `.config(...).createMachine(...)` chain. The first step names the intent:
+ *
+ *   // infer: types inferred from the literal, no annotations needed
+ *   const cfg = setup.infer().createMachine({ initial, context, states })
+ *
+ *   // as: you pin Context / Event, then names are compile-checked
+ *   const { createMachine } = setup.as<Ctx, Ev, Computed>().config({ ... })
+ *   createMachine({ ... })
+ *
+ * Why a chain instead of one call? TypeScript has no PARTIAL type-argument
+ * inference — pass even one type arg and you must pass them all, inferring none.
+ * Splitting the work across calls gives each its own inference site:
+ *
+ *   1. `setup.as<Ctx, Ev, Computed>()` — pin the machine types (they can't be
+ *      inferred from a registry). `setup.infer()` skips this, leaving them to be
+ *      inferred from the literal at `createMachine`.
+ *   2. `.config(registries)` — infer the registry object (`const`, so keys stay
+ *      literal); its callbacks are typed from step 1's Ctx/Ev.
+ *   3. `.createMachine(config)` — the config, with every guard/action/effect/delay
+ *      name now checked + autocompleted against step 2's keys.
+ *
+ * The checked chain in full:
+ *
+ *   const { createMachine } = setup.as<Ctx, Ev, Computed>().config({
+ *     guards:  { isOpen: ({ context }) => context.open },
+ *     actions: { setId:  ({ context }) => store.set(context.id) },
+ *     effects: { track:  ({ send }) => store.subscribe(...) },
+ *     delays:  { openDelay: ({ context }) => context.openMs },
+ *   })
+ *
+ *   createMachine({
+ *     initial: 'closed',
+ *     context: { ... },
+ *     states: {
+ *       open: {
+ *         entry:   ['setId'],            // ✅ checked against `actions`
+ *         effects: ['track'],            // ✅ checked against `effects`
+ *         after:   { openDelay: { ... } }, // ✅ checked against `delays` (numbers still ok)
+ *         on: { close: { target: 'closed', guard: 'isOpen' } }, // ✅ checked against `guards`
+ *       },
+ *     },
+ *   })
+ *
+ * `createMachine` returns the same `TransitionConfig` shape `machine()` consumes
+ * (registries merged into `implementations`), so the rest of the pipeline is
+ * unchanged.
+ */
+// `infer` / `as` are function declarations assembled into the `setup` object,
+// so the public surface is `setup.infer()` / `setup.as<...>()`. Both carry an
+// explicit return type (`ReturnType<typeof chain<...>>`) because the package is
+// built with `--isolatedDeclarations`, which can't infer the chain's complex
+// shape for an emitted `.d.ts`.
+
+/** Infer `State` / `Context` / `Event` from the config literal; no annotations. */
+function setupInfer(): ReturnType<typeof chain<never, never, Record<string, never>>> {
+  return chain<never, never, Record<string, never>>()
+}
+
+/** Pin `Context` / `Event` (/ `Computed`) explicitly; names become compile-checked via `.config(...)`. */
+function setupAs<
+  Context extends object = never,
+  Event extends { type: string } = never,
+  Computed = Record<string, never>,
+>(): ReturnType<typeof chain<Context, Event, Computed>> {
+  return chain<Context, Event, Computed>()
+}
+
+export const setup: { infer: typeof setupInfer; as: typeof setupAs } = {
+  infer: setupInfer,
+  as: setupAs,
 }

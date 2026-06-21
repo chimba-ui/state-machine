@@ -1,11 +1,11 @@
 /**
- * setup() — the name-checking authoring builder.
+ * setup — the name-checking authoring builder.
  *
- * Pins: setup<Ctx,Ev,Cm>().config(registries).createMachine(config) returns a
+ * Pins: setup.as<Ctx,Ev,Cm>().config(registries).createMachine(config) returns a
  * config that (a) merges the registries into implementations so names resolve at
  * runtime, and (b) type-checks every named guard / action / effect / after-delay
  * reference against the registry keys at the definition site. The lightweight
- * setup().createMachine(literal) path (no registries) also builds a valid config.
+ * setup.infer().createMachine(literal) path (no registries) also builds a valid config.
  * The @ts-expect-error blocks are part of the contract: each must be a COMPILE
  * error (an unused directive fails tsc), so the suite's typecheck
  * (`tsc -p tsconfig.jest.json`) is what enforces (b).
@@ -16,9 +16,9 @@ import { machine, setup } from '../src'
 type Ctx = { id: string; openMs: number; open: boolean }
 type Ev = { type: 'open' } | { type: 'close' } | { type: 'toggle' }
 
-describe('setup()', () => {
-  it('lightweight path: setup().createMachine(literal) builds a valid config, types inferred', () => {
-    const cfg = setup().createMachine({
+describe('setup', () => {
+  it('infer path: setup.infer().createMachine(literal) builds a valid config, types inferred', () => {
+    const cfg = setup.infer().createMachine({
       initial: 'closed',
       context: { count: 0 },
       states: {
@@ -39,7 +39,7 @@ describe('setup()', () => {
     const setId = vi.fn()
     const track = vi.fn(() => () => {})
 
-    const { createMachine } = setup<Ctx, Ev>().config({
+    const { createMachine } = setup.as<Ctx, Ev>().config({
       guards: { isOpen: ({ context }) => context.open },
       actions: { setId: ({ context }) => setId(context.id) },
       effects: { track: () => track() },
@@ -71,7 +71,7 @@ describe('setup()', () => {
   })
 
   it('checks names at compile time (the @ts-expect-error blocks are the test)', () => {
-    const { createMachine } = setup<Ctx, Ev>().config({
+    const { createMachine } = setup.as<Ctx, Ev>().config({
       guards: { isOpen: ({ context }) => context.open },
       actions: { setId: () => {} },
       effects: { track: () => () => {} },
@@ -117,7 +117,7 @@ describe('setup()', () => {
   })
 
   it('valid names + numeric delays coexist, and inline fns still work', () => {
-    const { createMachine } = setup<Ctx, Ev>().config({
+    const { createMachine } = setup.as<Ctx, Ev>().config({
       guards: { isOpen: ({ context }) => context.open },
     })
 

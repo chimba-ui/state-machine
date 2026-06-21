@@ -3,7 +3,7 @@ title: Context
 description: Reactive data inside a machine.
 ---
 
-`context` is the machine's data — a plain object declared in the config and read directly off the service. Writes go through `setContext`, the single batched entry point.
+`context` is the machine's data: a plain object declared in the config and read directly off the service. Writes go through `setContext`, the single batched entry point.
 
 ```ts
 import { machine } from '@dunky.dev/state-machine'
@@ -29,25 +29,29 @@ m.context.age // 37
 
 ## Memory model
 
-Context is **one plain object per machine**, copied from the config at construction. Its identity never changes — only its fields are mutated in place. This means:
+Context is **one plain object per machine**, copied from the config at construction. Its identity never changes; only its fields are mutated in place. This means:
 
-- Reads are zero-cost — no proxy, no getter.
+- Reads are zero-cost: no proxy, no getter.
 - Writes are batched: `setContext` applies a shallow merge, deduplicates unchanged fields, then notifies subscribers once.
 - A field that didn't change wakes no observer.
 
 ## `setContext`
 
-Accepts a partial patch object or an updater function:
+Accepts a partial patch object, shallow-merged into the current context:
 
 ```ts
-// patch — shallow-merged
 $.setContext({ count: 5 })
-
-// updater — receives current context, returns patch
-$.setContext(ctx => ({ count: ctx.count + 1 }))
 ```
 
-`setContext` is available in actions, effects, and watchers via the `$` argument. Outside the machine, use `m.setContext(patch)` directly.
+To derive the next value from the current one, read `$.context` (or use the [`act()`](#act-shorthand) shorthand):
+
+```ts
+$.setContext({ count: $.context.count + 1 })
+// or, terser:
+act($ => ({ count: $.context.count + 1 }))
+```
+
+`setContext` is available in actions, effects, and watchers via the `$` argument. The machine never exposes `setContext` externally; `m.context` is read-only. To change state from outside, dispatch an event with `m.send(...)`.
 
 ## `act()` shorthand
 
@@ -58,6 +62,6 @@ import { act } from '@dunky.dev/state-machine'
 
 on: {
   increment: { actions: act($ => ({ count: $.context.count + 1 })) },
-  reset: { actions: act({ count: 0 }) },
+  reset:     { actions: act({ count: 0 }) },
 }
 ```

@@ -3,7 +3,7 @@ title: States
 description: Flat states and how to manage complexity without nesting.
 ---
 
-States here are **flat** — no nesting, no parallel regions inside a single machine. That constraint keeps machines light and readable. The first worry is usually: _won't my state count explode?_
+States here are **flat**: no nesting, no parallel regions inside a single machine. That constraint keeps machines light and readable. The first worry is usually: _won't my state count explode?_
 
 It doesn't have to. The explosion only happens if you fold independent axes onto the single state axis. A flat state should encode exactly **one** axis of control flow. Everything that would multiply it belongs elsewhere:
 
@@ -39,14 +39,14 @@ machine({
 })
 ```
 
-**Two state nodes.** `highlighted` recomputes lazily — the transitions scale with the kinds of move, not the list length.
+**Two state nodes.** `highlighted` recomputes lazily, so the transitions scale with the kinds of move, not the list length.
 
 ## Adding a loader: `compose` instead of nesting
 
 If the combobox also has an async loader (`idle → loading → loaded → error`), don't fold it into the popup machine:
 
 ```ts
-// 2 + 4 = 6 nodes total — additive, not multiplicative
+// 2 + 4 = 6 nodes total, additive, not multiplicative
 const combobox = compose({ popup: popupMachine, loader: loaderMachine })
 ```
 
@@ -58,10 +58,10 @@ When the view wants to ask "is the list visible?" across several states, tag the
 
 ```ts
 states: {
-  idle: {},
-  open: { tags: ['expanded'] },
+  idle:      {},
+  open:      { tags: ['expanded'] },
   filtering: { tags: ['expanded'] },
 }
 
-m.hasTag('expanded') // true in 'open' or 'filtering' — one query, no OR-chain
+m.hasTag('expanded')  // true in 'open' or 'filtering'; one query, no OR-chain
 ```

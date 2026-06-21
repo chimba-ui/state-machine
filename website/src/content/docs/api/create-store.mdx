@@ -3,7 +3,7 @@ title: Store
 description: Singleton reactive state outside any one machine.
 ---
 
-Context lives _inside_ a machine. Some state belongs _outside_ any one machine — shared across instances. `createStore` is a tiny reactive cell for exactly that: a plain value plus a listener set.
+Context lives _inside_ a machine. Some state belongs _outside_ any one machine, shared across instances. `createStore` is a tiny reactive cell for exactly that: a plain value plus a listener set.
 
 ```ts
 import { createStore } from '@dunky.dev/state-machine'
@@ -17,7 +17,7 @@ const off = store.subscribe(s => console.log(s.count))
 off() // unsubscribe
 ```
 
-No-op writes don't notify — `set` compares the incoming patch against current values and skips unchanged fields.
+No-op writes don't notify: `set` compares the incoming patch against current values and skips unchanged fields.
 
 ## Domain methods
 

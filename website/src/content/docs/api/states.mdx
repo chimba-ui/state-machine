@@ -62,7 +62,7 @@ m.matches('open') // exact-state check
 
 ## Run-to-completion
 
-Events are queued. If an action sends another event, it waits until the current transition fully settles — no re-entrancy:
+Events are queued. If an action sends another event, it waits until the current transition fully settles. No re-entrancy:
 
 ```ts
 states: {
@@ -81,4 +81,4 @@ states: {
 
 ## Flat states
 
-States here are flat — no nesting, no parallel regions inside a single machine. When a component has two independent axes of state, compose two peer machines. See [Peer machines](/api/compose) and [States](/api/flat-states).
+States here are flat: no nesting, no parallel regions inside a single machine. When a component has two independent axes of state, compose two peer machines. See [Peer machines](/api/compose) and [States](/api/flat-states).

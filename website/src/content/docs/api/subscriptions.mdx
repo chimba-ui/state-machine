@@ -5,7 +5,7 @@ description: Observe machine changes from outside.
 
 Two ways to observe a machine from the outside: coarse `subscribe` for any change, fine-grained `select` for a specific slice.
 
-## `subscribe` — coarse
+## `subscribe`, coarse
 
 Fires on any state or context change. The standard bridge for `useSyncExternalStore`:
 
@@ -14,12 +14,12 @@ const off = m.subscribe(() => rerender())
 off() // unsubscribe
 ```
 
-## `select` — fine-grained
+## `select`, fine-grained
 
 Narrows to a slice and fires **only when that slice's value changes**. A subscriber wakes only for the data it reads:
 
 ```ts
-// named field — typed and autocompleted
+// named field: typed and autocompleted
 m.select.context('count').subscribe(n => console.log('count is now', n))
 m.select.computed('isEmpty').subscribe(empty => toggle(empty))
 m.select.state().subscribe(s => console.log('state →', s))
@@ -33,7 +33,7 @@ const view = m.select(() => ({
   count: m.context.count,
 }))
 
-// optional equality — skip re-renders when neither field changed
+// optional equality: skip re-renders when neither field changed
 view.subscribe(render, (a, b) => a.open === b.open && a.count === b.count)
 
 view.value // read the current value without subscribing
@@ -41,7 +41,7 @@ view.value // read the current value without subscribing
 
 ## Selection identity
 
-A `select` re-evaluates on any machine change but only calls its listeners when the selected value actually changes. This makes it safe to use directly in React's `useSyncExternalStore` — no infinite-loop risk from returning a fresh object on every call.
+A `select` re-evaluates on any machine change but only calls its listeners when the selected value actually changes. This makes it safe to use directly in React's `useSyncExternalStore`, with no infinite-loop risk from returning a fresh object on every call.
 
 ```ts
 // React bridge pattern

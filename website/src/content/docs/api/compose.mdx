@@ -3,7 +3,7 @@ title: Peer machines
 description: Run multiple machines as one unit.
 ---
 
-When a component has two independent axes of state — say a popup that's open/closed _and_ a submenu that's shown/hidden — each axis is its own machine. `compose` runs them as one unit (orthogonal regions, without nesting):
+When a component has two independent axes of state (say a popup that's open/closed _and_ a submenu that's shown/hidden), each axis is its own machine. `compose` runs them as one unit (orthogonal regions, without nesting):
 
 ```ts
 import { machine, compose } from '@dunky.dev/state-machine'
@@ -20,14 +20,14 @@ const combobox = compose({ popup, submenu })
 combobox.start() // starts every member
 combobox.stop() // stops all + disposes sync and combine
 
-// members stay independent — drive and read each directly
+// members stay independent: drive and read each directly
 popup.send({ type: 'focus' })
 submenu.send({ type: 'open' })
 ```
 
-## `sync` — cross-region coordination
+## `sync` for cross-region coordination
 
-React when any member changes. Coarse — it wakes on any change to any member; read what you need inside:
+React when any member changes. It's coarse: it wakes on any change to any member, and you read what you need inside:
 
 ```ts
 combobox.sync(() => {
@@ -35,7 +35,7 @@ combobox.sync(() => {
 })
 ```
 
-## `combine` — unified selection
+## `combine` for unified selection
 
 Derive one value across members. Re-evaluates on any member change; fires only when the combined value changes:
 
@@ -63,6 +63,6 @@ const combobox = compose({ popup, loader })
 
 ## vs. true parallel states
 
-Members are independent peers — a `send` goes to one member, not broadcast. Cross-region behavior is expressed explicitly via `sync`. That's the deliberate trade: simpler than nested/parallel statecharts, at the cost of a shared event bus.
+Members are independent peers: a `send` goes to one member, not broadcast. Cross-region behavior is expressed explicitly via `sync`. That's the deliberate trade: simpler than nested/parallel statecharts, at the cost of a shared event bus.
 
 See [States](/api/flat-states) for the full decision guide on when to use `computed`, `compose`, or `tags`.

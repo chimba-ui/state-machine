@@ -23,9 +23,9 @@ const m = machine({
 })
 ```
 
-## `act()` — write-sugar
+## `act()` write-sugar
 
-`act()` is shorthand for a context-writing action — drops the `$ => $.setContext(...)` wrapper. Takes one or many patches (applied in order; a later patch function sees earlier writes):
+`act()` is shorthand for a context-writing action. It drops the `$ => $.setContext(...)` wrapper, and takes one or many patches (applied in order; a later patch function sees earlier writes):
 
 ```ts
 import { act } from '@dunky.dev/state-machine'
@@ -38,7 +38,7 @@ on: {
 
 ## `entry` / `exit`
 
-Run actions whenever a state is entered or left — regardless of which transition triggered it:
+Run actions whenever a state is entered or left, regardless of which transition triggered it:
 
 ```ts
 states: {
@@ -51,7 +51,7 @@ states: {
 }
 ```
 
-## `oneOf()` — conditional actions
+## `oneOf()` conditional actions
 
 Pick one branch of actions by guard. First passing branch wins; a guardless branch is the fallback:
 
