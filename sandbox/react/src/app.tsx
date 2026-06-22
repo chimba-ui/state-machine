@@ -12,7 +12,13 @@ export function App() {
         One state machine drives this ⌘K palette. The same machine + connect runs the terminal
         (OpenTUI) and React Native versions — only the renderer differs.
       </p>
-      <CommandPalette commands={DEMO_COMMANDS} onSelect={c => setLast(c.label)} />
+      <CommandPalette
+        commands={DEMO_COMMANDS}
+        onSelect={c => {
+          setLast(c.label)
+          window.alert(`Selected: ${c.label}`)
+        }}
+      />
       <p style={styles.hint}>
         Press <kbd style={styles.kbd}>⌘K</kbd> · last selected · <strong>{last}</strong>
       </p>

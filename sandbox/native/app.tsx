@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Alert, StyleSheet, Text, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { DEMO_COMMANDS } from '@sandbox/cmdk-core'
 import { CommandPalette } from './command-palette'
@@ -14,7 +14,13 @@ export default function App() {
       <Text style={styles.lead}>
         The same state machine as the DOM and terminal demos. Only the renderer differs.
       </Text>
-      <CommandPalette commands={DEMO_COMMANDS} onSelect={c => setLast(c.label)} />
+      <CommandPalette
+        commands={DEMO_COMMANDS}
+        onSelect={c => {
+          setLast(c.label)
+          Alert.alert('Selected', c.label)
+        }}
+      />
       <Text style={styles.hint}>last selected · {last}</Text>
     </View>
   )
