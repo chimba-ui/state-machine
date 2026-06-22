@@ -32,6 +32,10 @@
   "scripts": {
     "build": "tsdown"
   },
+  "dependencies": {
+    "@dunky.dev/state-machine": "workspace:^",
+    "@dunky.dev/state-machine-utils": "workspace:^"
+  },
   "devDependencies": {
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.2.15",
@@ -41,8 +45,6 @@
     "react-dom": "^19.2.6"
   },
   "peerDependencies": {
-    "@dunky.dev/state-machine": "workspace:^",
-    "@dunky.dev/state-machine-utils": "workspace:^",
     "react": "*"
   }
 }

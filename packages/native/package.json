@@ -32,10 +32,12 @@
   "scripts": {
     "build": "tsdown"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@dunky.dev/react-state-machine": "workspace:^",
     "@dunky.dev/state-machine": "workspace:^",
-    "@dunky.dev/state-machine-utils": "workspace:^",
+    "@dunky.dev/state-machine-utils": "workspace:^"
+  },
+  "peerDependencies": {
     "react": "*",
     "react-native": "*"
   }
