@@ -1,5 +1,5 @@
 ---
-"benchmark": minor
+'benchmark': minor
 ---
 
 Document the current benchmark methodology.

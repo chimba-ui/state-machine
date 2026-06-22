@@ -1,5 +1,5 @@
 ---
-"benchmark-demo": minor
+'benchmark-demo': minor
 ---
 
 Document the current live-demo methodology.
