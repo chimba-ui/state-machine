@@ -56,11 +56,10 @@ export function CommandPalette(props: CommandPaletteProps) {
   })
 
   if (!api.open) {
-    return (
-      <box style={{ padding: 1 }}>
-        <text fg='#8990a0'>Press Ctrl+K to open the command palette…</text>
-      </box>
-    )
+    // A bare <text> (no wrapping box) so the parent column centers it exactly like
+    // the title and lead. A wrapping <box> stretches to fill the row width and
+    // left-aligns its child, which is what pushed the hint off-center.
+    return <text>Press Ctrl+K to open the command palette…</text>
   }
 
   const rootProps = normalize(api.parts.root)
@@ -70,7 +69,6 @@ export function CommandPalette(props: CommandPaletteProps) {
     <box
       style={{
         border: true,
-        borderColor: '#5b73ff',
         padding: 1,
         width: 56,
         flexDirection: 'column',
@@ -99,8 +97,8 @@ export function CommandPalette(props: CommandPaletteProps) {
                 paddingRight: 1,
               }}
             >
-              <text fg={selected ? '#ffffff' : '#cdd2e0'}>{command.label}</text>
-              {command.hint && <text fg={selected ? '#c7ccff' : '#8990a0'}>{command.hint}</text>}
+              <text>{command.label}</text>
+              {command.hint && <text>{command.hint}</text>}
             </box>
           )
         })}
