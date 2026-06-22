@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useKeyboard } from '@opentui/react'
 // The opentui package is framework-agnostic — it ships only the prop translator.
 // The lifecycle hook comes from the React binding (OpenTUI renders via a React
@@ -19,13 +18,9 @@ import {
 export function CommandPalette(props: CommandPaletteProps) {
   const { api, machine } = useMachine(commandPaletteMachineConfig, connectCommandPalette, [], props)
 
-  // A terminal command palette IS the app — there's no page behind it — so it
-  // opens on launch. (And ⌘K can't be used here: macOS/Ghostty don't forward Cmd
-  // to the program — Cmd is an app/OS modifier — so terminal palettes use Ctrl+K,
-  // exactly like fzf / lazygit.)
-  useEffect(() => {
-    machine.send({ type: 'open' })
-  }, [machine])
+  // Starts closed — press Ctrl+K to open. (⌘K can't be used in a terminal:
+  // macOS/Ghostty don't forward Cmd to the program — Cmd is an app/OS modifier —
+  // so terminal palettes use Ctrl+K, exactly like fzf / lazygit.)
 
   // Terminal key handling is global (no per-element focus model like the DOM), so
   // navigation goes through useKeyboard → the same logical `move`/`execute`/`close`
