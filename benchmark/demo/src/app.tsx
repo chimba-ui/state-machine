@@ -258,7 +258,7 @@ export function App() {
             minWidth: 90,
           }}
         >
-          {running ? 'Stop' : 'Start'}
+          ⏹️ {running ? 'Stop' : 'Start'}
         </button>
 
         <button
@@ -270,13 +270,13 @@ export function App() {
             fontWeight: 600,
             cursor: running ? 'default' : 'pointer',
             borderRadius: 6,
-            border: '1px solid #30363d',
-            background: 'transparent',
-            color: '#e6edf3',
+            border: 'none',
+            background: '#1f6feb',
+            color: 'white',
             opacity: running ? 0.4 : 1,
           }}
         >
-          30s test
+          ⏱️ 30s test
         </button>
 
         <label style={{ fontSize: 13 }}>
