@@ -129,12 +129,12 @@ importers:
       '@dunky.dev/react-state-machine':
         specifier: workspace:^
         version: link:../react
-      '@dunky.dev/shared-state-machine':
-        specifier: workspace:^
-        version: link:../shared/utils
       '@dunky.dev/state-machine':
         specifier: workspace:^
         version: link:../core
+      '@dunky.dev/state-machine-utils':
+        specifier: workspace:^
+        version: link:../shared/utils
       react:
         specifier: '*'
         version: 19.2.6
@@ -144,12 +144,12 @@ importers:
 
   packages/react:
     dependencies:
-      '@dunky.dev/shared-state-machine':
-        specifier: workspace:^
-        version: link:../shared/utils
       '@dunky.dev/state-machine':
         specifier: workspace:^
         version: link:../core
+      '@dunky.dev/state-machine-utils':
+        specifier: workspace:^
+        version: link:../shared/utils
     devDependencies:
       '@testing-library/react':
         specifier: ^16.1.0
