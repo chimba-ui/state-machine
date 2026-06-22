@@ -1,6 +1,7 @@
 {
   "name": "@dunky.dev/shared-state-machine",
   "version": "0.0.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dunky-dev/state-machine.git",

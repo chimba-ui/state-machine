@@ -116,3 +116,7 @@ The engine here is an independent implementation — its own kernel, its own
 state-machine runtime — built around one bet those libraries aren't: that behavior
 should run with **no environment assumption at all**, fast enough to drive
 thousands of machines at once.
+
+## License
+
+[MIT](./LICENSE) © Ivan Banov
