@@ -6,7 +6,16 @@ export function App() {
   const [last, setLast] = useState('—')
 
   return (
-    <box style={{ flexDirection: 'column', alignItems: 'center', padding: 1, gap: 1 }}>
+    <box
+      style={{
+        flexGrow: 1,
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 1,
+        gap: 1,
+      }}
+    >
       {/* No hardcoded fg colors anywhere — text inherits the terminal's default
           foreground, so the demo reads correctly in both light and dark themes.
           Emphasis comes from bold (attributes={1}), and the one accent uses a
