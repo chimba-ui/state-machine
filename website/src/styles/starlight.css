@@ -30,3 +30,14 @@
   font-weight: 700;
   letter-spacing: -0.01em;
 }
+
+/* External links (target="_blank") get a trailing ↗ so it's clear they leave
+ * the site. The glyph is non-selectable and inherits the link color. */
+.sl-markdown-content a[target='_blank']::after {
+  content: '\2197'; /* ↗ */
+  display: inline-block;
+  margin-inline-start: 0.15em;
+  font-size: 0.85em;
+  line-height: 1;
+  user-select: none;
+}
