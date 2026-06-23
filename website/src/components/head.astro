@@ -4,7 +4,9 @@
 // mounts <Analytics /> directly in index.astro).
 import Default from '@astrojs/starlight/components/Head.astro'
 import Analytics from '@vercel/analytics/astro'
+import SpeedInsights from '@vercel/speed-insights/astro'
 ---
 
 <Default><slot /></Default>
 <Analytics />
+<SpeedInsights />

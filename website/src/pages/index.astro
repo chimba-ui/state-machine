@@ -2,6 +2,7 @@
 import Header from "../components/header.astro";
 import Footer from "../components/footer.astro";
 import Analytics from "@vercel/analytics/astro";
+import SpeedInsights from "@vercel/speed-insights/astro";
 import "../styles/global.css";
 import { Code } from "@astrojs/starlight/components";
 import pacmanSrc from "../snippets/pacman.code.ts?raw";
@@ -766,6 +767,7 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
     <Footer />
 
     <Analytics />
+    <SpeedInsights />
 
     <script>
       import {
