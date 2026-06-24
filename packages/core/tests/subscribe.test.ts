@@ -308,6 +308,72 @@ describe('select.context / .computed / .state — named scopes', () => {
   })
 })
 
+// The `select` builder is memoized per machine (built once, cached): it closes
+// only over the machine, whose identity never changes, so re-deriving it — and
+// its three scope methods — on every read was pure garbage. These pin the
+// observable contract (stable identity) AND prove the memo + the shared bound
+// bus mutators didn't break per-selection independence.
+describe('select — memoized builder', () => {
+  const counter = () =>
+    machine<'idle', { a: number; b: number }, { type: 'bumpA' | 'bumpB' }>({
+      initial: 'idle',
+      context: { a: 0, b: 0 },
+      states: {
+        idle: {
+          on: {
+            bumpA: { actions: [({ context, setContext }) => setContext({ a: context.a + 1 })] },
+            bumpB: { actions: [({ context, setContext }) => setContext({ b: context.b + 1 })] },
+          },
+        },
+      },
+    })
+
+  it('returns the same builder object across reads', () => {
+    const m = counter()
+    expect(m.select).toBe(m.select)
+  })
+
+  it('the named scope methods keep a stable identity across reads', () => {
+    const m = counter()
+    expect(m.select.context).toBe(m.select.context)
+    expect(m.select.computed).toBe(m.select.computed)
+    expect(m.select.state).toBe(m.select.state)
+  })
+
+  it('distinct machines get distinct builders (no cross-instance sharing)', () => {
+    const a = counter()
+    const b = counter()
+    expect(a.select).not.toBe(b.select)
+  })
+
+  it('two selections off the cached builder fire independently and dedup per-field', () => {
+    const m = counter()
+    const aFn = vi.fn()
+    const bFn = vi.fn()
+    m.select.context('a').subscribe(aFn)
+    m.select.context('b').subscribe(bFn)
+    m.send({ type: 'bumpA' }) // only `a` changed
+    expect(aFn).toHaveBeenCalledTimes(1)
+    expect(bFn).not.toHaveBeenCalled() // shared bound add/remove must not cross-wire
+    m.send({ type: 'bumpB' }) // only `b` changed
+    expect(aFn).toHaveBeenCalledTimes(1)
+    expect(bFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('unsubscribing one selection leaves the other live (shared bus mutators)', () => {
+    const m = counter()
+    const aFn = vi.fn()
+    const bFn = vi.fn()
+    const offA = m.select.context('a').subscribe(aFn)
+    m.select.context('b').subscribe(bFn)
+    offA() // remove only A's listener via the shared boundBusDelete
+    m.send({ type: 'bumpA' })
+    expect(aFn).not.toHaveBeenCalled() // A is gone
+    m.send({ type: 'bumpB' })
+    expect(bFn).toHaveBeenCalledTimes(1) // B unaffected
+  })
+})
+
 // The bus iterates a stable snapshot with a live-membership check: a listener
 // ADDED mid-notify first fires on the next pass; a listener REMOVED mid-notify
 // is skipped immediately (unsubscribe takes effect at once).

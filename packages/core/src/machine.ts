@@ -85,6 +85,16 @@ class MachineClass<
   send: (event: Event) => void
   // live params + named registries that runAction(s) read (built once in the ctor)
   actionHost: ActionHost<Context, Event, Computed>
+  // The `select` builder is built once, lazily, and cached: it closes only over
+  // `this` (identity permanent), so re-deriving it — plus its three scope methods
+  // — on every `.select` access was pure garbage. A leaf list calls
+  // `machine.select(...)` once per row on mount, so the per-access allocation hit
+  // the engine's hottest integration path; this makes repeated reads free.
+  selectBuilder: Select<State, Context, Computed> | null = null
+  // Stable bound bus mutators, shared by every Selection built off this machine
+  // (makeSelection used to `.bind` a fresh pair per selection).
+  boundBusAdd: (l: () => void) => void
+  boundBusDelete: (l: () => void) => void
 
   constructor(config: TransitionConfig<State, Context, Event, Computed>) {
     this.config = config
@@ -137,6 +147,9 @@ class MachineClass<
       this.bump()
     }
     this.send = event => this.doSend(event)
+    // Bind once; every Selection reuses these instead of binding a fresh pair.
+    this.boundBusAdd = this.busAdd.bind(this)
+    this.boundBusDelete = this.busDelete.bind(this)
   }
 
   // ---- kernel notify ----
@@ -438,8 +451,8 @@ class MachineClass<
   // listener only when the selected value changes (Object.is default / equals).
   // `value` is a plain eval. No fire on subscribe.
   private makeSelection<Value>(selector: () => Value): Selection<Value> {
-    const add = this.busAdd.bind(this)
-    const remove = this.busDelete.bind(this)
+    const add = this.boundBusAdd
+    const remove = this.boundBusDelete
     return {
       get value() {
         return selector()
@@ -458,6 +471,7 @@ class MachineClass<
     }
   }
   get select(): Select<State, Context, Computed> {
+    if (this.selectBuilder) return this.selectBuilder
     const sel = (<Value>(selector: () => Value) => this.makeSelection(selector)) as Select<
       State,
       Context,
@@ -467,7 +481,7 @@ class MachineClass<
     sel.computed = <K extends keyof Computed>(key: K) =>
       this.makeSelection(() => this.computed[key])
     sel.state = () => this.makeSelection(() => this.stateValue)
-    return sel
+    return (this.selectBuilder = sel)
   }
 }
 
