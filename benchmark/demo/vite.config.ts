@@ -3,8 +3,9 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
 
 export default defineConfig({
-  // On GitHub Pages the site is served from /state-machine/; locally it's /.
-  // The deploy workflow sets BASE_PATH=/state-machine/ for the Pages build.
+  // Locally served from /; in prod the deploy workflow sets BASE_PATH to
+  // /state-machine/benchmark/ so assets match the dunky.dev rewrite path
+  // (see deploy-benchmark.yml and website/vercel.json).
   base: process.env.BASE_PATH ?? '/',
   plugins: [react()],
   resolve: {

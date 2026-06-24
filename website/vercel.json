@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [{ "source": "/", "destination": "/state-machine", "permanent": false }],
   "rewrites": [
+    { "source": "/state-machine/benchmark", "destination": "https://dunky-dev.github.io/state-machine/benchmark/" },
+    { "source": "/state-machine/benchmark/", "destination": "https://dunky-dev.github.io/state-machine/benchmark/" },
+    { "source": "/state-machine/benchmark/:path*", "destination": "https://dunky-dev.github.io/state-machine/benchmark/:path*" },
     { "source": "/state-machine", "destination": "/index.html" },
     { "source": "/state-machine/", "destination": "/index.html" },
     { "source": "/state-machine/:path*", "destination": "/:path*" }

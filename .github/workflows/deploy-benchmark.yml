@@ -34,10 +34,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build demo
-        # base must match the repo name so asset URLs resolve under
-        # https://dunky-dev.github.io/state-machine/
+        # GitHub Pages hosts the demo, but it's surfaced to users via a Vercel
+        # rewrite at dunky.dev/state-machine/benchmark (see website/vercel.json),
+        # so assets must resolve under that same path.
         env:
-          BASE_PATH: /state-machine/
+          BASE_PATH: /state-machine/benchmark/
         run: pnpm -C benchmark/demo build
 
       - uses: actions/configure-pages@v5
