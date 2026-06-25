@@ -36,13 +36,48 @@ the layered model:
 
 ## Workflow
 
-Before merging, walk this checklist:
+### Where does the code go?
 
-1. **Do tests reflect the change?** Behavior added or changed in `core/`
-   or a target must be exercised by a test under the package's `tests/`.
-2. **Did `core/` change?** Verify the change is substrate-agnostic. If
-   it depends on a React lifecycle, a DOM API, or an RN-only module,
-   move it to `packages/<target>/`.
+Three package groups, three jobs — never cross the lines:
+
+- **`packages/core/`** — agnostic behavior only. Pure TypeScript, no renderer,
+  no DOM, no `window`. States, transitions, guards, actions, effects, connector,
+  compose. If it touches a platform API, it belongs in a target.
+- **`packages/shared/`** — cross-target, cross-component helpers (mergeProps,
+  composeHandlers, positioning, memo). No machine logic, no runtime.
+- **`packages/<target>/`** (`react`, `native`, …) — one package per substrate.
+  Owns the lifecycle bridge (`useMachine`), the props translator (`normalize`),
+  and platform effects (`ComponentEffect`s). Nothing here reimplements state.
+
+### The machine never sees props
+
+Props enter only at the **edge** — the connector / connect function — never
+inside the machine config:
+
+- **Config the machine needs** (delays, flags) → seed into `context` once, update
+  via `setContext` when props change.
+- **Callbacks and controlled state** (`onOpenChange`, controlled `open`) → handled
+  by the connector; it observes the machine and calls back via reactions.
+- **Initial state from props** → computed before `machine()` is built.
+
+Breaking this rule couples the machine to one runtime. The same config must run
+byte-for-byte identically on React, React Native, a canvas loop, or a test.
+
+### Where does a side-effect go?
+
+Ask one question: does it need props or a platform API?
+
+- **No** → core config effect. Register it in `setup({ effects })`, name it on a
+  state. Scoped to that state, auto-cleaned on exit.
+- **Yes** → `ComponentEffect` in the target package. A plain
+  `(machine, props) => cleanup` tuple with the prop names it reads. On trigger,
+  it `send()`s a plain event the machine already understands.
+
+### Before merging
+
+1. New or changed behavior in `core/` must have a test in that package's `tests/`.
+2. Check the change is substrate-agnostic — no React lifecycle, no DOM API, no
+   RN-only import inside `packages/core/`.
 
 ## Diagrams in docs
 
@@ -54,6 +89,27 @@ box-drawing glyphs render inconsistently across fonts, terminals, and
 GitHub, and are awkward to edit; the ASCII set is portable and diffs
 cleanly. This applies to every `.md` in the repo (README, ARCHITECTURE,
 package READMEs).
+
+## Code
+
+### Performance
+
+- **Performance is a constraint, not a feature.** Prefer mutation over allocation on hot paths.
+  Avoid spreading objects, chaining array methods, or allocating closures inside loops.
+- **Descriptive names everywhere.** Short names are fine for
+  local variables with a tight, obvious scope.
+- **Comments.** If the code says what it does, the comment is
+  noise. Write comments to explain _why_: a hidden constraint, a subtle invariant, a
+  workaround, a hard decision. Keep them short, avoid over explaining to avoid noise.
+
+### Testing
+
+- **No overlapping tests.** Each test covers one distinct behavior. Do not write a test that
+  is already an implicit consequence of another test passing.
+- **Shared setup goes at the top of the file.** If multiple tests need the same machine config
+  or helper, define it once at the top — not inside each `it()`.
+- **Reusable multi-file fixtures go in `tests/fixtures/`.** Anything shared across test files
+  lives there, not inlined or duplicated.
 
 ## Benchmark
 

@@ -36,7 +36,7 @@ describe('inline guards', () => {
         idle: {
           on: {
             add: {
-              guard: ({ event }) => event.by > 0, // only positive additions
+              guard: ({ event }) => event.by > 0,
               actions: [
                 ({ context, setContext, event }) => setContext({ n: context.n + event.by }),
               ],
@@ -129,11 +129,12 @@ describe('named guards', () => {
 })
 
 describe('combinators — and / or / not', () => {
-  it('and(): true only when every sub-guard passes (names)', () => {
+  // shared machine: context.a and context.b, both guarded by named guards isA/isB
+  const makeAB = (a: boolean, b: boolean) => {
     let ran = false
     const m = machine<'idle', { a: boolean; b: boolean }, { type: 'go' }>({
       initial: 'idle',
-      context: { a: true, b: true },
+      context: { a, b },
       states: {
         idle: { on: { go: { guard: and('isA', 'isB'), actions: [() => (ran = true)] } } },
       },
@@ -141,27 +142,20 @@ describe('combinators — and / or / not', () => {
         guards: { isA: ({ context }) => context.a, isB: ({ context }) => context.b },
       },
     })
+    return { m, ran: () => ran }
+  }
+
+  it('and(): passes only when every sub-guard passes', () => {
+    const { m, ran } = makeAB(true, true)
     m.send({ type: 'go' })
-    expect(ran).toBe(true)
+    expect(ran()).toBe(true)
+
+    const { m: m2, ran: ran2 } = makeAB(true, false)
+    m2.send({ type: 'go' })
+    expect(ran2()).toBe(false)
   })
 
-  it('and(): blocks when one sub-guard fails', () => {
-    let ran = false
-    const m = machine<'idle', { a: boolean; b: boolean }, { type: 'go' }>({
-      initial: 'idle',
-      context: { a: true, b: false },
-      states: {
-        idle: { on: { go: { guard: and('isA', 'isB'), actions: [() => (ran = true)] } } },
-      },
-      implementations: {
-        guards: { isA: ({ context }) => context.a, isB: ({ context }) => context.b },
-      },
-    })
-    m.send({ type: 'go' })
-    expect(ran).toBe(false)
-  })
-
-  it('or(): true when any passes; not(): negates; mixed names + inline fns', () => {
+  it('or(): passes when any sub-guard passes; not(): negates; names and inline fns mix', () => {
     let ran = false
     const m = machine<'idle', { locked: boolean }, { type: 'go'; force?: boolean }>({
       initial: 'idle',
@@ -181,30 +175,6 @@ describe('combinators — and / or / not', () => {
     m.send({ type: 'go' }) // locked, no force → blocked
     expect(ran).toBe(false)
     m.send({ type: 'go', force: true }) // force → or passes → runs
-    expect(ran).toBe(true)
-  })
-
-  it('combinators accept inline functions too (not just names)', () => {
-    let ran = false
-    const isPos = ({ context }: { context: { n: number } }) => context.n > 0
-    const m = machine<'idle', { n: number }, { type: 'go' }>({
-      initial: 'idle',
-      context: { n: 5 },
-      states: {
-        idle: {
-          on: {
-            go: {
-              guard: and(
-                isPos,
-                not(({ context }) => context.n > 100),
-              ),
-              actions: [() => (ran = true)],
-            },
-          },
-        },
-      },
-    })
-    m.send({ type: 'go' }) // n=5: >0 AND not(>100) → true
     expect(ran).toBe(true)
   })
 
@@ -231,7 +201,7 @@ describe('combinators — and / or / not', () => {
         },
       },
     })
-    // x=2: or(isTwo,isThree)=true; and(isTwo,isOdd)=false; not(false)=true → true
+    // x=2: or(isTwo,isThree)=true; and(isTwo,isOdd)=false; not(false)=true → runs
     m.send({ type: 'go' })
     expect(ran).toBe(true)
   })
