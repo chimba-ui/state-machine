@@ -55,6 +55,13 @@ GitHub, and are awkward to edit; the ASCII set is portable and diffs
 cleanly. This applies to every `.md` in the repo (README, ARCHITECTURE,
 package READMEs).
 
+## Benchmark
+
+When the user asks to run the benchmark, check performance, or run perf
+tests, invoke the `/benchmark` skill. Do not run the benchmark manually
+or interpret results without it — the skill handles execution, output
+formatting, and prompts before updating any documented result tables.
+
 ## Per-package guidance
 
 If a package needs rules of its own (build quirks, platform-only
