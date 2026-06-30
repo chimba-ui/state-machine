@@ -55,11 +55,11 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
            machines", releasing at the grid's end. On mobile it's one column,
            ordered copy → game → code. -->
       <div
-        class="grid grid-cols-1 items-start gap-10 lg:items-stretch lg:grid-cols-5 lg:gap-x-12 lg:gap-y-0"
+        class="relative z-10 grid grid-cols-1 items-start gap-10 xl:items-stretch xl:grid-cols-5 xl:gap-x-12 xl:gap-y-0"
       >
         <!-- the polished DX-lib copy column (top-left), fills the first screen -->
         <section
-          class="order-1 flex flex-col lg:justify-center lg:col-span-3 lg:col-start-1 lg:row-start-1"
+          class="order-1 flex flex-col xl:justify-center xl:col-span-3 xl:col-start-1 xl:row-start-1"
         >
           <!-- brand lockup: Dunky wordmark logo + STATE-MACHINE eyebrow. -->
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -144,7 +144,7 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
              edge while the text stays aligned with the rest of the left content.
              Three lined up on lg, stacked on mobile. -->
         <section
-          class="band-left order-2 mt-12 lg:mt-24 lg:col-span-3 lg:col-start-1 lg:row-start-2"
+          class="band-left order-2 mt-12 xl:mt-24 xl:col-span-3 xl:col-start-1 xl:row-start-2"
         >
           <div class="band-left-bg" aria-hidden="true"></div>
           <div class="relative py-16 sm:py-20">
@@ -191,7 +191,7 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
         <!-- FAST MACHINES: the machine configs behind the live demo. Left 60%
              (row 3) so the game slides down the right 40% past the snippets. -->
         <section
-          class="order-3 lg:col-span-3 lg:col-start-1 lg:row-start-3 mt-8 lg:mt-24"
+          class="order-3 xl:col-span-3 xl:col-start-1 xl:row-start-3 mt-8 xl:mt-24"
           aria-label="The Dunky machines behind the demo"
         >
           <div class="mb-8">
@@ -223,11 +223,11 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
              comes to rest in the SNES dock beside "One machine". On mobile it
              sits right after the hero copy (order-2). -->
         <div
-          class="hidden lg:block lg:col-span-2 lg:col-start-4 lg:row-span-3 lg:row-start-1 z-10 -mb-[275px]"
+          class="hidden xl:block xl:col-span-2 xl:col-start-4 xl:row-span-3 xl:row-start-1 z-10 -mb-[275px]"
         >
           <div
             id="hero-live"
-            class="relative md:ml-auto md:w-[362px] lg:sticky lg:top-30 lg:w-[465px] 2xl:w-[540px] min-[1800px]:w-[600px]"
+            class="relative md:ml-auto md:w-[362px] xl:sticky xl:top-30 xl:w-[465px] 2xl:w-[540px] min-[1800px]:w-[600px]"
           >
             <!-- the running game, dressed up as a game CASSETTE TAPE that slides
                  down and docks into the console near the frames below -->
@@ -365,7 +365,7 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
 
         <!-- MOBILE-ONLY live state table, sits here, after the "One machine" copy.
              On lg+ the cassette card handles this; hidden there. -->
-        <div class="mt-6 lg:hidden">
+        <div class="mt-6 xl:hidden">
           <table
             class="pac-table dark-card w-full font-mono text-[10px] border-none! bg-black!"
           >
@@ -412,7 +412,7 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
              under it. lg+ only. -->
           <div
             id="dock"
-            class="console ml-auto hidden lg:block lg:w-[465px] 2xl:w-[540px] min-[1800px]:w-[600px]"
+            class="console ml-auto hidden xl:block xl:w-[465px] 2xl:w-[540px] min-[1800px]:w-[600px]"
           >
             <span class="console-slot" aria-hidden="true"></span>
             <span class="console-label">
@@ -462,7 +462,7 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
                Nudged 50px right on lg for better centring in its column. -->
             <figure
               id="frame-phone"
-              class="frame flex flex-col items-center lg:translate-x-[50px]"
+              class="frame flex flex-col items-center xl:translate-x-[50px]"
             >
               <div class="iphone">
                 <span class="iphone-island" aria-hidden="true"></span>
@@ -482,7 +482,7 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
             <!-- TERMINAL -->
             <figure
               id="frame-terminal"
-              class="frame flex flex-col items-center"
+              class="frame flex flex-col items-center xl:translate-x-[28px] 2xl:translate-x-0"
             >
               <div class="terminal">
                 <div class="terminal-bar">
@@ -1010,7 +1010,7 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
       const FRAME_IDS = ["frame-laptop", "frame-phone", "frame-terminal"];
       // cables only make sense on lg+, where the connector and frames sit apart;
       // on mobile everything stacks, so we skip them.
-      const wideDock = matchMedia("(min-width: 1024px)");
+      const wideDock = matchMedia("(min-width: 1280px)");
 
       // a small plug rectangle centred on (x, y)
       const plug = (x: number, y: number) => {
@@ -1077,7 +1077,7 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
       // connector (a gap), held there with a translateY clamp. No activation;
       // the frames are always live. Negative gap parks it LOWER (onto the
       // console), move the stop point down a touch.
-      const PARK_GAP = -40; // px relative to the console top (− = lower/into it)
+      const PARK_GAP = 10; // px relative to the console top (− = lower/into it)
       const parkCassette = () => {
         if (!wideDock.matches) {
           heroLive.style.transform = "";
@@ -1256,11 +1256,11 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
         };
 
         // symbol strip, subscribe to each pair machine for fine-grained updates
-        const symPriceEls = [0, 1, 2].map(
-          (i) => document.getElementById(`sym-price-${i}`)!,
+        const symPriceEls = [0, 1, 2].map((i) =>
+          document.getElementById(`sym-price-${i}`)!,
         );
-        const symArrowEls = [0, 1, 2].map(
-          (i) => document.getElementById(`sym-arrow-${i}`)!,
+        const symArrowEls = [0, 1, 2].map((i) =>
+          document.getElementById(`sym-arrow-${i}`)!,
         );
 
         demo.pairs.forEach((m, i) => {
@@ -1853,6 +1853,8 @@ const shareOnX = `https://twitter.com/intent/tweet?text=${encodeURIComponent(sha
         user-select: none;
       }
       .frame .frame-tui {
+        display: flex;
+        flex-direction: column;
         --tui: 11px;
       }
       /* sized so the board fits each screen: laptop 350×270 → ~17px; terminal
